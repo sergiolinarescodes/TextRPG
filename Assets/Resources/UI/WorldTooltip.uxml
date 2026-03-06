@@ -1,0 +1,5 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:VisualElement name="tooltip-container" style="position: absolute; left: 50%; top: 50%; translate: -50% -50%; background-color: rgba(22, 33, 62, 0.95); border-top-left-radius: 16px; border-top-right-radius: 16px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; border-top-width: 2px; border-bottom-width: 2px; border-left-width: 2px; border-right-width: 2px; border-color: rgba(255, 255, 255, 0.15); padding: 12px 24px; overflow: visible;">
+        <ui:Label name="tooltip-text" text="Tooltip" style="font-size: 48px; -unity-font-style: bold; color: white; -unity-text-align: middle-center; white-space: nowrap; overflow: visible; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);"/>
+    </ui:VisualElement>
+</ui:UXML>

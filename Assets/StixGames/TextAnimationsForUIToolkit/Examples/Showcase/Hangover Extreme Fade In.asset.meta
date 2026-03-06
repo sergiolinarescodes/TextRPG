@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: cd2f902ed4be35c40b798205775b0487
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Hangover
+    Extreme Fade In.asset
+  uploadId: 809492

@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 5d70e97715124eeeb2d7ef2fefe7319b
+timeCreated: 1730387134
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Events/AnimatedTextAudioEmitter.cs
+  uploadId: 809492

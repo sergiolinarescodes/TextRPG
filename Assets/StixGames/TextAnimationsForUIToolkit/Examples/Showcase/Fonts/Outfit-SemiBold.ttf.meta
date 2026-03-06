@@ -1,0 +1,28 @@
+fileFormatVersion: 2
+guid: d1bf90d59b8f08949be351410cb69386
+TrueTypeFontImporter:
+  externalObjects: {}
+  serializedVersion: 4
+  fontSize: 16
+  forceTextureCase: -2
+  characterSpacing: 0
+  characterPadding: 1
+  includeFontData: 1
+  fontNames:
+  - Outfit
+  fallbackFontReferences: []
+  customCharacters: 
+  fontRenderingMode: 0
+  ascentCalculationMode: 1
+  useLegacyBoundsCalculation: 0
+  shouldRoundAdvanceValue: 1
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Fonts/Outfit-SemiBold.ttf
+  uploadId: 809492

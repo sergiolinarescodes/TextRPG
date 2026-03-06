@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 576420bba9de10e4d8c68171017dcdfd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Shiny.asset
+  uploadId: 809492

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 431a254e06194133ab59424e238d47f2, type: 3}
+  m_Name: Showcase Settings
+  m_EditorClassIdentifier: 
+  linkCursorTexture: {fileID: 2800000, guid: 6e29451f255243849884f55e4a0d60c8, type: 3}
+  linkCursorHotspot: {x: 8, y: 3}
+  customAnimations:
+  - {fileID: 11400000, guid: 09afa0cefc0e3114a94ad87c441b1557, type: 2}
+  - {fileID: 11400000, guid: cd2f902ed4be35c40b798205775b0487, type: 2}
+  - {fileID: 11400000, guid: 8dc57a41d63098549ab90767845df253, type: 2}
+  - {fileID: 11400000, guid: 6876522dc8aab114796e8f3156ecce15, type: 2}
+  - {fileID: 11400000, guid: 576420bba9de10e4d8c68171017dcdfd, type: 2}
+  styles:
+  - tag: angry
+    openingTag: <b><color="red"><shake>
+    closingTag: </shake></color></b>
+  enableTextAppearance: 1
+  baseAppearanceSpeed: 40
+  enableTextVanishing: 0
+  baseVanishingSpeed: 30
+  vanishingDelay: 1
+  pauseAfterComma: 0.2
+  pauseAfterPunctuation: 0.5
+  defaultAnimationSettings: {fileID: 0}
+  fallbackAnimationSettings: {fileID: 0}
+  appearanceEventTimeOffset: 0
+  maxFramerate: 60
+  enableAnimationDebugging: 0
+  debugAnimationTime: 0

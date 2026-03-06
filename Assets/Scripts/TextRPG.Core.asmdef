@@ -1,0 +1,21 @@
+{
+    "name": "TextRPG.Core",
+    "rootNamespace": "TextRPG",
+    "references": [
+        "Reflex",
+        "Unidad.Core.Runtime",
+        "Unidad.Scripting.Runtime",
+        "Unity.InputSystem",
+        "PrimeTween.Runtime",
+        "TextAnimationsForUIToolkit"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

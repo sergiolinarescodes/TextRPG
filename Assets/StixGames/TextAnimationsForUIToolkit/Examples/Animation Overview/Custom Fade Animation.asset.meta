@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 61f230f2766df3a45ab0e71c3fcc7ab7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation Overview/Custom
+    Fade Animation.asset
+  uploadId: 809492

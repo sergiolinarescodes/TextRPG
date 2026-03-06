@@ -1,0 +1,6 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Custom%20Events/UI/Custom%20Events.uss?fileID=7433441132597879392&amp;guid=656bb73badccb93489e8e2dc84dc154a&amp;type=3#Custom Events" />
+    <ui:VisualElement name="root" class="root" style="background-color: rgb(0, 0, 0);">
+        <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;speed=2&gt;Add &lt;wiggle a=0.2&gt;custom events&lt;/wiggle&gt; to your text like this: &lt;noparse&gt;&lt;event=&quot;event name&quot;&gt;&lt;/noparse&gt;&lt;/speed&gt;&#10;&lt;pause=0.5&gt;&#10;Let&apos;s see it in action:&lt;pause=0.5&gt; 1&lt;event=&quot;color&quot;&gt;, 2&lt;event=&quot;color&quot;&gt;, 3&lt;event=&quot;color&quot;&gt;. And... 4&lt;event=&quot;color&quot;&gt;." settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Custom%20Events/Custom%20Events%20Settings.asset?fileID=11400000&amp;guid=57a4de52fee286545a895a9d20c08245&amp;type=2#Custom Events Settings" name="event-text" class="text" />
+    </ui:VisualElement>
+</ui:UXML>

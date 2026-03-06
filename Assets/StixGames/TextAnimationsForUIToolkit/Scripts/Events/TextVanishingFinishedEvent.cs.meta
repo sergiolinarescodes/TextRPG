@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 96bc22dc3b2e4eb78ef2511a37a00405
+timeCreated: 1737634307
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Events/TextVanishingFinishedEvent.cs
+  uploadId: 809492

@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: d9c60bb008f244b79dba36b62806f272
+timeCreated: 1734164730
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/CustomAnimations/CustomFadeAnimation.cs
+  uploadId: 809492

@@ -1,0 +1,12 @@
+To get started, add an AnimatedLabel in UI builder. Optionally you can create a TextAnimationSettings scriptable object
+and assign it to your AnimatedLabel.
+
+You can animate your text by adding tags to it, for example "Welcome to Text <wave>Animations</wave> for UI Toolkit".
+
+For a more detailed guide, check out the documentation at https://docs.stixgames.com/text-animations
+Also don't forget to look at the example scenes to see how to use various features in action.
+
+If you have questions or problems using the asset, you can contact me via my contact page https://stixgames.com/contact/,
+or via email at support@stixgames.com
+
+And don't forget to join my discord for faster support or to share your creations: https://discord.gg/jvBFhQA

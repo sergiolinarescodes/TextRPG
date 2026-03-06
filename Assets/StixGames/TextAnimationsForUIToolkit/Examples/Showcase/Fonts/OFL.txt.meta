@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 13748d6bd671a2746893b7a52ece7d43
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Fonts/OFL.txt
+  uploadId: 809492

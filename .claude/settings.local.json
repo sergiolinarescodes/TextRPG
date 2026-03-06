@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(du:*)",
+      "Bash(gh auth:*)",
+      "Bash(where gh:*)",
+      "Bash(winget install:*)",
+      "Bash(export:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(mkdir:*)",
+      "Bash(python3:*)",
+      "Bash(node:*)",
+      "Bash(gh repo:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo:*)",
+      "Bash(tar:*)",
+      "Bash(\"/c/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Unity.exe\":*)",
+      "Bash(\"C:/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Unity.exe\":*)",
+      "Bash(\"C:/Users/kelns/repos/Experimental/Packages/com.unidad.core/Runtime/UI/WorldSpace/FloatingTextAnchor.cs.meta\":*)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(\"C:/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Data/Tools/netcorerun/netcorerun.exe\":*)",
+      "Bash(python:*)"
+    ]
+  }
+}

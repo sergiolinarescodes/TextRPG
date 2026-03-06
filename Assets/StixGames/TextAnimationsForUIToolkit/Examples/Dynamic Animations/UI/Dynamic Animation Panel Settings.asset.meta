@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: a98773cc84dcbea4980352a7c014e858
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Dynamic Animations/UI/Dynamic
+    Animation Panel Settings.asset
+  uploadId: 809492

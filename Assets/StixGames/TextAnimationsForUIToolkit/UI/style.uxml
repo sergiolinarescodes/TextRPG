@@ -1,0 +1,9 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/UI/text-animations-theme.uss?fileID=7433441132597879392&amp;guid=81801449bda7be64b901d9851f5e8413&amp;type=3#text-animations-theme" />
+    <ui:Foldout text="Foldout" name="foldout">
+        <ui:Label tabindex="-1" text="Invalid tag name. Only letters, numbers, underscores (_), and hypens (-) are allowed." display-tooltip-when-elided="true" name="tag-name-error" class="error-hint" />
+        <uie:PropertyField binding-path="tag" name="tag" style="margin-bottom: 3px;" />
+        <uie:PropertyField binding-path="openingTag" />
+        <uie:PropertyField binding-path="closingTag" />
+    </ui:Foldout>
+</ui:UXML>

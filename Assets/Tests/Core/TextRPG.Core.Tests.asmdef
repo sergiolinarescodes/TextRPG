@@ -1,0 +1,28 @@
+{
+    "name": "TextRPG.Core.Tests",
+    "rootNamespace": "TextRPG",
+    "references": [
+        "TextRPG.Core",
+        "Unidad.Core.Runtime",
+        "Unidad.Core.Tests",
+        "Unidad.Scripting.Runtime",
+        "Reflex",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

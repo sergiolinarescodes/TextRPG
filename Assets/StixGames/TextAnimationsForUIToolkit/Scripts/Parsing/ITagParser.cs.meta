@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 7ce0f5c118874c6da76aead5056bd4c3
+timeCreated: 1730968655
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Parsing/ITagParser.cs
+  uploadId: 809492

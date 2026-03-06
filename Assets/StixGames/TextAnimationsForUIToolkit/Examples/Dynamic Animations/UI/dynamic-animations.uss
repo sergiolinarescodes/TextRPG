@@ -1,0 +1,31 @@
+.dynamic-button {
+    background-color: rgb(197, 21, 0);
+    border-left-width: 0;
+    border-right-width: 0;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding-left: 24px;
+    padding-right: 24px;
+    padding-top: 24px;
+    padding-bottom: 24px;
+    -unity-font-style: normal;
+    color: rgb(255, 255, 255);
+    font-size: 48px;
+    transition-property: background-color;
+    transition-duration: 0.5s;
+    -unity-font-definition: url('project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Fonts/Outfit-SemiBold.ttf?fileID=12800000&guid=d1bf90d59b8f08949be351410cb69386&type=3#Outfit-SemiBold');
+}
+
+.dynamic-button:hover {
+    background-color: rgb(255, 15, 0);
+}
+
+.dynamic-button:active {
+    background-color: rgb(255, 125, 0);
+    transition-property: background-color;
+    transition-duration: 0s;
+}

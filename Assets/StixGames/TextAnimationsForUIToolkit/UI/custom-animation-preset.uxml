@@ -1,0 +1,28 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/UI/text-animations-theme.uss?fileID=7433441132597879392&amp;guid=81801449bda7be64b901d9851f5e8413&amp;type=3#text-animations-theme" />
+    <ui:VisualElement name="general">
+        <ui:Label tabindex="-1" text="General" display-tooltip-when-elided="true" class="main-heading" />
+        <ui:Label tabindex="-1" text="Invalid tag name. Only letters, numbers, underscores (_), and hypens (-) are allowed." display-tooltip-when-elided="true" name="tag-name-error" class="error-hint" />
+        <uie:PropertyField binding-path="tag" name="tag" />
+        <uie:PropertyField binding-path="isTextAppearanceEffect" name="is-text-appearance" />
+        <uie:PropertyField binding-path="isTextVanishingEffect" name="is-text-vanishing" />
+        <uie:PropertyField binding-path="forceAnimateSpriteColor" name="force-animate-sprite-color" />
+    </ui:VisualElement>
+    <ui:VisualElement name="animation-settings">
+        <ui:Label tabindex="-1" text="Animation Settings" display-tooltip-when-elided="true" class="main-heading" />
+        <uie:PropertyField binding-path="defaultFrequency" name="default-frequency" />
+        <uie:PropertyField binding-path="defaultWaveSize" name="default-wave-size" />
+        <uie:PropertyField binding-path="defaultDuration" name="default-duration" />
+    </ui:VisualElement>
+    <ui:VisualElement name="properties">
+        <ui:Label tabindex="-1" text="Animated Properties" display-tooltip-when-elided="true" class="main-heading" />
+        <uie:PropertyField binding-path="translateX" />
+        <uie:PropertyField binding-path="translateY" />
+        <uie:PropertyField binding-path="rotation" />
+        <uie:PropertyField binding-path="scaleOffset" />
+        <ui:VisualElement style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); flex-direction: row;">
+            <ui:Toggle binding-path="animateColor" tooltip="Enable / Disable animating color" name="animate-color" style="margin-right: 3px; padding-left: 0; padding-right: 0; padding-top: 0; padding-bottom: 0; margin-top: 3px; margin-bottom: 3px;" />
+            <uie:PropertyField binding-path="color" name="color" style="flex-grow: 1;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

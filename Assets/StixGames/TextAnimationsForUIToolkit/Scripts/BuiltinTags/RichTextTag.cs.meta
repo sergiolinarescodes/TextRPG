@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 16af5bac0a084767aef48f146de24b77
+timeCreated: 1734009375
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/BuiltinTags/RichTextTag.cs
+  uploadId: 809492

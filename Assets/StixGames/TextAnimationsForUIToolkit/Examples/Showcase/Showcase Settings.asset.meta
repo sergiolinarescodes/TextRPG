@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 200c9dbb70fc7154b9a9ac64809e60fa
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Showcase
+    Settings.asset
+  uploadId: 809492

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: d2dc303a65a131241ba0e99781a2d7fe
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Dynamic Animations/Scripts/ButtonAmplitudeAnimator.cs
+  uploadId: 809492

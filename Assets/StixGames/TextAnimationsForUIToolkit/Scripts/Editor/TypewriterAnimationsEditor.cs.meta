@@ -1,0 +1,26 @@
+﻿fileFormatVersion: 2
+guid: c9f22c75deb140909c65d7a50f7606da
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - visualTree: {fileID: 9197481963319205126, guid: 6243e5f671121004ba047bf258c0a90c,
+      type: 3}
+  - lightModeStyle: {fileID: 7433441132597879392, guid: 5ba13afbe63c65549810be769c61b447,
+      type: 3}
+  - darkModeStyle: {fileID: 7433441132597879392, guid: 31562baa5e15f6f4291bb0ff762bf9fe,
+      type: 3}
+  - animationTree: {fileID: 9197481963319205126, guid: aeebee030264cb64f86a2af9bf475273,
+      type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Editor/TypewriterAnimationsEditor.cs
+  uploadId: 809492

@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 4d0620501ea3e334fb68f252cd08ad81
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation Overview/UI/Animation
+    Overview Panel Settings.asset
+  uploadId: 809492

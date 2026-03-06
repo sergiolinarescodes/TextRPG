@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: c69ca06d256f62843ac0ee03861cc43f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Custom Events/UI/Custom
+    Events Panel Settings.asset
+  uploadId: 809492

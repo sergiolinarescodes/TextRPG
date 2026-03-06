@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a8337725212168f41a98caf6d030cd4c
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Editor/UIToolkitTextAnimationsEditor.asmdef
+  uploadId: 809492

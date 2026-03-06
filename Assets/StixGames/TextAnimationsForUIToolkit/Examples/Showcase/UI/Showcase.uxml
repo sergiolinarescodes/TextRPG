@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/UI/Showcase.uss?fileID=7433441132597879392&amp;guid=5e4ae72405e136d4c8c80a4966d3987b&amp;type=3#Showcase" />
+    <ui:VisualElement style="flex-grow: 1; background-color: rgba(0, 0, 0, 0); -unity-font-definition: url(&apos;project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Fonts/Outfit-SemiBold.ttf?fileID=12800000&amp;guid=d1bf90d59b8f08949be351410cb69386&amp;type=3#Outfit-SemiBold&apos;);">
+        <ui:VisualElement name="info-parent" style="background-color: rgba(0, 0, 0, 0); align-items: center; justify-content: center; height: 80px;">
+            <ui:Label tabindex="-1" text="Click on the characters to start a dialogue" display-tooltip-when-elided="true" name="info" style="font-size: 32px;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="dialogue" class="dialogue" style="visibility: hidden;">
+            <TextAnimationsForUIToolkit.AnimatedLabel name="speech-bubble" text="Press play to start dialogues." settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Showcase%20Settings.asset?fileID=11400000&amp;guid=200c9dbb70fc7154b9a9ac64809e60fa&amp;type=2#Showcase Settings" class="speech-bubble" style="padding-top: 32px; padding-right: 32px; padding-bottom: 32px; padding-left: 32px; -unity-text-align: middle-center; white-space: normal; margin-bottom: 8px;" />
+            <ui:VisualElement name="button-parent" class="button-parent" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                <ui:Button name="next-button" text="Next" class="button" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

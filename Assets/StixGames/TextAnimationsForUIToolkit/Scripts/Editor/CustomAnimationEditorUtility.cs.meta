@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 166f92fe87cc4892a10249b5e8ea49ee
+timeCreated: 1734687292
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Editor/CustomAnimationEditorUtility.cs
+  uploadId: 809492

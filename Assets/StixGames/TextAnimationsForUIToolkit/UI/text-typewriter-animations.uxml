@@ -1,0 +1,22 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/UI/text-animations-theme.uss?fileID=7433441132597879392&amp;guid=81801449bda7be64b901d9851f5e8413&amp;type=3#text-animations-theme" />
+    <ui:VisualElement name="text-typewriter-animations">
+        <ui:VisualElement name="fade-ins">
+            <ui:Label text="Text Appearance" class="main-heading" />
+            <ui:VisualElement name="fade-in-animations" style="flex-grow: 1;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="fade-outs">
+            <ui:Label text="Text Vanishing" class="main-heading" />
+            <ui:VisualElement name="fade-out-animations" style="flex-grow: 1;" />
+        </ui:VisualElement>
+        <ui:VisualElement name="custom-animations">
+            <ui:Label text="Custom Animations" class="main-heading" />
+            <ui:VisualElement name="only-typewriter-animations-allowed" class="error-hint" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                <ui:Label tabindex="-1" text="The following custom animations are not marked as a Appearance or Vanishing effect and will have no effect:" display-tooltip-when-elided="true" style="white-space: normal;" />
+                <ui:Label tabindex="-1" text="Label" display-tooltip-when-elided="true" name="custom-animations-without-typewriter" style="-unity-font-style: bold; margin-top: 4px;" />
+            </ui:VisualElement>
+            <ui:Button text="Create custom animation" display-tooltip-when-elided="true" name="create-custom-animation" />
+            <uie:PropertyField binding-path="customTypewriterAnimations" name="custom-animations" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

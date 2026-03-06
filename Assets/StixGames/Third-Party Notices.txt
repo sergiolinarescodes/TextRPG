@@ -1,0 +1,7 @@
+The asset uses 3d models (including textures) and mouse pointer icon by Kenney (https://kenney.nl/) in the showcase scene. They are licensed under the CC0 License.
+
+The asset uses pirate sprites by Pixel Frog (https://pixelfrog-assets.itch.io/pirate-bomb) in the showcase scene. They are license under the CC0 License 
+
+The asset uses the "Outfit" font in various example scenes. It is licensed under the SIL OPEN FONT LICENSE Version 1.1
+
+The sound effects in the showcase scene were generated with https://sfxr.me/

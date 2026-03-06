@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 0af2d5efcc7e4f27a1e47f2e21fc7593
+timeCreated: 1729712132
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/TypewriterAnimationSettings.cs
+  uploadId: 809492

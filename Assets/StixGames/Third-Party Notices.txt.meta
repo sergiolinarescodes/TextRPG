@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f2f98ec150f2617499bea4741542e1fd
+TextScriptImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/Third-Party Notices.txt
+  uploadId: 809492

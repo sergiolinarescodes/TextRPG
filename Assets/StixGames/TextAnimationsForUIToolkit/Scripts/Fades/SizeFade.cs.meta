@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: 38df6c67ebd346c69b184e2f50d6d99e
+timeCreated: 1729714982
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Fades/SizeFade.cs
+  uploadId: 809492

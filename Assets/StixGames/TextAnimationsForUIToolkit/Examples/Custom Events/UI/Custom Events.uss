@@ -1,0 +1,13 @@
+.root {
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    color: rgb(255, 255, 255);
+}
+
+.text {
+    font-size: 45px;
+    -unity-font-style: normal;
+    -unity-text-align: upper-center;
+    -unity-font-definition: url('project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Showcase/Fonts/Outfit-SemiBold.ttf?fileID=12800000&guid=d1bf90d59b8f08949be351410cb69386&type=3#Outfit-SemiBold');
+}

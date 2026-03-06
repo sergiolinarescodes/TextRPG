@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: d683977b49e941f4fae73b6840ce7749
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Dynamic Animations/Materials/Dynamic
+    Animations Skybox.mat
+  uploadId: 809492

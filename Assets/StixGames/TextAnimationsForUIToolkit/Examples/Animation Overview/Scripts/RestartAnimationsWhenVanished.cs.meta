@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: df70d27b9dd3458b843fa0853fc296b4
+timeCreated: 1737634770
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation Overview/Scripts/RestartAnimationsWhenVanished.cs
+  uploadId: 809492

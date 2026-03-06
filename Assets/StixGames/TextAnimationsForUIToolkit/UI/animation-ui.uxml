@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/UI/text-animations-theme.uss?fileID=7433441132597879392&amp;guid=81801449bda7be64b901d9851f5e8413&amp;type=3#text-animations-theme" />
+    <ui:VisualElement name="fade-in" class="animation">
+        <ui:VisualElement class="animation__heading">
+            <ui:Toggle name="animation__toggle" label="Label" class="animation__toggle" />
+        </ui:VisualElement>
+        <ui:VisualElement name="animation__content" class="animation__content">
+            <ui:Label text="Content is set dynamically in the editor script" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

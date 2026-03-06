@@ -1,0 +1,40 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xsi="http://www.w3.org/2001/XMLSchema-instance" engine="UnityEngine.UIElements" editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/UI/Animation%20Overview.uss?fileID=7433441132597879392&amp;guid=9adeab8429a487046b6a13b890d4fc0a&amp;type=3#Animation Overview" />
+    <ui:VisualElement name="root" class="root" style="justify-content: center;">
+        <ui:VisualElement name="panels" class="panels" style="margin-left: 16px; margin-right: 16px; margin-top: 16px; margin-bottom: 16px;">
+            <ui:VisualElement name="builtin-animations" class="panel builtin-animations">
+                <ui:Label tabindex="-1" text="Built-in Animations" display-tooltip-when-elided="true" class="header" />
+                <ui:VisualElement class="animation-row" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;bounce&gt;BOUNCE" name="bounce" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;rainbow&gt;RAINBOW" name="rainbow" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;rot&gt;ROTATE" name="rotate" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                </ui:VisualElement>
+                <ui:VisualElement class="animation-row" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;shake&gt;SHAKE" name="shake" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;size-wave&gt;SIZE WAVE" name="size-wave" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;swing&gt;SWING" name="swing" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                </ui:VisualElement>
+                <ui:VisualElement class="animation-row" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;wave&gt;WAVING" name="waving" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;wiggle&gt;WIGGLE" name="wiggle" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;custom&gt;CUSTOM" name="custom" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20Settings.asset?fileID=11400000&amp;guid=9121ca0a191c6c04cb124c2b21076ed1&amp;type=2#Animation Overview Settings" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="builtin-vanishing-and-appearance" class="panel typewriter-animations" style="background-color: rgba(0, 0, 0, 0);">
+                <ui:Label tabindex="-1" text="Built-in Appearance / Vanishing" display-tooltip-when-elided="true" class="header" />
+                <ui:VisualElement class="animation-row" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;fade-in d=0.4&gt;&lt;fade-out d=0.4&gt;FADE IN / OUT" name="fade" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20with%20Typewriting%20Settings.asset?fileID=11400000&amp;guid=c1982d823a1ee344eacb541e964c680f&amp;type=2#Animation Overview with Typewriting Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;offset-in&gt;&lt;offset-out&gt;OFFSET IN / OUT" name="offset" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20with%20Typewriting%20Settings.asset?fileID=11400000&amp;guid=c1982d823a1ee344eacb541e964c680f&amp;type=2#Animation Overview with Typewriting Settings" />
+                </ui:VisualElement>
+                <ui:VisualElement class="animation-row" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;random-in d=0.3&gt;&lt;random-out d=0.3&gt;RANDOM IN / OUT" name="random" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20with%20Typewriting%20Settings.asset?fileID=11400000&amp;guid=c1982d823a1ee344eacb541e964c680f&amp;type=2#Animation Overview with Typewriting Settings" />
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;size-in&gt;&lt;size-out&gt;SIZE IN / OUT" name="size" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20with%20Typewriting%20Settings.asset?fileID=11400000&amp;guid=c1982d823a1ee344eacb541e964c680f&amp;type=2#Animation Overview with Typewriting Settings" />
+                </ui:VisualElement>
+                <ui:VisualElement class="animation-row" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+                    <TextAnimationsForUIToolkit.AnimatedLabel text="&lt;custom-fade&gt;CUSTOM IN / OUT" name="custom" settings="project://database/Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation%20Overview/Animation%20Overview%20with%20Typewriting%20Settings.asset?fileID=11400000&amp;guid=c1982d823a1ee344eacb541e964c680f&amp;type=2#Animation Overview with Typewriting Settings" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:Label tabindex="-1" text="All animations and appearance / vanishing effects can be combined with each other" display-tooltip-when-elided="true" class="header" style="margin-bottom: 16px;" />
+    </ui:VisualElement>
+</ui:UXML>

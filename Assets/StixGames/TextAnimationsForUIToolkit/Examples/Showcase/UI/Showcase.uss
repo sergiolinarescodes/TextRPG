@@ -1,0 +1,53 @@
+.dialogue {
+    position: absolute;
+    justify-content: center;
+    align-items: stretch;
+    flex-direction: column;
+}
+
+.speech-bubble {
+    width: 600px;
+    background-color: rgba(0, 69, 156, 0.93);
+    -unity-text-align: middle-center;
+    border-top-left-radius: 32px;
+    border-top-right-radius: 32px;
+    border-bottom-right-radius: 32px;
+    border-bottom-left-radius: 32px;
+    font-size: 48px;
+    color: rgb(255, 255, 255);
+}
+
+.speech-bubble--left {
+    background-color: rgba(48, 0, 151, 0.93);
+}
+
+.button {
+    background-color: rgba(224, 0, 55, 0.93);
+    border-left-color: rgba(149, 149, 149, 0);
+    border-right-color: rgba(149, 149, 149, 0);
+    border-top-color: rgba(149, 149, 149, 0);
+    border-bottom-color: rgba(149, 149, 149, 0);
+    border-top-width: 0;
+    border-right-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-top-left-radius: 30px;
+    border-top-right-radius: 30px;
+    border-bottom-right-radius: 30px;
+    border-bottom-left-radius: 30px;
+    padding-right: 32px;
+    padding-left: 32px;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+}
+
+.button:hover {
+    background-color: rgba(99, 0, 24, 0.93);
+}
+
+.button-parent {
+    align-items: flex-end;
+}

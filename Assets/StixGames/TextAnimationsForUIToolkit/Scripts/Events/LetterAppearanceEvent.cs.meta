@@ -1,0 +1,10 @@
+﻿fileFormatVersion: 2
+guid: 84af692329294e54b1a1c563ce7a9f0d
+timeCreated: 1732871503
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Scripts/Events/LetterAppearanceEvent.cs
+  uploadId: 809492

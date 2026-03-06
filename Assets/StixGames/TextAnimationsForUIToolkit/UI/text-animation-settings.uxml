@@ -1,0 +1,72 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/StixGames/TextAnimationsForUIToolkit/UI/text-animations-theme.uss?fileID=7433441132597879392&amp;guid=81801449bda7be64b901d9851f5e8413&amp;type=3#text-animations-theme" />
+    <ui:VisualElement name="typewriter" class="settings-section">
+        <ui:Label text="Typewriter" class="main-heading" />
+        <ui:VisualElement name="appearance" class="settings-subsection">
+            <ui:Label text="Text Appearance" class="sub-heading" />
+            <ui:Toggle label="Enable" name="appearance__toggle" binding-path="enableTextAppearance" class="unity-base-field__aligned" />
+            <ui:VisualElement name="appearance__settings" style="flex-grow: 1;">
+                <uie:PropertyField binding-path="baseAppearanceSpeed" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="vanishing" class="settings-subsection">
+            <ui:Label text="Text Vanishing" class="sub-heading" />
+            <ui:Toggle label="Enable" name="vanishing__toggle" binding-path="enableTextVanishing" class="unity-base-field__aligned" />
+            <ui:VisualElement name="vanishing__settings" style="flex-grow: 1;">
+                <uie:PropertyField binding-path="baseVanishingSpeed" />
+                <uie:PropertyField binding-path="vanishingDelay" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement class="settings-subsection">
+            <ui:Label text="Typewriter Settings" class="sub-heading" />
+            <ui:VisualElement name="typewriter-general-settings">
+                <uie:PropertyField binding-path="pauseAfterComma" />
+                <uie:PropertyField binding-path="pauseAfterPunctuation" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="animations" class="settings-section">
+        <ui:Label text="Animations" class="main-heading" />
+        <ui:VisualElement name="default-animations" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+            <ui:Label text="Default Animations" tooltip="Default animations get applied to all text. Useful for UI elements like buttons." class="sub-heading" />
+            <ui:VisualElement name="default-animations-container" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);" />
+            <ui:Button text="Create custom animation" display-tooltip-when-elided="true" name="create-custom-animation" />
+            <uie:PropertyField binding-path="defaultAnimations.customAnimations" name="custom-animations" />
+        </ui:VisualElement>
+        <ui:VisualElement name="typewriter-animations" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+            <ui:Label text="Typewriter Animations" class="sub-heading" />
+            <uie:PropertyField binding-path="defaultTypewriterAnimationSettings" name="default-typewriter-animations" />
+            <uie:PropertyField binding-path="fallbackTypewriterAnimationSettings" name="fallback-typewriter-animations" />
+            <ui:VisualElement style="flex-grow: 1; flex-direction: row; flex-shrink: 0; flex-wrap: wrap;">
+                <ui:Button text="Create default typewriter animations" name="create-default-animation-button" style="flex-grow: 1; flex-shrink: 1;" />
+                <ui:Button text="Create fallback typewriter animations" name="create-fallback-animation-button" style="flex-grow: 1; flex-shrink: 0;" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+        <ui:VisualElement name="custom-animations" style="flex-grow: 1; background-color: rgba(0, 0, 0, 0);">
+            <ui:Label text="Custom Animations" class="sub-heading" />
+            <ui:Button text="Create custom animation" display-tooltip-when-elided="true" name="create-custom-animation" style="margin-top: 8px;" />
+            <uie:PropertyField binding-path="customAnimations" name="custom-animations" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+    <ui:VisualElement name="general" class="settings-section">
+        <ui:Label text="General" enable-rich-text="false" class="main-heading" />
+        <uie:PropertyField binding-path="linkCursorTexture" />
+        <uie:PropertyField binding-path="linkCursorHotspot" />
+        <uie:PropertyField binding-path="templates" />
+    </ui:VisualElement>
+    <ui:VisualElement name="performance" class="settings-section">
+        <ui:Label text="Performance" class="main-heading" />
+        <uie:PropertyField binding-path="maxFramerate" />
+    </ui:VisualElement>
+    <ui:VisualElement name="events" class="settings-section">
+        <ui:Label text="Events" class="main-heading" />
+        <uie:PropertyField binding-path="letterAppearanceEventOffset" />
+    </ui:VisualElement>
+    <ui:VisualElement name="debug" class="settings-section">
+        <ui:Label text="Debug" class="main-heading" />
+        <ui:Label tabindex="-1" text="Animation debugging skips optimizations to make sure all your changes are visible immediately. &lt;b&gt;Do not use it in production.&lt;/b&gt;" display-tooltip-when-elided="true" class="hint" />
+        <uie:PropertyField binding-path="enableAnimationDebugging" name="enable-animation-debugging" />
+        <uie:PropertyField binding-path="debugAnimationTime" name="debug-animation-time" />
+        <uie:PropertyField binding-path="enableRichTextDebugging" style="margin-top: 10px;" />
+    </ui:VisualElement>
+</ui:UXML>

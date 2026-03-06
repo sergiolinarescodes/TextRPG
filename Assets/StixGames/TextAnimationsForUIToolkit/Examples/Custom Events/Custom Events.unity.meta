@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 60b22ec43471af74b8334ca235db9599
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Custom Events/Custom
+    Events.unity
+  uploadId: 809492

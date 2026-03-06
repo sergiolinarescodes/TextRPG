@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: c1982d823a1ee344eacb541e964c680f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 310280
+  packageName: Text Animations for UI Toolkit
+  packageVersion: 1.4.0
+  assetPath: Assets/StixGames/TextAnimationsForUIToolkit/Examples/Animation Overview/Animation
+    Overview with Typewriting Settings.asset
+  uploadId: 809492
