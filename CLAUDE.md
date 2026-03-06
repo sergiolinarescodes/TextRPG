@@ -109,16 +109,6 @@
 - Run `dotnet build TextRPG.sln` to verify compilation (0 errors expected)
 - Unity editor must NOT be open for batch mode commands
 
-### Running Tests
-- Unity tests use the **Unity Test Framework** (not standard .NET test runner)
-- `dotnet test` does NOT work for Unity NUnit tests — they require the Unity editor
-- To run tests in batch mode (editor must be closed):
-  ```
-  "C:/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Unity.exe" -runTests -batchmode -projectPath "C:/Users/kelns/repos/TextRPG" -testResults test-results.xml -testPlatform EditMode
-  ```
-- To run tests interactively: open Unity editor → Window > General > Test Runner → EditMode tab → Run All
-- Scenario Browser: Window > Unidad > Scenario Browser (visual testing)
-
 ## Git Rules
 - NEVER add `Co-Authored-By` lines to commits
 - NEVER amend commits unless explicitly asked
