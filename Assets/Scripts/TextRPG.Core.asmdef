@@ -7,7 +7,8 @@
         "Unidad.Scripting.Runtime",
         "Unity.InputSystem",
         "PrimeTween.Runtime",
-        "TextAnimationsForUIToolkit"
+        "TextAnimationsForUIToolkit",
+        "GUID:17f96cd3b93974f6493e51a2f25c1241"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "com.gilzoide.sqlite-net": "https://github.com/gilzoide/unity-sqlite-net.git#1.3.2",
     "com.gustavopsantos.reflex": "https://github.com/gustavopsantos/reflex.git?path=/Assets/Reflex/#13.0.3",
     "com.kyrylokuzyk.primetween": "file:../Assets/Plugins/PrimeTween/internal/com.kyrylokuzyk.primetween.tgz",
     "com.unidad.core": "file:com.unidad.core",

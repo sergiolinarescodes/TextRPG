@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using TextRPG.Core.WordAction;
+using TextRPG.Core.WordInput;
 using Unidad.Core.Bootstrap;
 
 namespace TextRPG.Core.Bootstrap
@@ -11,7 +13,8 @@ namespace TextRPG.Core.Bootstrap
     {
         protected override void RegisterInstallers(List<ISystemInstaller> installers)
         {
-            // Register game systems here in dependency order.
+            installers.Add(new WordInputSystemInstaller());
+            installers.Add(new WordActionSystemInstaller());
         }
     }
 }
