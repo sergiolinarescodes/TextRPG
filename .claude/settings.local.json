@@ -20,7 +20,20 @@
       "Bash(\"C:/Users/kelns/repos/Experimental/Packages/com.unidad.core/Runtime/UI/WorldSpace/FloatingTextAnchor.cs.meta\":*)",
       "WebFetch(domain:gist.github.com)",
       "Bash(\"C:/Program Files/Unity/Hub/Editor/6000.3.10f1/Editor/Data/Tools/netcorerun/netcorerun.exe\":*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(/c/Users/kelns/AppData/Local/Programs/Python/Python312/python.exe:*)",
+      "Bash(curl:*)",
+      "Bash(echo:*)",
+      "Bash(printenv PATH:*)",
+      "Bash(cp:*)",
+      "Bash(jq:*)",
+      "Bash(where python:*)",
+      "Bash(ls /c/Python*/python.exe)",
+      "Read(//c/Users/kelns/AppData/Local/Programs/Python/**)",
+      "Bash(py --version)",
+      "Bash(py:*)",
+      "Bash(where:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

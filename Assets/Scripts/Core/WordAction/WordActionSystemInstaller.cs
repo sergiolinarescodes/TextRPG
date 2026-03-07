@@ -17,6 +17,8 @@ namespace TextRPG.Core.WordAction
             builder.AddSingleton(container =>
             {
                 var data = container.Resolve<WordActionData>();
+                if (data.AmmoWordSet.Count > 0)
+                    return (IWordResolver)new FilteredWordResolver(data.Resolver, data.AmmoWordSet);
                 return data.Resolver;
             }, typeof(IWordResolver));
 
@@ -25,6 +27,12 @@ namespace TextRPG.Core.WordAction
                 var data = container.Resolve<WordActionData>();
                 return data.ActionRegistry;
             }, typeof(IActionRegistry));
+
+            builder.AddSingleton(container =>
+            {
+                var data = container.Resolve<WordActionData>();
+                return data.TagResolver;
+            }, typeof(IWordTagResolver));
         }
 
         public ISystemTestFactory CreateTestFactory() => new WordActionTestFactory();

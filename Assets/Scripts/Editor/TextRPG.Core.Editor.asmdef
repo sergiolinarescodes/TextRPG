@@ -1,0 +1,19 @@
+{
+    "name": "TextRPG.Core.Editor",
+    "rootNamespace": "TextRPG.Editor",
+    "references": [
+        "TextRPG.Core",
+        "Gilzoide.SqliteNet"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

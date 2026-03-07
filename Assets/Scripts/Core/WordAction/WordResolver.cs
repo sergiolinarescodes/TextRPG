@@ -38,5 +38,7 @@ namespace TextRPG.Core.WordAction
         }
 
         public int WordCount => _mappings.Count;
+
+        public IEnumerable<string> AllWords => _mappings.Keys;
     }
 }

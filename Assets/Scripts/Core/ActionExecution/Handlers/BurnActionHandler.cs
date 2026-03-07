@@ -1,0 +1,22 @@
+using TextRPG.Core.StatusEffect;
+
+namespace TextRPG.Core.ActionExecution.Handlers
+{
+    internal sealed class BurnActionHandler : IActionHandler
+    {
+        private readonly IStatusEffectService _statusEffects;
+
+        public string ActionId => "Burn";
+
+        public BurnActionHandler(IActionHandlerContext ctx)
+        {
+            _statusEffects = ctx.StatusEffects;
+        }
+
+        public void Execute(ActionContext context)
+        {
+            for (int i = 0; i < context.Targets.Count; i++)
+                _statusEffects.ApplyEffect(context.Targets[i], StatusEffectType.Burning, context.Value, context.Source);
+        }
+    }
+}

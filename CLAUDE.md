@@ -41,6 +41,16 @@
 - Services must be testable independently of any scenario
 - Example: energy-starved module stopping a turn = service logic; orange ghost animation = scenario presentation
 
+### CRITICAL: Always Use Unidad Framework Components
+- **NEVER** reimplement functionality that already exists in `Packages/com.unidad.core/`
+- **BEFORE** writing any new utility, pattern, or helper, search the framework package for existing implementations
+- Use `EventBus` (from `Unidad.Core.EventBus`) in scenarios — never create custom event bus implementations
+- Use `ModifierStack<T>` for stackable stat/value modifiers — never roll your own
+- Use `SystemServiceBase` for all services — never manually manage event subscriptions
+- Use `DataDrivenScenario` for all scenarios — never implement `ITestScenario` directly
+- Use `IGameObjectFactory`, `PoolRegistry`, `RegistryBase`, `StateMachine`, `IContributor` etc. from the framework
+- If you think a framework component is missing, ask the user before creating a new one
+
 ### Patterns — Use Advanced Solutions
 - **AI**: Build scorer-based systems using `IContributor<TContext>` pattern, not simple if/else
 - **State machines**: Use `IState<TContext>` / `StateMachine<TContext>`, not enum switches
@@ -56,6 +66,8 @@
 - `AllSystemScenariosTests` auto-discovers and runs ALL scenarios — no scenario can be skipped
 - Every `INativeFunction` MUST have unit tests covering normal operation and edge cases (invalid args, out-of-bounds, no energy, etc.)
 - When adding native functions to a system, also add integration tests verifying they work end-to-end via script execution
+- Every `IActionHandler` MUST have verification checks in `CombatActionVerificationScenario` — when adding or modifying an action handler, add checks that verify **correctness** (exact damage values, HP changes, status effects applied, stat modifications, event payloads) not just invocation
+- New action handlers MUST include checks for: normal operation, edge cases (overkill, capped healing, empty targets), and combo interactions with other handlers
 
 ### Test Parity
 - Scenarios run identically in NUnit (Test Runner) and in-game (Scenario Browser Editor Window)

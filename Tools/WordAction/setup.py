@@ -46,9 +46,30 @@ def main():
         CREATE TABLE IF NOT EXISTS word_meta (
             word   TEXT PRIMARY KEY COLLATE NOCASE,
             target TEXT NOT NULL DEFAULT 'SingleEnemy',
-            cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 10)
+            cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 10),
+            range  INTEGER NOT NULL DEFAULT 0,
+            area   TEXT NOT NULL DEFAULT 'Single'
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS word_tags (
+            word TEXT NOT NULL COLLATE NOCASE,
+            tag  TEXT NOT NULL,
+            PRIMARY KEY (word, tag)
+        )
+    """)
+
+    # Migration: add per-action targeting columns to word_actions if missing
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(word_actions)")}
+    if "target" not in cols:
+        conn.execute("ALTER TABLE word_actions ADD COLUMN target TEXT DEFAULT NULL")
+    if "range" not in cols:
+        conn.execute("ALTER TABLE word_actions ADD COLUMN range INTEGER DEFAULT NULL")
+    if "area" not in cols:
+        conn.execute("ALTER TABLE word_actions ADD COLUMN area TEXT DEFAULT NULL")
+    if "assoc_word" not in cols:
+        conn.execute("ALTER TABLE word_actions ADD COLUMN assoc_word TEXT NOT NULL DEFAULT ''")
+
     conn.commit()
 
     processed = conn.execute("SELECT COUNT(*) FROM processed_words").fetchone()[0]

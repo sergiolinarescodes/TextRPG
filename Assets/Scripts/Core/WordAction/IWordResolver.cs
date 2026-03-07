@@ -8,5 +8,6 @@ namespace TextRPG.Core.WordAction
         WordMeta GetStats(string word);
         bool HasWord(string word);
         int WordCount { get; }
+        IEnumerable<string> AllWords { get; }
     }
 }

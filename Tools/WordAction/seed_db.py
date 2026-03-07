@@ -12,120 +12,238 @@ CREATE TABLE IF NOT EXISTS word_actions (
     word        TEXT NOT NULL COLLATE NOCASE,
     action_name TEXT NOT NULL,
     value       INTEGER NOT NULL CHECK(value BETWEEN 1 AND 10),
-    PRIMARY KEY (word, action_name)
+    target      TEXT DEFAULT NULL,
+    range       INTEGER DEFAULT NULL,
+    area        TEXT DEFAULT NULL,
+    assoc_word  TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (word, action_name, assoc_word)
 );
 CREATE INDEX IF NOT EXISTS idx_word ON word_actions(word);
 
 CREATE TABLE IF NOT EXISTS word_meta (
     word   TEXT PRIMARY KEY COLLATE NOCASE,
     target TEXT NOT NULL DEFAULT 'SingleEnemy',
-    cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 10)
+    cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 10),
+    range  INTEGER NOT NULL DEFAULT 0,
+    area   TEXT NOT NULL DEFAULT 'Single'
 );
+
+CREATE TABLE IF NOT EXISTS word_tags (
+    word TEXT NOT NULL COLLATE NOCASE,
+    tag  TEXT NOT NULL,
+    PRIMARY KEY (word, tag)
+);
+CREATE INDEX IF NOT EXISTS idx_word_tags ON word_tags(word);
 """
 
-# (word, action_name, value)
+# (word, action_name, value, target, range, area, assoc_word)  — last 4 are nullable per-action overrides, assoc_word defaults to ''
 SEED_ACTIONS = [
     # Water words
-    ("drip",       "Water", 1),
-    ("splash",     "Water", 2),  ("splash",     "Damage", 1),
-    ("wave",       "Water", 3),  ("wave",       "Push", 2),  ("wave",       "Damage", 2),
-    ("stream",     "Water", 2),  ("stream",     "Damage", 1),
-    ("torrent",    "Water", 4),  ("torrent",    "Damage", 3),  ("torrent",    "Push", 2),
-    ("tsunami",    "Water", 5),  ("tsunami",    "Damage", 5),  ("tsunami",    "Push", 2),
-    ("ocean",      "Water", 3),  ("ocean",      "Damage", 2),
-    ("flood",      "Water", 4),  ("flood",      "Damage", 3),
-    ("deluge",     "Water", 5),  ("deluge",     "Damage", 4),
-    ("rain",       "Water", 1),  ("rain",       "Slow", 1),
+    ("drip",       "Water", 1, None, None, None, ""),
+    ("splash",     "Water", 2, None, None, None, ""),  ("splash",     "Damage", 1, None, None, None, ""),
+    ("wave",       "Water", 3, None, None, None, ""),  ("wave",       "Push", 2, None, None, None, ""),  ("wave",       "Damage", 2, None, None, None, ""),
+    ("stream",     "Water", 2, None, None, None, ""),  ("stream",     "Damage", 1, None, None, None, ""),
+    ("torrent",    "Water", 4, None, None, None, ""),  ("torrent",    "Damage", 3, None, None, None, ""),  ("torrent",    "Push", 2, None, None, None, ""),
+    ("tsunami",    "Water", 5, None, None, None, ""),  ("tsunami",    "Damage", 5, None, None, None, ""),  ("tsunami",    "Push", 2, None, None, None, ""),
+    ("ocean",      "Water", 3, None, None, None, ""),  ("ocean",      "Damage", 2, None, None, None, ""),
+    ("flood",      "Water", 4, None, None, None, ""),  ("flood",      "Damage", 3, None, None, None, ""),
+    ("deluge",     "Water", 5, None, None, None, ""),  ("deluge",     "Damage", 4, None, None, None, ""),
+    ("rain",       "Water", 1, None, None, None, ""),  ("rain",       "Slow", 1, None, None, None, ""),
 
     # Fire words
-    ("ember",      "Fire", 1),   ("ember",      "Damage", 1),
-    ("spark",      "Fire", 2),   ("spark",      "Light", 1),  ("spark",      "Damage", 1),
-    ("flame",      "Fire", 3),   ("flame",      "Burn", 2),   ("flame",      "Damage", 2),
-    ("blaze",      "Fire", 4),   ("blaze",      "Burn", 3),   ("blaze",      "Damage", 3),
-    ("inferno",    "Fire", 5),   ("inferno",    "Burn", 4),   ("inferno",    "Damage", 4),  ("inferno", "Light", 2),
-    ("torch",      "Fire", 2),   ("torch",      "Burn", 1),   ("torch",      "Damage", 1),
-    ("scorch",     "Fire", 3),   ("scorch",     "Burn", 3),   ("scorch",     "Damage", 2),
+    ("ember",      "Fire", 1, None, None, None, ""),   ("ember",      "Damage", 1, None, None, None, ""),
+    ("spark",      "Fire", 2, None, None, None, ""),   ("spark",      "Light", 1, None, None, None, ""),  ("spark",      "Damage", 1, None, None, None, ""),
+    ("flame",      "Fire", 3, None, None, None, ""),   ("flame",      "Burn", 2, None, None, None, ""),   ("flame",      "Damage", 2, None, None, None, ""),
+    ("blaze",      "Fire", 4, None, None, None, ""),   ("blaze",      "Burn", 3, None, None, None, ""),   ("blaze",      "Damage", 3, None, None, None, ""),
+    ("inferno",    "Fire", 5, None, None, None, ""),   ("inferno",    "Burn", 4, None, None, None, ""),   ("inferno",    "Damage", 4, None, None, None, ""),  ("inferno", "Light", 2, None, None, None, ""),
+    ("torch",      "Fire", 2, None, None, None, ""),   ("torch",      "Burn", 1, None, None, None, ""),   ("torch",      "Damage", 1, None, None, None, ""),
+    ("scorch",     "Fire", 3, None, None, None, ""),   ("scorch",     "Burn", 3, None, None, None, ""),   ("scorch",     "Damage", 2, None, None, None, ""),
 
     # Push / Wind words
-    ("shove",      "Push", 2),   ("shove",      "Damage", 1),
-    ("thrust",     "Push", 3),   ("thrust",     "Damage", 2),
-    ("gust",       "Wind", 2),   ("gust",       "Push", 2),
-    ("hurricane",  "Wind", 5),   ("hurricane",  "Push", 4),   ("hurricane",  "Damage", 4),
+    ("shove",      "Push", 2, None, None, None, ""),   ("shove",      "Damage", 1, None, None, None, ""),
+    ("thrust",     "Push", 3, None, None, None, ""),   ("thrust",     "Damage", 2, None, None, None, ""),
+    ("gust",       "Wind", 2, None, None, None, ""),   ("gust",       "Push", 2, None, None, None, ""),
+    ("hurricane",  "Wind", 5, None, None, None, ""),   ("hurricane",  "Push", 4, None, None, None, ""),   ("hurricane",  "Damage", 4, None, None, None, ""),
 
     # Physical words
-    ("scratch",    "Damage", 1),
-    ("hit",        "Damage", 2),
-    ("strike",     "Damage", 3), ("strike",     "Shock", 1),
-    ("smash",      "Damage", 4), ("smash",      "Heavy", 2),
-    ("obliterate", "Damage", 5), ("obliterate", "Heavy", 3),
-    ("crush",      "Damage", 3), ("crush",      "Heavy", 3),
+    ("scratch",    "Damage", 1, None, None, None, ""),
+    ("hit",        "Damage", 2, None, None, None, ""),
+    ("strike",     "Damage", 3, None, None, None, ""), ("strike",     "Shock", 1, None, None, None, ""),
+    ("smash",      "Damage", 4, None, None, None, ""), ("smash",      "Heavy", 2, None, None, None, ""),
+    ("obliterate", "Damage", 5, None, None, None, ""), ("obliterate", "Heavy", 3, None, None, None, ""),
+    ("crush",      "Damage", 3, None, None, None, ""), ("crush",      "Heavy", 3, None, None, None, ""),
 
     # Healing words
-    ("bandage",    "Heal", 2),
-    ("mend",       "Heal", 3),
-    ("restore",    "Heal", 4),   ("restore",    "Buff", 1),
-    ("rejuvenate", "Heal", 5),   ("rejuvenate", "Buff", 2),
-    ("resurrect",  "Heal", 5),   ("resurrect",  "Light", 2),  ("resurrect",  "Buff", 3),
+    ("bandage",    "Heal", 2, None, None, None, ""),
+    ("mend",       "Heal", 3, None, None, None, ""),
+    ("restore",    "Heal", 4, None, None, None, ""),   ("restore",    "BuffStrength", 1, None, None, None, ""),
+    ("rejuvenate", "Heal", 5, None, None, None, ""),   ("rejuvenate", "BuffStrength", 2, None, None, None, ""),
+    ("resurrect",  "Heal", 5, None, None, None, ""),   ("resurrect",  "Light", 2, None, None, None, ""),  ("resurrect",  "BuffStrength", 3, None, None, None, ""),
 
     # Light words
-    ("glow",       "Light", 1),
-    ("shine",      "Light", 2),
-    ("radiance",   "Light", 3),  ("radiance",   "Heal", 1),
-    ("beacon",     "Light", 2),  ("beacon",     "Buff", 1),
-    ("flash",      "Light", 3),  ("flash",      "Shock", 2),  ("flash",      "Damage", 1),
+    ("glow",       "Light", 1, None, None, None, ""),
+    ("shine",      "Light", 2, None, None, None, ""),
+    ("radiance",   "Light", 3, None, None, None, ""),  ("radiance",   "Heal", 1, None, None, None, ""),
+    ("beacon",     "Light", 2, None, None, None, ""),  ("beacon",     "BuffLuck", 1, None, None, None, ""),
+    ("flash",      "Light", 3, None, None, None, ""),  ("flash",      "Shock", 2, None, None, None, ""),  ("flash",      "Damage", 1, None, None, None, ""),
 
     # Dark words
-    ("shadow",     "Dark", 2),   ("shadow",     "Curse", 1),
-    ("gloom",      "Dark", 1),   ("gloom",      "Slow", 1),
-    ("void",       "Dark", 4),   ("void",       "Damage", 3),
-    ("eclipse",    "Dark", 3),   ("eclipse",    "Curse", 2),
-    ("abyss",      "Dark", 5),   ("abyss",      "Damage", 3),
+    ("shadow",     "Dark", 2, None, None, None, ""),   ("shadow",     "Curse", 1, None, None, None, ""),
+    ("gloom",      "Dark", 1, None, None, None, ""),   ("gloom",      "Slow", 1, None, None, None, ""),
+    ("void",       "Dark", 4, None, None, None, ""),   ("void",       "Damage", 3, None, None, None, ""),
+    ("eclipse",    "Dark", 3, None, None, None, ""),   ("eclipse",    "Curse", 2, None, None, None, ""),
+    ("abyss",      "Dark", 5, None, None, None, ""),   ("abyss",      "Damage", 3, None, None, None, ""),
+
+    # Per-action targeting example
+    ("absorb",     "Damage", 1, "SingleEnemy", 3, "Single", ""),  ("absorb", "Heal", 1, "Self", 0, "Single", ""),
+
+    # Movement words
+    ("sprint",     "Move", 5, None, None, None, ""),
+    ("dash",       "Move", 3, None, None, None, ""),
+    ("charge",     "Move", 4, None, None, None, ""),  ("charge",     "Damage", 3, None, None, None, ""),
+    ("blink",      "Teleport", 4, None, None, None, ""),
+    ("warp",       "Teleport", 7, None, None, None, ""),
+    ("scatter",    "MoveRandom", 5, None, None, None, ""),
+    ("rally",      "MoveNearAlly", 4, None, None, None, ""),
+    ("engage",     "MoveNearEnemy", 3, None, None, None, ""),  ("engage",     "Damage", 2, None, None, None, ""),
+    ("flank",      "MoveFlank", 5, None, None, None, ""),  ("flank",      "Damage", 4, None, None, None, ""),
+    ("retreat",    "Move", 3, None, None, None, ""),  ("retreat",    "Shield", 2, None, None, None, ""),
+    ("teleport",   "Teleport", 6, None, None, None, ""),
+    ("rush",       "Move", 2, None, None, None, ""),  ("rush",       "Damage", 5, None, None, None, ""),
+
+    # Weapon words — assoc_word links weapon to ammo
+    ("gun",        "Weapon", 4, "Self", None, None, "9mm"),
+    ("gun",        "Weapon", 4, "Self", None, None, "buckshot"),
+    ("sword",      "Weapon", 5, "Self", None, None, "slash"),
+    ("sword",      "Weapon", 5, "Self", None, None, "stab"),
+
+    # Ammo words (only usable through weapon mode)
+    ("9mm",        "Damage", 3, "SingleEnemy", 15, None, ""),
+    ("buckshot",   "Damage", 4, "SingleEnemy", 15, "Cross", ""),
+    ("slash",      "Damage", 3, "Melee", 1, None, ""),
+    ("stab",       "Damage", 4, "SingleEnemy", 1, None, ""),
 ]
 
-# (word, target, cost)
+# (word, target, cost, range, area)
 SEED_META = [
-    ("drip",        "SingleEnemy",  0),
-    ("splash",      "SingleEnemy",  0),
-    ("wave",        "MeleeArea",    2),
-    ("stream",      "SingleEnemy",  0),
-    ("torrent",     "SingleEnemy",  2),
-    ("tsunami",     "AreaAll",      6),
-    ("ocean",       "AreaEnemies",  3),
-    ("flood",       "AreaAll",      4),
-    ("deluge",      "AreaAll",      5),
-    ("rain",        "AreaAll",      1),
-    ("ember",       "SingleEnemy",  0),
-    ("spark",       "SingleEnemy",  0),
-    ("flame",       "SingleEnemy",  1),
-    ("blaze",       "SingleEnemy",  2),
-    ("inferno",     "AreaEnemies",  5),
-    ("torch",       "SingleEnemy",  1),
-    ("scorch",      "SingleEnemy",  2),
-    ("shove",       "MeleeInFront", 0),
-    ("thrust",      "MeleeInFront", 1),
-    ("gust",        "SingleEnemy",  0),
-    ("hurricane",   "AreaAll",      5),
-    ("scratch",     "MeleeInFront", 0),
-    ("hit",         "MeleeInFront", 0),
-    ("strike",      "MeleeInFront", 1),
-    ("smash",       "MeleeInFront", 2),
-    ("obliterate",  "AreaEnemies",  4),
-    ("crush",       "MeleeInFront", 2),
-    ("bandage",     "Self",         0),
-    ("mend",        "Self",         1),
-    ("restore",     "SingleAlly",   2),
-    ("rejuvenate",  "SingleAlly",   3),
-    ("resurrect",   "SingleAlly",   5),
-    ("glow",        "Self",         0),
-    ("shine",       "Self",         0),
-    ("radiance",    "AreaAllies",   1),
-    ("beacon",      "AreaAllies",   1),
-    ("flash",       "AreaEnemies",  1),
-    ("shadow",      "SingleEnemy",  1),
-    ("gloom",       "AreaEnemies",  1),
-    ("void",        "AreaAll",      3),
-    ("eclipse",     "AreaAll",      3),
-    ("abyss",       "AreaAll",      4),
+    ("drip",        "SingleEnemy",  0, 3, "Single"),
+    ("splash",      "SingleEnemy",  0, 3, "Single"),
+    ("wave",        "Melee",        2, 2, "Cross"),
+    ("stream",      "SingleEnemy",  0, 4, "Single"),
+    ("torrent",     "SingleEnemy",  2, 4, "Line3"),
+    ("tsunami",     "AreaAll",      6, 0, "Diamond2"),
+    ("ocean",       "AreaEnemies",  3, 0, "Square3x3"),
+    ("flood",       "AreaAll",      4, 0, "Diamond2"),
+    ("deluge",      "AreaAll",      5, 0, "Square3x3"),
+    ("rain",        "AreaEnemies",  1, 0, "VerticalLine"),
+    ("ember",       "SingleEnemy",  0, 3, "Single"),
+    ("spark",       "SingleEnemy",  0, 3, "Single"),
+    ("flame",       "SingleEnemy",  1, 3, "Single"),
+    ("blaze",       "SingleEnemy",  2, 4, "Cross"),
+    ("inferno",     "AreaEnemies",  5, 0, "Square3x3"),
+    ("torch",       "SingleEnemy",  1, 2, "Single"),
+    ("scorch",      "SingleEnemy",  2, 3, "Single"),
+    ("shove",       "Melee",        0, 1, "Single"),
+    ("thrust",      "Melee",        1, 1, "Single"),
+    ("gust",        "SingleEnemy",  0, 4, "Single"),
+    ("hurricane",   "AreaAll",      5, 0, "Diamond2"),
+    ("scratch",     "Melee",        0, 1, "Single"),
+    ("hit",         "Melee",        0, 1, "Single"),
+    ("strike",      "Melee",        1, 1, "Single"),
+    ("smash",       "Melee",        2, 1, "Cross"),
+    ("obliterate",  "AreaEnemies",  4, 0, "Square3x3"),
+    ("crush",       "Melee",        2, 1, "Single"),
+    ("bandage",     "Self",         0, 0, "Single"),
+    ("mend",        "Self",         1, 0, "Single"),
+    ("restore",     "AllAlliesAndSelf", 2, 0, "Single"),
+    ("rejuvenate",  "AllAlliesAndSelf", 3, 0, "Single"),
+    ("resurrect",   "AllAlliesAndSelf", 5, 0, "Single"),
+    ("glow",        "Self",         0, 0, "Single"),
+    ("shine",       "Self",         0, 0, "Single"),
+    ("radiance",    "AllAlliesAndSelf", 1, 0, "Cross"),
+    ("beacon",      "AllAlliesAndSelf", 1, 0, "Single"),
+    ("flash",       "AreaEnemies",  1, 0, "Cross"),
+    ("shadow",      "SingleEnemy",  1, 4, "Single"),
+    ("gloom",       "AreaEnemies",  1, 0, "Single"),
+    ("void",        "AreaAll",      3, 0, "Diamond2"),
+    ("eclipse",     "AreaAll",      3, 0, "Square3x3"),
+    ("abyss",       "AreaAll",      4, 0, "Diamond2"),
+    ("absorb",      "SingleEnemy",  0, 3, "Single"),
+    ("sprint",      "Self",         2, 0, "Single"),
+    ("dash",        "Self",         1, 0, "Single"),
+    ("charge",      "Self",         3, 0, "Single"),
+    ("blink",       "Self",         2, 0, "Single"),
+    ("warp",        "Self",         4, 0, "Single"),
+    ("scatter",     "Self",         2, 0, "Single"),
+    ("rally",       "Self",         2, 0, "Single"),
+    ("engage",      "Self",         3, 0, "Single"),
+    ("flank",       "Self",         4, 0, "Single"),
+    ("retreat",     "Self",         2, 0, "Single"),
+    ("teleport",    "Self",         3, 0, "Single"),
+    ("rush",        "Self",         2, 0, "Single"),
+    # Weapon meta
+    ("gun",         "Self",         0, 0, "Single"),
+    ("sword",       "Self",         0, 0, "Single"),
+    # Ammo meta
+    ("9mm",         "SingleEnemy",  0, 15, "Single"),
+    ("buckshot",    "SingleEnemy",  0, 15, "Cross"),
+    ("slash",       "Melee",        0, 1, "Single"),
+    ("stab",        "SingleEnemy",  0, 1, "Single"),
+]
+
+# (word, tag)
+SEED_TAGS = [
+    ("drip", "ELEMENTAL"), ("drip", "NATURE"),
+    ("splash", "ELEMENTAL"), ("splash", "NATURE"),
+    ("wave", "ELEMENTAL"), ("wave", "NATURE"), ("wave", "OFFENSIVE"),
+    ("stream", "ELEMENTAL"), ("stream", "NATURE"),
+    ("torrent", "ELEMENTAL"), ("torrent", "NATURE"), ("torrent", "OFFENSIVE"),
+    ("tsunami", "ELEMENTAL"), ("tsunami", "NATURE"), ("tsunami", "OFFENSIVE"),
+    ("ocean", "ELEMENTAL"), ("ocean", "NATURE"), ("ocean", "OFFENSIVE"),
+    ("flood", "ELEMENTAL"), ("flood", "NATURE"), ("flood", "OFFENSIVE"),
+    ("deluge", "ELEMENTAL"), ("deluge", "NATURE"), ("deluge", "OFFENSIVE"),
+    ("rain", "ELEMENTAL"), ("rain", "NATURE"),
+    ("ember", "ELEMENTAL"), ("ember", "OFFENSIVE"),
+    ("spark", "ELEMENTAL"), ("spark", "OFFENSIVE"),
+    ("flame", "ELEMENTAL"), ("flame", "OFFENSIVE"),
+    ("blaze", "ELEMENTAL"), ("blaze", "OFFENSIVE"),
+    ("inferno", "ELEMENTAL"), ("inferno", "OFFENSIVE"),
+    ("torch", "ELEMENTAL"), ("torch", "OFFENSIVE"),
+    ("scorch", "ELEMENTAL"), ("scorch", "OFFENSIVE"),
+    ("shove", "PHYSICAL"), ("shove", "OFFENSIVE"),
+    ("thrust", "PHYSICAL"), ("thrust", "OFFENSIVE"),
+    ("gust", "ELEMENTAL"), ("gust", "NATURE"),
+    ("hurricane", "ELEMENTAL"), ("hurricane", "NATURE"), ("hurricane", "OFFENSIVE"),
+    ("scratch", "PHYSICAL"), ("scratch", "OFFENSIVE"),
+    ("hit", "PHYSICAL"), ("hit", "OFFENSIVE"),
+    ("strike", "PHYSICAL"), ("strike", "OFFENSIVE"),
+    ("smash", "PHYSICAL"), ("smash", "OFFENSIVE"),
+    ("obliterate", "PHYSICAL"), ("obliterate", "OFFENSIVE"),
+    ("crush", "PHYSICAL"), ("crush", "OFFENSIVE"),
+    ("bandage", "RESTORATION"),
+    ("mend", "RESTORATION"),
+    ("restore", "RESTORATION"), ("restore", "SUPPORT"),
+    ("rejuvenate", "RESTORATION"), ("rejuvenate", "SUPPORT"),
+    ("resurrect", "RESTORATION"), ("resurrect", "HOLY"),
+    ("glow", "HOLY"),
+    ("shine", "HOLY"),
+    ("radiance", "HOLY"), ("radiance", "RESTORATION"),
+    ("beacon", "HOLY"), ("beacon", "SUPPORT"),
+    ("flash", "HOLY"), ("flash", "OFFENSIVE"),
+    ("shadow", "SHADOW"), ("shadow", "OFFENSIVE"),
+    ("gloom", "SHADOW"),
+    ("void", "SHADOW"), ("void", "OFFENSIVE"),
+    ("eclipse", "SHADOW"), ("eclipse", "OFFENSIVE"),
+    ("abyss", "SHADOW"), ("abyss", "OFFENSIVE"),
+    ("absorb", "SHADOW"), ("absorb", "RESTORATION"),
+    ("sprint", "PHYSICAL"), ("dash", "PHYSICAL"),
+    ("charge", "PHYSICAL"), ("charge", "OFFENSIVE"),
+    ("blink", "ARCANE"), ("warp", "ARCANE"),
+    ("scatter", "ARCANE"), ("rally", "SUPPORT"),
+    ("engage", "PHYSICAL"), ("engage", "OFFENSIVE"),
+    ("flank", "PHYSICAL"), ("flank", "OFFENSIVE"),
+    ("retreat", "DEFENSIVE"), ("teleport", "ARCANE"),
+    ("rush", "PHYSICAL"), ("rush", "OFFENSIVE"),
 ]
 
 
@@ -139,22 +257,27 @@ def main():
     cur = conn.cursor()
     cur.executescript(SCHEMA)
     cur.executemany(
-        "INSERT OR REPLACE INTO word_actions (word, action_name, value) VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO word_actions (word, action_name, value, target, range, area, assoc_word) VALUES (?, ?, ?, ?, ?, ?, ?)",
         SEED_ACTIONS,
     )
     cur.executemany(
-        "INSERT OR REPLACE INTO word_meta (word, target, cost) VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO word_meta (word, target, cost, range, area) VALUES (?, ?, ?, ?, ?)",
         SEED_META,
+    )
+    cur.executemany(
+        "INSERT OR REPLACE INTO word_tags (word, tag) VALUES (?, ?)",
+        SEED_TAGS,
     )
     conn.commit()
 
     action_count = cur.execute("SELECT COUNT(*) FROM word_actions").fetchone()[0]
     unique_words = cur.execute("SELECT COUNT(DISTINCT word) FROM word_actions").fetchone()[0]
     meta_count = cur.execute("SELECT COUNT(*) FROM word_meta").fetchone()[0]
+    tag_count = cur.execute("SELECT COUNT(*) FROM word_tags").fetchone()[0]
     conn.close()
 
     print(f"Created {DB_PATH}")
-    print(f"  {action_count} action rows, {unique_words} unique words, {meta_count} word meta entries")
+    print(f"  {action_count} action rows, {unique_words} unique words, {meta_count} meta, {tag_count} tags")
 
 
 if __name__ == "__main__":

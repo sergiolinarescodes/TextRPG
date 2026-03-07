@@ -21,7 +21,7 @@ namespace TextRPG.Core.WordAction.Scenarios
             "word-action-lookup",
             "Word Action Lookup",
             "Resolves a word to its action mappings and displays results. " +
-            "Uses in-memory test data (tsunami, ember, inferno, etc.).",
+            "Loads words from the SQLite database.",
             new[] { WordParam }
         )) { }
 
@@ -29,7 +29,7 @@ namespace TextRPG.Core.WordAction.Scenarios
         {
             var word = ResolveParam<string>(overrides, "word")?.Trim().ToLowerInvariant() ?? "";
 
-            var data = WordActionTestFactory.CreateTestData();
+            var data = WordActionDatabaseLoader.Load();
             _resolver = data.Resolver;
             _actionRegistry = data.ActionRegistry;
 
@@ -166,32 +166,9 @@ namespace TextRPG.Core.WordAction.Scenarios
             root.Add(infoLabel);
         }
 
-        private static Color GetActionColor(string actionId)
+        private Color GetActionColor(string actionId)
         {
-            return actionId switch
-            {
-                "Water"     => new Color(0.2f, 0.5f, 1f),
-                "Fire"      => new Color(1f, 0.4f, 0.1f),
-                "Earth"     => new Color(0.6f, 0.4f, 0.2f),
-                "Wind"      => new Color(0.7f, 0.9f, 0.9f),
-                "Push"      => new Color(0.8f, 0.8f, 0.2f),
-                "Slow"      => new Color(0.4f, 0.4f, 0.7f),
-                "Burn"      => new Color(1f, 0.5f, 0.2f),
-                "Freeze"    => new Color(0.5f, 0.8f, 1f),
-                "Curse"     => new Color(0.6f, 0.1f, 0.4f),
-                "Buff"      => new Color(0.2f, 0.9f, 0.3f),
-                "Heavy"     => new Color(0.5f, 0.5f, 0.4f),
-                "Shock"     => new Color(1f, 1f, 0.3f),
-                "Light"     => new Color(1f, 1f, 0.7f),
-                "Dark"      => new Color(0.5f, 0.2f, 0.8f),
-                "Poison"    => new Color(0.3f, 0.8f, 0.2f),
-                "Shield"    => new Color(0.6f, 0.7f, 0.8f),
-                "Damage"    => new Color(1f, 0.2f, 0.2f),
-                "Heal"      => new Color(0.2f, 0.9f, 0.3f),
-                "Summon"    => new Color(0.8f, 0.5f, 1f),
-                "Time"      => new Color(0.9f, 0.8f, 0.5f),
-                _           => Color.gray,
-            };
+            return _actionRegistry.TryGet(actionId, out var def) ? def.Color : Color.gray;
         }
 
         protected override ScenarioVerificationResult VerifyInternal(ScenarioParameterOverrides overrides)
