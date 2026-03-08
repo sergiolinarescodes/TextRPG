@@ -9,14 +9,14 @@ namespace TextRPG.Core.Passive
     {
         private static readonly Dictionary<string, PassiveDefinition> All = new()
         {
-            ["heal_on_ally_hit"] = new PassiveDefinition(
-                "heal_on_ally_hit", "Ally Protection", "Heals allies when they take damage", Color.green),
+            [PassiveIds.HealOnAllyHit] = new PassiveDefinition(
+                PassiveIds.HealOnAllyHit, "Ally Protection", "Heals allies when they take damage", Color.green),
 
-            ["heal_on_round_end"] = new PassiveDefinition(
-                "heal_on_round_end", "Regeneration Aura", "Heals all allies at end of each round", Color.green),
+            [PassiveIds.HealOnRoundEnd] = new PassiveDefinition(
+                PassiveIds.HealOnRoundEnd, "Regeneration Aura", "Heals all allies at end of each round", Color.green),
 
-            ["damage_on_ally_hit"] = new PassiveDefinition(
-                "damage_on_ally_hit", "Retribution", "Damages attackers when allies are hit", Color.red),
+            [PassiveIds.DamageOnAllyHit] = new PassiveDefinition(
+                PassiveIds.DamageOnAllyHit, "Retribution", "Damages attackers when allies are hit", Color.red),
         };
 
         private static readonly PassiveDefinition Fallback = new(

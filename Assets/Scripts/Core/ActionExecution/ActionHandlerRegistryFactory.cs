@@ -1,7 +1,9 @@
 using TextRPG.Core.ActionExecution.Handlers;
+using TextRPG.Core.StatusEffect;
 using TextRPG.Core.Weapon;
 
 using static TextRPG.Core.EntityStats.StatType;
+using static TextRPG.Core.ActionExecution.Handlers.ApplyStatusEffectHandler.DurationMode;
 
 namespace TextRPG.Core.ActionExecution
 {
@@ -39,12 +41,12 @@ namespace TextRPG.Core.ActionExecution
                 registry.Register("Shock", new ShockActionHandler(ctx));
                 registry.Register("Fear", new FearActionHandler(ctx));
                 registry.Register("Stun", new StunActionHandler(ctx));
-                registry.Register("Poison", new PoisonActionHandler(ctx));
-                registry.Register("Bleed", new BleedActionHandler(ctx));
-                registry.Register("Grow", new GrowActionHandler(ctx));
-                registry.Register("Thorns", new ThornsActionHandler(ctx));
-                registry.Register("Reflect", new ReflectActionHandler(ctx));
-                registry.Register("Hardening", new HardeningActionHandler(ctx));
+                registry.Register("Poison", new ApplyStatusEffectHandler("Poison", ctx, StatusEffectType.Poisoned, false, FromValue));
+                registry.Register("Bleed", new ApplyStatusEffectHandler("Bleed", ctx, StatusEffectType.Bleeding, false, Permanent));
+                registry.Register("Grow", new ApplyStatusEffectHandler("Grow", ctx, StatusEffectType.Growing, true, FromValue));
+                registry.Register("Thorns", new ApplyStatusEffectHandler("Thorns", ctx, StatusEffectType.Thorns, true, FromValue));
+                registry.Register("Reflect", new ApplyStatusEffectHandler("Reflect", ctx, StatusEffectType.Reflecting, true, StackByValue));
+                registry.Register("Hardening", new ApplyStatusEffectHandler("Hardening", ctx, StatusEffectType.Hardening, true, StackByValue));
             }
 
             if (ctx.StatusEffects != null && ctx.EntityStats != null)

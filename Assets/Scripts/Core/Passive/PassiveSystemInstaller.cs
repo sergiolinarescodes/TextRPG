@@ -32,9 +32,9 @@ namespace TextRPG.Core.Passive
         {
             return new Dictionary<string, IPassiveHandler>
             {
-                ["heal_on_ally_hit"] = new HealOnAllyHitHandler(),
-                ["heal_on_round_end"] = new HealOnRoundEndHandler(),
-                ["damage_on_ally_hit"] = new DamageOnAllyHitHandler(),
+                [PassiveIds.HealOnAllyHit] = new HealOnAllyHitHandler(),
+                [PassiveIds.HealOnRoundEnd] = new HealOnRoundEndHandler(),
+                [PassiveIds.DamageOnAllyHit] = new DamageOnAllyHitHandler(),
             };
         }
     }

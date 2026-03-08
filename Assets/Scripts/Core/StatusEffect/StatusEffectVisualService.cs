@@ -29,6 +29,7 @@ namespace TextRPG.Core.StatusEffect
         private CombatSlotVisual _slotVisual;
         private VisualElement _tooltipLayer;
         private VisualElement _currentTooltip;
+        private EventCallback<GeometryChangedEvent> _pendingLayoutCallback;
         private readonly List<(VisualElement cell, EventCallback<PointerEnterEvent> enter, EventCallback<PointerLeaveEvent> leave)> _hoverCallbacks = new();
 
         public StatusEffectVisualService(IEventBus eventBus) : base(eventBus)
@@ -269,11 +270,13 @@ namespace TextRPG.Core.StatusEffect
             _currentTooltip = tooltip;
 
             // Position after layout using framework TooltipPositioner for clamping
-            tooltip.RegisterCallback<GeometryChangedEvent>(OnTooltipLayout);
+            _pendingLayoutCallback = OnTooltipLayout;
+            tooltip.RegisterCallback(_pendingLayoutCallback);
 
             void OnTooltipLayout(GeometryChangedEvent evt)
             {
                 tooltip.UnregisterCallback<GeometryChangedEvent>(OnTooltipLayout);
+                _pendingLayoutCallback = null;
                 var tooltipSize = new Vector2(tooltip.resolvedStyle.width, tooltip.resolvedStyle.height);
                 var containerSize = new Vector2(_tooltipLayer.resolvedStyle.width, _tooltipLayer.resolvedStyle.height);
                 var result = TooltipPositioner.Compute(cellBound, tooltipSize, containerSize, TooltipPlacement.Bottom, arrowSize: 0f);
@@ -289,6 +292,11 @@ namespace TextRPG.Core.StatusEffect
 
         private void HideTooltip()
         {
+            if (_currentTooltip != null && _pendingLayoutCallback != null)
+            {
+                _currentTooltip.UnregisterCallback(_pendingLayoutCallback);
+                _pendingLayoutCallback = null;
+            }
             _currentTooltip?.RemoveFromHierarchy();
             _currentTooltip = null;
         }

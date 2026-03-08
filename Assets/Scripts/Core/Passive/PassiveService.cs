@@ -13,7 +13,7 @@ namespace TextRPG.Core.Passive
         private readonly IReadOnlyDictionary<string, IPassiveHandler> _handlerRegistry;
         private readonly IPassiveContext _context;
         private readonly IReadOnlyDictionary<string, EnemyDefinition> _unitRegistry;
-        private readonly Dictionary<EntityId, List<(string PassiveId, int Value)>> _activePassives = new();
+        private readonly Dictionary<EntityId, List<PassiveEntry>> _activePassives = new();
 
         public PassiveService(
             IEventBus eventBus,
@@ -34,13 +34,13 @@ namespace TextRPG.Core.Passive
         {
             if (passives == null || passives.Length == 0) return;
 
-            var list = new List<(string, int)>();
+            var list = new List<PassiveEntry>();
             foreach (var entry in passives)
             {
                 if (_handlerRegistry.TryGetValue(entry.PassiveId, out var handler))
                 {
                     handler.Register(entityId, entry.Value, _context);
-                    list.Add((entry.PassiveId, entry.Value));
+                    list.Add(entry);
                 }
             }
 
@@ -52,9 +52,9 @@ namespace TextRPG.Core.Passive
         {
             if (!_activePassives.TryGetValue(entityId, out var list)) return;
 
-            foreach (var (passiveId, _) in list)
+            foreach (var entry in list)
             {
-                if (_handlerRegistry.TryGetValue(passiveId, out var handler))
+                if (_handlerRegistry.TryGetValue(entry.PassiveId, out var handler))
                     handler.Unregister(entityId, _context);
             }
 
@@ -67,10 +67,7 @@ namespace TextRPG.Core.Passive
         {
             if (!_activePassives.TryGetValue(entityId, out var list))
                 return Array.Empty<PassiveEntry>();
-            var result = new PassiveEntry[list.Count];
-            for (int i = 0; i < list.Count; i++)
-                result[i] = new PassiveEntry(list[i].PassiveId, list[i].Value);
-            return result;
+            return list;
         }
 
         private void OnEntityDied(EntityDiedEvent e) => RemovePassives(e.EntityId);

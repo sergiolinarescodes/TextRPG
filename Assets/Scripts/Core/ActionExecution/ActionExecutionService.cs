@@ -95,7 +95,7 @@ namespace TextRPG.Core.ActionExecution
                     _statusEffects.HasEffect(targets[0], StatusEffectType.Reflecting))
                 {
                     var reflectTarget = targets[0];
-                    targets = new List<EntityId> { _combatContext.SourceEntity };
+                    targets = new[] { _combatContext.SourceEntity };
                     _statusEffects.DecrementStack(reflectTarget, StatusEffectType.Reflecting);
                 }
 

@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using TextRPG.Core.EntityStats;
 using TextRPG.Core.WordAction;
-using UnityEngine;
-using EntityId = TextRPG.Core.EntityStats.EntityId;
 
 namespace TextRPG.Core.ActionExecution
 {
@@ -35,11 +32,7 @@ namespace TextRPG.Core.ActionExecution
                 var spec = TargetTypeClassifier.Parse(actionTarget);
                 var targets = _combatContext.GetTargets(spec.BaseType, 0, spec.StatusFilter);
 
-                var entities = new List<EntityId>(targets.Count);
-                for (int j = 0; j < targets.Count; j++)
-                    entities.Add(targets[j]);
-
-                previews.Add(new ActionTargetPreview(mapping.ActionId, entities));
+                previews.Add(new ActionTargetPreview(mapping.ActionId, targets));
             }
 
             return new TargetingPreview(previews);
