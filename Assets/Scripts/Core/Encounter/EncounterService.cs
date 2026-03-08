@@ -1,13 +1,12 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.ActionExecution;
-using TextRPG.Core.CombatGrid;
+using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.UnitRendering;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
-using Unidad.Core.Grid;
 using Unidad.Core.Systems;
 using UnityEngine;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
@@ -18,7 +17,7 @@ namespace TextRPG.Core.Encounter
     {
         private readonly IEntityStatsService _entityStats;
         private readonly ITurnService _turnService;
-        private readonly ICombatGridService _combatGrid;
+        private readonly ICombatSlotService _slotService;
         private readonly ICombatContext _combatContext;
         private readonly EnemyWordResolver _enemyWordResolver;
 
@@ -29,21 +28,22 @@ namespace TextRPG.Core.Encounter
 
         public bool IsEncounterActive => _activeEncounterId != null;
         public IReadOnlyList<EntityId> EnemyEntities => _enemyEntities;
+        public EntityId PlayerEntity => _player;
         public EnemyWordResolver EnemyResolver => _enemyWordResolver;
 
         public EncounterService(IEventBus eventBus, IEntityStatsService entityStats, ITurnService turnService,
-            ICombatGridService combatGrid, ICombatContext combatContext, EnemyWordResolver enemyWordResolver)
+            ICombatSlotService slotService, ICombatContext combatContext, EnemyWordResolver enemyWordResolver)
             : base(eventBus)
         {
             _entityStats = entityStats;
             _turnService = turnService;
-            _combatGrid = combatGrid;
+            _slotService = slotService;
             _combatContext = combatContext;
             _enemyWordResolver = enemyWordResolver;
             Subscribe<EntityDiedEvent>(OnEntityDied);
         }
 
-        public void StartEncounter(EncounterDefinition encounter, EntityId player, GridPosition playerPosition)
+        public void StartEncounter(EncounterDefinition encounter, EntityId player)
         {
             if (IsEncounterActive)
                 throw new InvalidOperationException("An encounter is already active.");
@@ -54,22 +54,18 @@ namespace TextRPG.Core.Encounter
             _enemyDefinitions.Clear();
             _enemyWordResolver.Clear();
 
-            _combatGrid.Initialize(8, 6);
-            var playerUnitDef = new UnitDefinition(new UnitId(player.Value), "PLAYER", 100, 10, 5, 8, Color.cyan);
-            _combatGrid.RegisterCombatant(player, playerUnitDef, playerPosition);
+            _slotService.Initialize();
 
             for (int i = 0; i < encounter.Enemies.Length; i++)
             {
                 var enemyDef = encounter.Enemies[i];
-                var position = encounter.EnemyPositions[i];
                 var entityId = new EntityId($"enemy_{enemyDef.Name.ToLowerInvariant()}_{i}");
 
                 _entityStats.RegisterEntity(entityId, enemyDef.MaxHealth, enemyDef.Strength, enemyDef.MagicPower,
-                    enemyDef.PhysicalDefense, enemyDef.MagicDefense, enemyDef.Luck, enemyDef.MovementPoints);
+                    enemyDef.PhysicalDefense, enemyDef.MagicDefense, enemyDef.Luck,
+                    startingShield: enemyDef.StartingShield);
 
-                var unitDef = new UnitDefinition(new UnitId(entityId.Value), enemyDef.Name, enemyDef.MaxHealth,
-                    enemyDef.Strength, 0, 0, enemyDef.Color);
-                _combatGrid.RegisterCombatant(entityId, unitDef, position);
+                _slotService.RegisterEnemy(entityId, i);
 
                 _enemyEntities.Add(entityId);
                 _enemyDefinitions[entityId] = enemyDef;
@@ -84,7 +80,7 @@ namespace TextRPG.Core.Encounter
             _combatContext.SetSourceEntity(player);
             _combatContext.SetEnemies(_enemyEntities);
             _combatContext.SetAllies(Array.Empty<EntityId>());
-            _combatContext.SetGrid(_combatGrid);
+            _combatContext.SetSlotService(_slotService);
 
             Publish(new EncounterStartedEvent(encounter.Id, encounter.Enemies.Length));
         }
@@ -111,6 +107,16 @@ namespace TextRPG.Core.Encounter
             Publish(new EncounterEndedEvent(id, victory));
         }
 
+        public void RegisterEnemy(EntityId entityId, EnemyDefinition definition = null)
+        {
+            if (_enemyDefinitions.ContainsKey(entityId))
+                return;
+
+            definition ??= new EnemyDefinition("SUMMON", 10, 1, 0, 0, 0, 0, Color.red, new[] { "scratch" });
+            _enemyEntities.Add(entityId);
+            _enemyDefinitions[entityId] = definition;
+        }
+
         public bool IsEnemy(EntityId entityId) => _enemyDefinitions.ContainsKey(entityId);
 
         public EnemyDefinition GetEnemyDefinition(EntityId entityId)
@@ -124,6 +130,9 @@ namespace TextRPG.Core.Encounter
         {
             if (!IsEncounterActive || !IsEnemy(e.EntityId))
                 return;
+
+            _slotService.RemoveEntity(e.EntityId);
+            _turnService.RemoveFromTurnOrder(e.EntityId);
 
             var allDead = true;
             foreach (var enemy in _enemyEntities)

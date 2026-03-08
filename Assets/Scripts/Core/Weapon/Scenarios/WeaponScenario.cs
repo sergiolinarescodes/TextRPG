@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.ActionExecution.Handlers;
-using TextRPG.Core.CombatGrid;
+using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.UnitRendering;
 using TextRPG.Core.WordAction;
 using TextRPG.Core.WordInput;
 using Unidad.Core.EventBus;
-using Unidad.Core.Grid;
 using Unidad.Core.Testing;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -26,33 +25,29 @@ namespace TextRPG.Core.Weapon.Scenarios
         private IWordResolver _ammoResolver;
         private IWordMatchService _wordMatchService;
         private IEntityStatsService _entityStats;
-        private ICombatGridService _combatGrid;
+        private ICombatSlotService _slotService;
         private ICombatContext _combatContext;
-        private IUnitService _unitService;
-        private IGrid<UnitId?> _grid;
 
         private VisualElement _weaponSlot;
         private Label _weaponDurabilityLabel;
         private VisualElement _weaponNameContainer;
-        private bool _isWeaponMode;
+        private EntityId _playerId;
         private readonly List<IDisposable> _subscriptions = new();
 
         private static readonly Color WeaponSlotBorderDefault = new(0.5f, 0.5f, 0.5f);
-        private static readonly Color WeaponSlotBorderActive = new(1f, 0.8f, 0.2f);
         private static readonly Color WeaponNameColor = new(1f, 0.85f, 0.3f);
 
         public WeaponScenario() : base(new TestScenarioDefinition(
             "weapon",
             "Weapon System",
             "Equip a weapon and use ammo words. Type GUN or SWORD to equip, " +
-            "then click the weapon slot to enter weapon mode and type ammo words.",
+            "then type ammo words to auto-fire at enemies.",
             Array.Empty<ScenarioParameter>()
         )) { }
 
         protected override void ExecuteInternal(ScenarioParameterOverrides overrides)
         {
             _eventBus = new EventBus();
-            _unitService = new UnitService(_eventBus);
             _entityStats = new EntityStatsService(_eventBus);
 
             var wordActionData = WordActionDatabaseLoader.Load();
@@ -62,28 +57,23 @@ namespace TextRPG.Core.Weapon.Scenarios
             _ammoResolver = wordActionData.AmmoResolver;
             _wordMatchService = new WordMatchService(filteredResolver, wordActionData.ActionRegistry);
 
-            // Combat grid
-            _combatGrid = new CombatGridService(_eventBus, _unitService);
-            _combatGrid.Initialize(3, 8);
-            _grid = _combatGrid.Grid;
+            // CombatSlot
+            _slotService = new CombatSlotService(_eventBus);
+            _slotService.Initialize();
 
             _combatContext = new CombatContext();
             _combatContext.SetEntityStats(_entityStats);
-            _combatContext.SetGrid(_combatGrid);
+            _combatContext.SetSlotService(_slotService);
 
             // Player
-            var playerId = new EntityId("player");
+            _playerId = new EntityId("player");
+            var playerId = _playerId;
             _entityStats.RegisterEntity(playerId, 100, 10, 8, 5, 4, 3);
-            _combatGrid.RegisterCombatant(playerId,
-                new UnitDefinition(new UnitId("player"), "YOU", 100, 10, 8, 12, Color.white),
-                new GridPosition(1, 0));
 
             // Enemy
             var enemyId = new EntityId("goblin");
             _entityStats.RegisterEntity(enemyId, 50, 6, 4, 3, 2, 2);
-            _combatGrid.RegisterCombatant(enemyId,
-                new UnitDefinition(new UnitId("goblin"), "GOB", 50, 6, 5, 4, new Color(0.2f, 0.8f, 0.2f)),
-                new GridPosition(1, 7));
+            _slotService.RegisterEnemy(enemyId, 0);
 
             _combatContext.SetSourceEntity(playerId);
             _combatContext.SetEnemies(new[] { enemyId });
@@ -126,7 +116,7 @@ namespace TextRPG.Core.Weapon.Scenarios
             root.style.height = Length.Percent(100);
             root.style.backgroundColor = Color.black;
 
-            var infoLabel = new Label("Type GUN or SWORD to equip. Click weapon slot to enter weapon mode.");
+            var infoLabel = new Label("Type GUN or SWORD to equip. Then type ammo words to auto-fire.");
             infoLabel.style.color = Color.white;
             infoLabel.style.fontSize = 14;
             infoLabel.style.paddingLeft = 10;
@@ -173,14 +163,21 @@ namespace TextRPG.Core.Weapon.Scenarios
             _weaponDurabilityLabel.style.right = 0;
             _weaponSlot.Add(_weaponDurabilityLabel);
 
-            _weaponSlot.RegisterCallback<ClickEvent>(_ =>
-            {
-                _isWeaponMode = !_isWeaponMode;
-                UpdateWeaponSlotBorder();
-                Debug.Log($"[WeaponScenario] Weapon mode: {(_isWeaponMode ? "ON" : "OFF")}");
-            });
+            _weaponSlot.RegisterCallback<ClickEvent>(_ => FireWeapon());
 
             root.Add(_weaponSlot);
+        }
+
+        private void FireWeapon()
+        {
+            if (_weaponService == null || !_weaponService.HasWeapon(_playerId)) return;
+
+            var ammoWords = _weaponService.GetAmmoWords(_playerId);
+            if (ammoWords.Count == 0) return;
+
+            var ammo = ammoWords[UnityEngine.Random.Range(0, ammoWords.Count)];
+            Debug.Log($"[WeaponScenario] Fire weapon: {ammo}");
+            _eventBus.Publish(new WeaponAmmoSubmittedEvent(_playerId, ammo));
         }
 
         private void OnWeaponEquipped(WeaponEquippedEvent evt)
@@ -199,20 +196,7 @@ namespace TextRPG.Core.Weapon.Scenarios
             float cellHeight = 56;
             var layout = UnitTextLayout.Calculate(name, cellWidth, cellHeight);
 
-            foreach (var rowText in layout.Rows)
-            {
-                var label = new Label(rowText);
-                label.style.fontSize = layout.FontSize;
-                label.style.color = WeaponNameColor;
-                label.style.unityTextAlign = TextAnchor.MiddleCenter;
-                label.style.whiteSpace = WhiteSpace.NoWrap;
-                label.style.unityFontStyleAndWeight = FontStyle.Bold;
-                label.style.marginTop = 0;
-                label.style.marginBottom = 0;
-                label.style.paddingTop = 0;
-                label.style.paddingBottom = 0;
-                _weaponNameContainer.Add(label);
-            }
+            UnitTextLabels.AddTo(layout, WeaponNameColor, _weaponNameContainer);
         }
 
         private void OnDurabilityChanged(WeaponDurabilityChangedEvent evt)
@@ -225,17 +209,7 @@ namespace TextRPG.Core.Weapon.Scenarios
         {
             Debug.Log($"[WeaponScenario] Weapon destroyed: {evt.WeaponWord}");
             _weaponSlot.style.display = DisplayStyle.None;
-            _isWeaponMode = false;
             _weaponNameContainer.Clear();
-        }
-
-        private void UpdateWeaponSlotBorder()
-        {
-            var color = _isWeaponMode ? WeaponSlotBorderActive : WeaponSlotBorderDefault;
-            _weaponSlot.style.borderTopColor = color;
-            _weaponSlot.style.borderBottomColor = color;
-            _weaponSlot.style.borderLeftColor = color;
-            _weaponSlot.style.borderRightColor = color;
         }
 
         protected override ScenarioVerificationResult VerifyInternal(ScenarioParameterOverrides overrides)
@@ -266,10 +240,8 @@ namespace TextRPG.Core.Weapon.Scenarios
             _ammoResolver = null;
             _wordMatchService = null;
             _entityStats = null;
-            _combatGrid = null;
+            _slotService = null;
             _combatContext = null;
-            _unitService = null;
-            _grid = null;
             _weaponSlot = null;
             _weaponDurabilityLabel = null;
             _weaponNameContainer = null;

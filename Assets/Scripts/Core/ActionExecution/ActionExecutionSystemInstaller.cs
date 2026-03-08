@@ -1,9 +1,11 @@
 using Reflex.Core;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
+using Unidad.Core.Abstractions;
 using Unidad.Core.Bootstrap;
 using Unidad.Core.EventBus;
 using Unidad.Core.Testing;
@@ -24,13 +26,15 @@ namespace TextRPG.Core.ActionExecution
 
             builder.AddSingleton(container =>
             {
+                var unitRegistry = UnitDatabaseLoader.LoadAll();
                 var handlerContext = new ActionHandlerContext(
                     container.Resolve<IEntityStatsService>(),
                     container.Resolve<IEventBus>(),
                     container.Resolve<ICombatContext>(),
                     container.Resolve<IStatusEffectService>(),
                     container.Resolve<ITurnService>(),
-                    container.Resolve<IWeaponService>());
+                    container.Resolve<IWeaponService>(),
+                    unitRegistry: unitRegistry);
 
                 var registry = ActionHandlerRegistryFactory.CreateDefault(handlerContext);
                 return (IActionHandlerRegistry)registry;
@@ -42,7 +46,10 @@ namespace TextRPG.Core.ActionExecution
                 var wordResolver = container.Resolve<IWordResolver>();
                 var handlerRegistry = container.Resolve<IActionHandlerRegistry>();
                 var combatContext = container.Resolve<ICombatContext>();
-                return (IActionExecutionService)new ActionExecutionService(eventBus, wordResolver, handlerRegistry, combatContext);
+                var entityStats = container.Resolve<IEntityStatsService>();
+                var statusEffects = container.Resolve<IStatusEffectService>();
+                var animationResolver = container.Resolve<IAnimationResolver>();
+                return (IActionExecutionService)new ActionExecutionService(eventBus, wordResolver, handlerRegistry, combatContext, entityStats, statusEffects, animationResolver);
             }, typeof(IActionExecutionService));
 
             builder.AddSingleton(container =>

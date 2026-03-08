@@ -34,19 +34,16 @@ namespace TextRPG.Core.WordAction
             registry.Register("Stun", new ActionDefinition("Stun", "Stun", new Color(0.9f, 0.9f, 0.1f)));
             registry.Register("Freeze", new ActionDefinition("Freeze", "Freeze", new Color(0.5f, 0.8f, 1f)));
             registry.Register("Concussion", new ActionDefinition("Concussion", "Concussion", new Color(0.7f, 0.5f, 0.2f)));
-            registry.Register("Move", new ActionDefinition("Move", "Move", new Color(0.4f, 0.7f, 0.4f)));
             registry.Register("BuffStrength", new ActionDefinition("BuffStrength", "Buff Strength", new Color(0.3f, 0.9f, 0.3f)));
             registry.Register("BuffMagicPower", new ActionDefinition("BuffMagicPower", "Buff Magic Power", new Color(0.4f, 0.6f, 1f)));
             registry.Register("BuffPhysicalDefense", new ActionDefinition("BuffPhysicalDefense", "Buff Phys Def", new Color(0.7f, 0.7f, 0.3f)));
             registry.Register("BuffMagicDefense", new ActionDefinition("BuffMagicDefense", "Buff Magic Def", new Color(0.5f, 0.5f, 1f)));
             registry.Register("BuffLuck", new ActionDefinition("BuffLuck", "Buff Luck", new Color(0.9f, 0.8f, 0.2f)));
-            registry.Register("BuffMovement", new ActionDefinition("BuffMovement", "Buff Movement", new Color(0.3f, 0.8f, 0.6f)));
             registry.Register("DebuffStrength", new ActionDefinition("DebuffStrength", "Debuff Strength", new Color(0.6f, 0.2f, 0.2f)));
             registry.Register("DebuffMagicPower", new ActionDefinition("DebuffMagicPower", "Debuff Magic Power", new Color(0.4f, 0.2f, 0.6f)));
             registry.Register("DebuffPhysicalDefense", new ActionDefinition("DebuffPhysicalDefense", "Debuff Phys Def", new Color(0.5f, 0.3f, 0.1f)));
             registry.Register("DebuffMagicDefense", new ActionDefinition("DebuffMagicDefense", "Debuff Magic Def", new Color(0.3f, 0.2f, 0.5f)));
             registry.Register("DebuffLuck", new ActionDefinition("DebuffLuck", "Debuff Luck", new Color(0.5f, 0.4f, 0.1f)));
-            registry.Register("DebuffMovement", new ActionDefinition("DebuffMovement", "Debuff Movement", new Color(0.4f, 0.3f, 0.3f)));
 
             var mappings = new Dictionary<string, List<WordActionMapping>>
             {

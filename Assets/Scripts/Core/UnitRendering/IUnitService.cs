@@ -4,6 +4,8 @@ namespace TextRPG.Core.UnitRendering
 {
     public interface IUnitService
     {
+        void Register(UnitId id, UnitDefinition definition);
+        void RemoveUnit(UnitId id);
         UnitInstance PlaceUnit(UnitDefinition definition, GridPosition position, IGrid<UnitId?> grid);
         void RemoveUnit(UnitId id, IGrid<UnitId?> grid);
         void MoveUnit(UnitId id, GridPosition to, IGrid<UnitId?> grid);

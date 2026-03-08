@@ -1,5 +1,7 @@
 using System;
+using TextAnimationsForUIToolkit;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace TextRPG.Core.UnitRendering
 {
@@ -62,4 +64,52 @@ namespace TextRPG.Core.UnitRendering
     }
 
     public readonly record struct TextLayoutResult(string[] Rows, int CharsPerRow, int RowCount, float FontSize);
+
+    public static class UnitTextLabels
+    {
+        public static Label[] AddTo(TextLayoutResult layout, Color textColor, VisualElement container)
+        {
+            var labels = new Label[layout.Rows.Length];
+            for (int i = 0; i < layout.Rows.Length; i++)
+            {
+                var label = new Label(layout.Rows[i]);
+                label.style.fontSize = layout.FontSize;
+                label.style.color = textColor;
+                label.style.unityTextAlign = TextAnchor.MiddleCenter;
+                label.style.whiteSpace = WhiteSpace.NoWrap;
+                label.style.unityFontStyleAndWeight = FontStyle.Bold;
+                label.style.marginTop = 0;
+                label.style.marginBottom = 0;
+                label.style.paddingTop = 0;
+                label.style.paddingBottom = 0;
+                container.Add(label);
+                labels[i] = label;
+            }
+            return labels;
+        }
+
+        public static AnimatedLabel[] AddAnimatedWithRecipeTo(TextLayoutResult layout, Color textColor,
+            VisualElement container, string markupTemplate)
+        {
+            var labels = new AnimatedLabel[layout.Rows.Length];
+            for (int i = 0; i < layout.Rows.Length; i++)
+            {
+                var label = new AnimatedLabel();
+                label.style.fontSize = layout.FontSize;
+                label.style.color = textColor;
+                label.style.unityTextAlign = TextAnchor.MiddleCenter;
+                label.style.whiteSpace = WhiteSpace.NoWrap;
+                label.style.unityFontStyleAndWeight = FontStyle.Bold;
+                label.style.marginTop = 0;
+                label.style.marginBottom = 0;
+                label.style.paddingTop = 0;
+                label.style.paddingBottom = 0;
+                label.text = string.Format(markupTemplate, layout.Rows[i]);
+                label.Play();
+                container.Add(label);
+                labels[i] = label;
+            }
+            return labels;
+        }
+    }
 }

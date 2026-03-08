@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Unidad.Core.Grid;
+using TextRPG.Core.EntityStats;
 
 namespace TextRPG.Core.ActionExecution
 {
@@ -8,5 +8,5 @@ namespace TextRPG.Core.ActionExecution
 
     public readonly record struct ActionTargetPreview(
         string ActionId,
-        IReadOnlyList<GridPosition> AffectedPositions);
+        IReadOnlyList<EntityId> AffectedEntities);
 }

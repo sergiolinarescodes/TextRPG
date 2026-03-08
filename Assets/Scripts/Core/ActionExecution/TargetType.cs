@@ -13,6 +13,9 @@ namespace TextRPG.Core.ActionExecution
         // === Positional ===
         Melee,
         Area,
+        FrontEnemy,
+        MiddleEnemy,
+        BackEnemy,
 
         // === Random ===
         RandomEnemy,
@@ -38,27 +41,6 @@ namespace TextRPG.Core.ActionExecution
         RandomEnemyWithoutStatus,
         AllEnemiesWithStatus,
         AllEnemiesWithoutStatus,
-
-        // === Status-based: specific effects ===
-        AllBurningEnemies,
-        AllWetEnemies,
-        AllPoisonedEnemies,
-        AllFrozenEnemies,
-        AllStunnedEnemies,
-        AllCursedEnemies,
-        AllFearfulEnemies,
-
-        // === Status + random ===
-        RandomBurningEnemy,
-        RandomWetEnemy,
-        RandomPoisonedEnemy,
-        RandomFrozenEnemy,
-        RandomStunnedEnemy,
-
-        // === Status + stat ===
-        LowestHealthBurningEnemy,
-        LowestHealthPoisonedEnemy,
-        LowestHealthWetEnemy,
 
         // === Subset targeting ===
         HalfEnemiesRandom,

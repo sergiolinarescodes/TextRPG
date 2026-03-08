@@ -33,7 +33,14 @@
       "Bash(py --version)",
       "Bash(py:*)",
       "Bash(where:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(ls /c/Python*)",
+      "Read(//c/Users/kelns/scoop/**)",
+      "Bash(\"C:/Users/kelns/AppData/Local/Programs/Python/Python312/python.exe\":*)",
+      "Bash(sort:*)",
+      "Read(//c/Users/kelns/repos/TextRPG/**)",
+      "Bash(mv TextRPG.Core.csproj.tmp TextRPG.Core.csproj)",
+      "Bash(then:*)"
     ]
   }
 }

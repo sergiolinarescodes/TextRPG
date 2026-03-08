@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
 using Unidad.Core.Patterns.Modifier;
 using Unidad.Core.Systems;
@@ -10,15 +11,20 @@ namespace TextRPG.Core.EntityStats
     {
         private readonly Dictionary<EntityId, EntityStatEntry> _entities = new();
 
-        public EntityStatsService(IEventBus eventBus) : base(eventBus) { }
+        public EntityStatsService(IEventBus eventBus) : base(eventBus)
+        {
+            Subscribe<TurnStartedEvent>(OnTurnStarted);
+        }
 
         public void RegisterEntity(EntityId id, int maxHealth, int strength, int magicPower,
-                                   int physicalDefense, int magicDefense, int luck, int movementPoints = 0)
+                                   int physicalDefense, int magicDefense, int luck,
+                                   int maxMana = 10, int manaRegen = 2, int startingMana = 5,
+                                   int startingShield = 0)
         {
             if (_entities.ContainsKey(id))
                 throw new InvalidOperationException($"Entity '{id.Value}' is already registered.");
 
-            var entry = new EntityStatEntry(maxHealth, strength, magicPower, physicalDefense, magicDefense, luck, movementPoints);
+            var entry = new EntityStatEntry(maxHealth, strength, magicPower, physicalDefense, magicDefense, luck, maxMana, manaRegen, startingMana, startingShield);
             _entities[id] = entry;
             Publish(new EntityRegisteredEvent(id, maxHealth));
         }
@@ -50,12 +56,18 @@ namespace TextRPG.Core.EntityStats
             return GetEntry(id).CurrentHealth;
         }
 
-        public void ApplyDamage(EntityId id, int amount)
+        public void ApplyDamage(EntityId id, int amount, EntityId? damageSource = null)
         {
             if (amount < 0)
                 throw new ArgumentException("Damage amount cannot be negative.", nameof(amount));
 
             var entry = GetEntry(id);
+
+            var reduction = GetStat(id, StatType.DamageReduction);
+            if (reduction > 0)
+                amount = Math.Max(0, amount - reduction);
+            if (amount == 0)
+                return;
 
             var shieldAbsorbed = Math.Min(amount, entry.CurrentShield);
             if (shieldAbsorbed > 0)
@@ -69,7 +81,7 @@ namespace TextRPG.Core.EntityStats
             if (healthDamage > 0)
             {
                 entry.CurrentHealth = Math.Max(0, entry.CurrentHealth - healthDamage);
-                Publish(new DamageTakenEvent(id, healthDamage, entry.CurrentHealth));
+                Publish(new DamageTakenEvent(id, healthDamage, entry.CurrentHealth, damageSource));
 
                 if (entry.CurrentHealth == 0)
                     Publish(new EntityDiedEvent(id));
@@ -103,6 +115,34 @@ namespace TextRPG.Core.EntityStats
             return GetEntry(id).CurrentShield;
         }
 
+        public int GetCurrentMana(EntityId id)
+        {
+            return GetEntry(id).CurrentMana;
+        }
+
+        public void ApplyMana(EntityId id, int amount)
+        {
+            var entry = GetEntry(id);
+            var maxMana = GetStat(id, StatType.MaxMana);
+            var previous = entry.CurrentMana;
+            entry.CurrentMana = Math.Min(maxMana, entry.CurrentMana + amount);
+            Publish(new ManaChangedEvent(id, entry.CurrentMana, previous));
+        }
+
+        public bool TrySpendMana(EntityId id, int cost)
+        {
+            var entry = GetEntry(id);
+            if (entry.CurrentMana < cost)
+            {
+                Publish(new ManaInsufficientEvent(id, cost, entry.CurrentMana));
+                return false;
+            }
+            var previous = entry.CurrentMana;
+            entry.CurrentMana -= cost;
+            Publish(new ManaChangedEvent(id, entry.CurrentMana, previous));
+            return true;
+        }
+
         public void AddModifier(EntityId id, StatType stat, IModifier<int> modifier)
         {
             var entry = GetEntry(id);
@@ -119,6 +159,13 @@ namespace TextRPG.Core.EntityStats
             return removed;
         }
 
+        private void OnTurnStarted(TurnStartedEvent e)
+        {
+            if (!_entities.ContainsKey(e.EntityId)) return;
+            var regen = GetStat(e.EntityId, StatType.ManaRegen);
+            if (regen > 0) ApplyMana(e.EntityId, regen);
+        }
+
         private EntityStatEntry GetEntry(EntityId id)
         {
             if (!_entities.TryGetValue(id, out var entry))
@@ -128,14 +175,17 @@ namespace TextRPG.Core.EntityStats
 
         private sealed class EntityStatEntry
         {
-            private readonly int[] _baseStats = new int[8];
-            private readonly ModifierStack<int>[] _modifierStacks = new ModifierStack<int>[8];
+            private const int StatCount = 10;
+            private readonly int[] _baseStats = new int[StatCount];
+            private readonly ModifierStack<int>[] _modifierStacks = new ModifierStack<int>[StatCount];
 
             public int CurrentHealth { get; set; }
             public int CurrentShield { get; set; }
+            public int CurrentMana { get; set; }
 
             public EntityStatEntry(int maxHealth, int strength, int magicPower,
-                                   int physicalDefense, int magicDefense, int luck, int movementPoints)
+                                   int physicalDefense, int magicDefense, int luck,
+                                   int maxMana, int manaRegen, int startingMana, int startingShield)
             {
                 _baseStats[(int)StatType.Health] = maxHealth;
                 _baseStats[(int)StatType.MaxHealth] = maxHealth;
@@ -144,8 +194,11 @@ namespace TextRPG.Core.EntityStats
                 _baseStats[(int)StatType.PhysicalDefense] = physicalDefense;
                 _baseStats[(int)StatType.MagicDefense] = magicDefense;
                 _baseStats[(int)StatType.Luck] = luck;
-                _baseStats[(int)StatType.MovementPoints] = movementPoints;
+                _baseStats[(int)StatType.MaxMana] = maxMana;
+                _baseStats[(int)StatType.ManaRegen] = manaRegen;
                 CurrentHealth = maxHealth;
+                CurrentMana = startingMana;
+                CurrentShield = startingShield;
 
                 for (int i = 0; i < _modifierStacks.Length; i++)
                     _modifierStacks[i] = new ModifierStack<int>();

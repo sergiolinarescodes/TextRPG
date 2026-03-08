@@ -24,7 +24,7 @@ namespace TextRPG.Core.ActionExecution
             var wordData = WordActionTestFactory.CreateTestData();
             var combatContext = new CombatContext();
             var handlerRegistry = CreateHandlerRegistry(deps.EventBus, entityStats, statusEffects, combatContext);
-            return new ActionExecutionService(deps.EventBus, wordData.Resolver, handlerRegistry, combatContext);
+            return new ActionExecutionService(deps.EventBus, wordData.Resolver, handlerRegistry, combatContext, entityStats, statusEffects);
         }
 
         public IEnumerable<ITestScenario> GetScenarios()

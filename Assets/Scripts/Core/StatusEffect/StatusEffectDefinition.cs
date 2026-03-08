@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace TextRPG.Core.StatusEffect
 {
     public sealed record StatusEffectDefinition(
@@ -6,6 +8,8 @@ namespace TextRPG.Core.StatusEffect
         StackPolicy StackPolicy,
         int? DamagePerTick,
         StatModifierEntry[] StatModifiers,
-        bool GrantsExtraTurn
+        bool GrantsExtraTurn,
+        Color DisplayColor = default,
+        string Description = ""
     );
 }

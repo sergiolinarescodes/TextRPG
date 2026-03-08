@@ -42,6 +42,12 @@ namespace TextRPG.Core.StatusEffect
             registry.Register(StatusEffectType.Stun, new StunHandler());
             registry.Register(StatusEffectType.Concussion, new ConcussionHandler());
             registry.Register(StatusEffectType.Fear, new FearHandler());
+            registry.Register(StatusEffectType.Bleeding, new BleedingHandler());
+            registry.Register(StatusEffectType.Concentrated, new ConcentratedHandler());
+            registry.Register(StatusEffectType.Growing, new GrowingHandler());
+            registry.Register(StatusEffectType.Thorns, new ThornsHandler());
+            registry.Register(StatusEffectType.Reflecting, new ReflectingHandler());
+            registry.Register(StatusEffectType.Hardening, new HardeningHandler());
             return registry;
         }
     }

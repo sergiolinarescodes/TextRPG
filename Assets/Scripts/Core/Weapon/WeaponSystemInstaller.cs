@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Reflex.Core;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.WordAction;
+using Unidad.Core.Abstractions;
 using Unidad.Core.Bootstrap;
 using Unidad.Core.EventBus;
 using Unidad.Core.Testing;
@@ -33,8 +34,9 @@ namespace TextRPG.Core.Weapon
                 var data = container.Resolve<WordActionData>();
                 var handlerRegistry = container.Resolve<IActionHandlerRegistry>();
                 var combatContext = container.Resolve<ICombatContext>();
+                var animationResolver = container.Resolve<IAnimationResolver>();
                 return (IWeaponActionExecutor)new WeaponActionExecutor(
-                    eventBus, weaponService, data.AmmoResolver, handlerRegistry, combatContext);
+                    eventBus, weaponService, data.AmmoResolver, handlerRegistry, combatContext, animationResolver);
             }, typeof(IWeaponActionExecutor));
         }
 

@@ -33,6 +33,12 @@ namespace TextRPG.Core.TurnSystem
             IsTurnActive = false;
         }
 
+        public void AddToTurnOrder(EntityId entityId)
+        {
+            if (!_turnOrder.Contains(entityId))
+                _turnOrder.Add(entityId);
+        }
+
         public void BeginTurn()
         {
             if (_turnOrder.Count == 0)
@@ -73,6 +79,18 @@ namespace TextRPG.Core.TurnSystem
                     Publish(new RoundStartedEvent(CurrentRoundNumber));
                 }
             }
+        }
+
+        public void RemoveFromTurnOrder(EntityId entityId)
+        {
+            var idx = _turnOrder.IndexOf(entityId);
+            if (idx < 0) return;
+            _turnOrder.RemoveAt(idx);
+            if (_turnOrder.Count == 0) return;
+            if (idx < _currentIndex)
+                _currentIndex--;
+            else if (idx == _currentIndex && _currentIndex >= _turnOrder.Count)
+                _currentIndex = 0;
         }
 
         public void GrantExtraTurn(EntityId entityId)

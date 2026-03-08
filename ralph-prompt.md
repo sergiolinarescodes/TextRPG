@@ -34,10 +34,10 @@ Output JSON array:
 [
     {
         "word": "tsunami",
-        "target": "AreaAll",
+        "target": "AllEnemies",
         "cost": 6,
         "range": 0,
-        "area": "Diamond2",
+        "area": "Single",
         "tags": ["ELEMENTAL", "NATURE", "OFFENSIVE"],
         "actions": [
             {"action": "Water", "value": 5},
@@ -49,12 +49,12 @@ Output JSON array:
         "word": "absorb",
         "target": "SingleEnemy",
         "cost": 0,
-        "range": 3,
+        "range": 0,
         "area": "Single",
         "tags": ["SHADOW", "RESTORATION"],
         "actions": [
-            {"action": "Damage", "value": 1, "target": "SingleEnemy", "range": 3, "area": "Single"},
-            {"action": "Heal", "value": 1, "target": "Self", "range": 0, "area": "Single"}
+            {"action": "Damage", "value": 1, "target": "SingleEnemy"},
+            {"action": "Heal", "value": 1, "target": "Self"}
         ]
     },
     {
@@ -98,21 +98,20 @@ python Tools/WordAction/stats.py
 | `Stun` | Apply Stun (Value = duration) |
 | `Freeze` | Apply Frozen — immune but can't act (Value = duration) |
 | `Concussion` | Apply Concussion stacking debuff (Value = stacks) |
-| `Summon` | Summon a creature (Value = creature HP) |
-| `Move` | Move source toward target (Value = steps) |
+| `Concentrate` | Restore mana + apply Concentrated buff (Value = mana amount) |
+| `Bleed` | Apply Bleeding DoT — grows if untreated, heals reduce (Value = ignored, uses 999 duration) |
+| `Summon` | Summon a unit (Value = creature level). If the word matches a unit in the DB, uses that unit's stats and passives. Structure-type units (high HP, no/few attacks, defensive passives) use words like "fortress", "wall", "totem", "barricade". Offensive structures like "turret" have attack abilities + offensive passives (e.g. retaliate damage when allies are hit). |
 | `Slow` | Slow target (Value = duration) |
 | `BuffStrength` | Buff Strength stat (Value = amount) |
 | `BuffMagicPower` | Buff Magic Power stat (Value = amount) |
 | `BuffPhysicalDefense` | Buff Physical Defense stat (Value = amount) |
 | `BuffMagicDefense` | Buff Magic Defense stat (Value = amount) |
 | `BuffLuck` | Buff Luck stat (Value = amount) |
-| `BuffMovement` | Buff Movement Points stat (Value = amount) |
 | `DebuffStrength` | Debuff Strength stat (Value = amount) |
 | `DebuffMagicPower` | Debuff Magic Power stat (Value = amount) |
 | `DebuffPhysicalDefense` | Debuff Physical Defense stat (Value = amount) |
 | `DebuffMagicDefense` | Debuff Magic Defense stat (Value = amount) |
 | `DebuffLuck` | Debuff Luck stat (Value = amount) |
-| `DebuffMovement` | Debuff Movement Points stat (Value = amount) |
 | `Heavy` | Heavy impact (Value = intensity) |
 | `Wind` | Wind elemental (Value = intensity) |
 | `Earth` | Earth elemental (Value = intensity) |
@@ -120,6 +119,10 @@ python Tools/WordAction/stats.py
 | `Light` | Light magic (Value = intensity) |
 | `Curse` | Apply curse debuff (Value = duration) |
 | `Poison` | Apply poison DoT (Value = duration) |
+| `Grow` | Apply Growing regen — heals per tick, bonus when Wet (Value = duration) |
+| `Thorns` | Apply Thorns — retaliates damage back to attackers (Value = duration) |
+| `Reflect` | Apply Reflecting — redirects single-target abilities back to caster (Value = stacks) |
+| `Hardening` | Apply Hardening — flat damage reduction that decays each turn (Value = stacks) |
 | `Shield` | Apply shield (Value = amount) |
 | `Time` | Time manipulation (Value = intensity) |
 
@@ -127,31 +130,30 @@ python Tools/WordAction/stats.py
 
 ## TARGETING
 
-**Basic:** `Self`, `SingleEnemy`, `AreaEnemies`, `AreaAll`, `AllAllies`, `AllAlliesAndSelf`
-**Positional:** `Melee` (adjacent only), `Area` (AoE around caster)
+**Basic:** `Self`, `SingleEnemy`, `AllEnemies` (alias: `AreaEnemies`), `All` (alias: `AreaAll`), `AllAllies`, `AllAlliesAndSelf`
+**Positional:** `FrontEnemy` (slot 0, or nearest), `MiddleEnemy` (slot 1, or nearest), `BackEnemy` (slot 2, or nearest), `Melee` (alias for FrontEnemy), `Area` (alias for AllEnemies)
 **Random:** `RandomEnemy`, `RandomAlly`, `RandomAny`
 **Stat-based:** `LowestHealthEnemy`, `HighestHealthEnemy`, `LowestDefenseEnemy`, `HighestDefenseEnemy`, `LowestStrengthEnemy`, `HighestStrengthEnemy`, `LowestMagicEnemy`, `HighestMagicEnemy`
 **Random+stat:** `RandomLowestHealthEnemy`, `RandomHighestHealthEnemy`
-**Status:** `RandomEnemyWithStatus`, `RandomEnemyWithoutStatus`, `AllEnemiesWithStatus`, `AllEnemiesWithoutStatus`
-**Specific status:** `AllBurningEnemies`, `AllWetEnemies`, `AllPoisonedEnemies`, `AllFrozenEnemies`, `AllStunnedEnemies`, `AllCursedEnemies`, `AllFearfulEnemies`
-**Status+random:** `RandomBurningEnemy`, `RandomWetEnemy`, `RandomPoisonedEnemy`, `RandomFrozenEnemy`, `RandomStunnedEnemy`
-**Status+stat:** `LowestHealthBurningEnemy`, `LowestHealthPoisonedEnemy`, `LowestHealthWetEnemy`
+**Status (any):** `RandomEnemyWithStatus`, `RandomEnemyWithoutStatus`, `AllEnemiesWithStatus`, `AllEnemiesWithoutStatus`
 **Subset:** `HalfEnemiesRandom`, `TwoRandomEnemies`, `ThreeRandomEnemies`
+
+### Composite status targeting (preferred)
+
+Use `BaseType+StatusEffect` format to target enemies with a specific status. Any base target type can be combined with any status effect:
+
+- `AllEnemies+Burning` — all burning enemies
+- `RandomEnemy+Wet` — random wet enemy
+- `LowestHealthEnemy+Poisoned` — lowest-HP poisoned enemy
+- `SingleEnemy+Bleeding` — single bleeding enemy
+
+Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Buffed`, `Shielded`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`
 
 ---
 
 ## AREA SHAPES
 
-| Shape | Tiles |
-|-------|-------|
-| `Single` | 1 tile — no expansion (default) |
-| `Cross` | + shape — center + 4 cardinal neighbors |
-| `Square3x3` | 3x3 grid centered on target |
-| `Diamond2` | All tiles within Manhattan distance 2 |
-| `Line3` | 3 tiles in line from caster through target |
-| `VerticalLine` | Full vertical line in front of caster through target |
-
-Area splash is **indiscriminate** — hits everyone in the shape regardless of faction.
+**Note:** The combat system uses a slot-based layout (no 2D grid), so area shapes are ignored at runtime. Always use `"area": "Single"` (default). Targeting is fully determined by the `target` field.
 
 ---
 
@@ -166,13 +168,18 @@ Area splash is **indiscriminate** — hits everyone in the shape regardless of f
 - **Word meaning drives effects**: "avalanche" → Damage + Push + Water; "whisper" → Fear; "fortress" → Heal + Shield (Self)
 - **Longer/rarer words = stronger**: 3-4 letter words are weak (1-2 value), 7+ letter words are powerful (4-6 value)
 - **Cost scales with power**: powerful words cost more energy
-- **Range makes sense thematically**: melee words (slash, punch) Range 1-2; ranged words (arrow, bolt) Range 3-5; magic words Range 0 (unlimited)
-- **Area matches word meaning**: "earthquake" → Diamond2; "beam" → Line3; "blast" → Cross; "rain" → VerticalLine
+- **Range is ignored** (slot system — everything is always in range). Use `0` for all words.
+- **Area is ignored** (slot system — no area expansion). Use `"Single"` for all words. Targeting is handled by the `target` field (e.g. `AllEnemies` for AoE).
 - **Most NLTK words are NOT game words** — articles, prepositions, obscure terms → empty actions array, they still get marked as processed
 - **~15-20% of words should have actions** — be selective, only words with clear combat/RPG meaning
 - **Mix targeting types**: don't make every word SingleEnemy
 - **Use specific stat buffs/debuffs**: use `BuffStrength`, `DebuffPhysicalDefense`, etc. instead of generic `Buff`. Match the stat to the word's meaning (e.g. "fortify" → `BuffPhysicalDefense`, "weaken" → `DebuffStrength`)
 - **Per-action targeting**: if a word's actions target different things, add `target`/`range`/`area` to individual actions (e.g. "absorb" damages enemy + heals self)
+- **Duplicate actions**: a word CAN have the same action multiple times (e.g. "barrage" → Damage×2). Each instance executes separately. Example:
+  ```json
+  {"word": "barrage", "actions": [{"action": "Damage", "value": 2}, {"action": "Damage", "value": 2}]}
+  ```
+- **Structure words**: Defensive/building words ("fortress", "barricade", "wall", "totem", "bunker") → `Summon` action, target `Self`, tags `DEFENSIVE`/`SUPPORT`. Offensive structure words ("turret", "cannon", "sentry") → `Summon` action, target `Self`, tags `OFFENSIVE`/`PHYSICAL`. These are units with high HP, passives, and few/no active attacks — the passive system handles their effects automatically.
 - **Balance tags**: ensure good coverage across all categories
 
 ---

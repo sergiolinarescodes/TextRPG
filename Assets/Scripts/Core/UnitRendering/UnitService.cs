@@ -15,6 +15,18 @@ namespace TextRPG.Core.UnitRendering
             _eventBus = eventBus;
         }
 
+        public void Register(UnitId id, UnitDefinition definition)
+        {
+            var instance = new UnitInstance(definition, new GridPosition(0, 0));
+            _registry.Register(id, instance);
+        }
+
+        public void RemoveUnit(UnitId id)
+        {
+            _registry.Remove(id);
+            _eventBus.Publish(new UnitRemovedEvent(id, new GridPosition(0, 0)));
+        }
+
         public UnitInstance PlaceUnit(UnitDefinition definition, GridPosition position, IGrid<UnitId?> grid)
         {
             if (!grid.IsInBounds(position))

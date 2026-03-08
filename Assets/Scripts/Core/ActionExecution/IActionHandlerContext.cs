@@ -1,4 +1,6 @@
-using TextRPG.Core.CombatGrid;
+using System.Collections.Generic;
+using TextRPG.Core.CombatSlot;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
@@ -16,5 +18,7 @@ namespace TextRPG.Core.ActionExecution
         ITurnService TurnService { get; }
         IWeaponService WeaponService { get; }
         StatusEffectInteractionTable InteractionTable { get; }
+        IReadOnlyDictionary<string, EnemyDefinition> UnitRegistry { get; }
+        ICombatSlotService SlotService { get; }
     }
 }

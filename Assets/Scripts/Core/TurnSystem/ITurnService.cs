@@ -11,8 +11,10 @@ namespace TextRPG.Core.TurnSystem
         bool IsTurnActive { get; }
 
         void SetTurnOrder(IReadOnlyList<EntityId> order);
+        void AddToTurnOrder(EntityId entityId);
         void BeginTurn();
         void EndTurn();
+        void RemoveFromTurnOrder(EntityId entityId);
         void GrantExtraTurn(EntityId entityId);
     }
 }

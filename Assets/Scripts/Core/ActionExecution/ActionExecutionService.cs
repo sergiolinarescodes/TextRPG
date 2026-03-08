@@ -1,6 +1,9 @@
-using System;
+using System.Collections.Generic;
+using TextRPG.Core.EntityStats;
+using TextRPG.Core.StatusEffect;
 using TextRPG.Core.WordAction;
 using TextRPG.Core.WordInput;
+using Unidad.Core.Abstractions;
 using Unidad.Core.EventBus;
 using Unidad.Core.Systems;
 
@@ -11,14 +14,22 @@ namespace TextRPG.Core.ActionExecution
         private readonly IWordResolver _wordResolver;
         private readonly IActionHandlerRegistry _handlerRegistry;
         private readonly ICombatContext _combatContext;
+        private readonly IEntityStatsService _entityStats;
+        private readonly IStatusEffectService _statusEffects;
+        private readonly IAnimationResolver _animationResolver;
 
         public ActionExecutionService(IEventBus eventBus, IWordResolver wordResolver,
-            IActionHandlerRegistry handlerRegistry, ICombatContext combatContext)
+            IActionHandlerRegistry handlerRegistry, ICombatContext combatContext,
+            IEntityStatsService entityStats = null, IStatusEffectService statusEffects = null,
+            IAnimationResolver animationResolver = null)
             : base(eventBus)
         {
             _wordResolver = wordResolver;
             _handlerRegistry = handlerRegistry;
             _combatContext = combatContext;
+            _entityStats = entityStats;
+            _statusEffects = statusEffects;
+            _animationResolver = animationResolver;
             Subscribe<WordSubmittedEvent>(OnWordSubmitted);
         }
 
@@ -41,28 +52,75 @@ namespace TextRPG.Core.ActionExecution
             var meta = _wordResolver.GetStats(word);
             Publish(new WordResolvedEvent(word, actions, meta));
 
-            Publish(new ActionExecutionStartedEvent(word, actions.Count));
+            if (_entityStats != null && meta.Cost > 0)
+            {
+                if (!_entityStats.TrySpendMana(_combatContext.SourceEntity, meta.Cost))
+                {
+                    Publish(new WordRejectedEvent(word, meta.Cost));
+                    return;
+                }
+            }
+
+            var resolved = ResolveActions(word, actions, meta);
+
+            Publish(new ActionExecutionStartedEvent(word, resolved.Count));
+
+            bool isInstant = _animationResolver == null || _animationResolver.IsInstant;
+
+            if (isInstant)
+            {
+                ExecuteAllImmediately(resolved);
+                Publish(new ActionResolvedEvent(word, resolved, _combatContext.SourceEntity, true));
+                Publish(new ActionExecutionCompletedEvent(word));
+            }
+            else
+            {
+                Publish(new ActionResolvedEvent(word, resolved, _combatContext.SourceEntity, false));
+            }
+        }
+
+        private List<ResolvedAction> ResolveActions(string word, IReadOnlyList<WordActionMapping> actions, WordMeta meta)
+        {
+            var resolved = new List<ResolvedAction>(actions.Count);
 
             for (int i = 0; i < actions.Count; i++)
             {
                 var mapping = actions[i];
                 var actionTarget = mapping.Target ?? meta.Target;
-                var actionRange = mapping.Range ?? meta.Range;
-                var actionArea = mapping.Area ?? meta.Area;
 
-                var targetType = TargetTypeClassifier.ParseTargetType(actionTarget);
-                var primaryTargets = _combatContext.GetTargets(targetType, actionRange);
-                var targets = _combatContext.ExpandArea(primaryTargets, actionArea);
+                var spec = TargetTypeClassifier.Parse(actionTarget);
+                var targets = _combatContext.GetTargets(spec.BaseType, 0, spec.StatusFilter);
 
-                if (_handlerRegistry.TryGet(mapping.ActionId, out var handler))
+                if (targets.Count == 1 && _statusEffects != null &&
+                    _statusEffects.HasEffect(targets[0], StatusEffectType.Reflecting))
                 {
-                    var context = new ActionContext(_combatContext.SourceEntity, targets, mapping.Value, word);
-                    handler.Execute(context);
-                    Publish(new ActionHandlerExecutedEvent(mapping.ActionId, mapping.Value, _combatContext.SourceEntity, targets));
+                    var reflectTarget = targets[0];
+                    targets = new List<EntityId> { _combatContext.SourceEntity };
+                    _statusEffects.DecrementStack(reflectTarget, StatusEffectType.Reflecting);
+                }
+
+                if (_handlerRegistry.TryGet(mapping.ActionId, out _))
+                {
+                    resolved.Add(new ResolvedAction(
+                        mapping.ActionId, mapping.Value,
+                        _combatContext.SourceEntity, targets, word));
                 }
             }
 
-            Publish(new ActionExecutionCompletedEvent(word));
+            return resolved;
+        }
+
+        private void ExecuteAllImmediately(List<ResolvedAction> resolved)
+        {
+            foreach (var action in resolved)
+            {
+                if (_handlerRegistry.TryGet(action.ActionId, out var handler))
+                {
+                    var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word);
+                    handler.Execute(context);
+                    Publish(new ActionHandlerExecutedEvent(action.ActionId, action.Value, action.Source, action.Targets));
+                }
+            }
         }
     }
 }

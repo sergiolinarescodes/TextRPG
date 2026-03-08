@@ -16,19 +16,14 @@ namespace TextRPG.Core.ActionExecution
             registry.Register("Push", new PushActionHandler(ctx));
             registry.Register("Fire", new FireActionHandler(ctx));
             registry.Register("Shield", new ShieldActionHandler(ctx));
-
-            registry.Register("Move", new MoveActionHandler(ctx));
-            registry.Register("Teleport", new TeleportActionHandler(ctx));
-            registry.Register("MoveRandom", new MoveRandomActionHandler(ctx));
-            registry.Register("MoveNearAlly", new MoveNearAllyActionHandler(ctx));
-            registry.Register("MoveNearEnemy", new MoveNearEnemyActionHandler(ctx));
-            registry.Register("MoveFlank", new MoveFlankActionHandler(ctx));
+            registry.Register("Thinking", new ThinkingActionHandler(ctx));
 
             var stats = new[]
             {
                 (Strength, "Strength"), (MagicPower, "MagicPower"),
                 (PhysicalDefense, "PhysicalDefense"), (MagicDefense, "MagicDefense"),
-                (Luck, "Luck"), (MovementPoints, "Movement"),
+                (Luck, "Luck"),
+                (MaxMana, "MaxMana"), (ManaRegen, "ManaRegen"),
             };
             foreach (var (stat, name) in stats)
             {
@@ -44,7 +39,16 @@ namespace TextRPG.Core.ActionExecution
                 registry.Register("Shock", new ShockActionHandler(ctx));
                 registry.Register("Fear", new FearActionHandler(ctx));
                 registry.Register("Stun", new StunActionHandler(ctx));
+                registry.Register("Poison", new PoisonActionHandler(ctx));
+                registry.Register("Bleed", new BleedActionHandler(ctx));
+                registry.Register("Grow", new GrowActionHandler(ctx));
+                registry.Register("Thorns", new ThornsActionHandler(ctx));
+                registry.Register("Reflect", new ReflectActionHandler(ctx));
+                registry.Register("Hardening", new HardeningActionHandler(ctx));
             }
+
+            if (ctx.StatusEffects != null && ctx.EntityStats != null)
+                registry.Register("Concentrate", new ConcentrateActionHandler(ctx));
 
             if (ctx.StatusEffects != null && ctx.TurnService != null)
                 registry.Register("Summon", new SummonActionHandler(ctx));

@@ -1,15 +1,12 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.ActionExecution;
-using TextRPG.Core.CombatGrid;
-using TextRPG.Core.Encounter.Definitions;
+using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
-using TextRPG.Core.UnitRendering;
 using Unidad.Core.EventBus;
-using Unidad.Core.Grid;
 using Unidad.Core.Testing;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -22,7 +19,7 @@ namespace TextRPG.Core.Encounter.Scenarios
         private IEncounterService _encounterService;
         private IEntityStatsService _entityStats;
         private ITurnService _turnService;
-        private ICombatGridService _combatGrid;
+        private ICombatSlotService _slotService;
         private IEventBus _eventBus;
         private EntityId _player;
         private bool _encounterStarted;
@@ -32,7 +29,7 @@ namespace TextRPG.Core.Encounter.Scenarios
         public EncounterScenario() : base(new TestScenarioDefinition(
             "encounter-flow",
             "Encounter Flow",
-            "Starts an ORC encounter, registers entities on the grid, verifies turn order and enemy spawning.",
+            "Starts an ORC encounter, registers entities in slots, verifies turn order and enemy spawning.",
             Array.Empty<ScenarioParameter>()
         )) { }
 
@@ -44,16 +41,15 @@ namespace TextRPG.Core.Encounter.Scenarios
             _eventBus = new EventBus();
             _entityStats = new EntityStatsService(_eventBus);
             _turnService = new TurnService(_eventBus);
-            var unitService = new UnitService(_eventBus);
-            _combatGrid = new CombatGridService(_eventBus, unitService);
+            _slotService = new CombatSlotService(_eventBus);
             var combatContext = new CombatContext();
             var enemyResolver = new EnemyWordResolver();
 
-            _encounterService = new EncounterService(_eventBus, _entityStats, _turnService, _combatGrid, combatContext, enemyResolver);
+            _encounterService = new EncounterService(_eventBus, _entityStats, _turnService, _slotService, combatContext, enemyResolver);
 
             _player = new EntityId("player");
             _entityStats.RegisterEntity(_player, maxHealth: 100, strength: 12, magicPower: 8,
-                physicalDefense: 6, magicDefense: 4, luck: 5, movementPoints: 3);
+                physicalDefense: 6, magicDefense: 4, luck: 5);
 
             _subscriptions.Add(_eventBus.Subscribe<EncounterStartedEvent>(e =>
             {
@@ -66,16 +62,15 @@ namespace TextRPG.Core.Encounter.Scenarios
             _subscriptions.Add(_eventBus.Subscribe<EncounterEndedEvent>(e =>
                 Debug.Log($"[EncounterScenario] Encounter ended: victory={e.Victory}")));
 
-            var orcDef = OrcDefinition.Create();
+            var orcDef = UnitIds.Enemies.ORC_DEF;
 
             var encounter = new EncounterDefinition(
                 "orc_ambush", "Orc Ambush",
-                new[] { orcDef, orcDef },
-                new[] { new GridPosition(5, 2), new GridPosition(6, 3) }
+                new[] { orcDef, orcDef }
             );
 
-            _encounterService.StartEncounter(encounter, _player, new GridPosition(1, 2));
-            OrcDefinition.RegisterWords(enemyResolver);
+            _encounterService.StartEncounter(encounter, _player);
+            UnitDatabaseLoader.RegisterUnitWords(enemyResolver, UnitIds.Enemies.ORC);
 
             BuildUI();
         }
@@ -114,8 +109,9 @@ namespace TextRPG.Core.Encounter.Scenarios
             {
                 var def = _encounterService.GetEnemyDefinition(enemy);
                 var hp = _entityStats.GetCurrentHealth(enemy);
-                var pos = _combatGrid.GetPosition(enemy);
-                var label = new Label($"  {def.Name} ({enemy.Value}) HP={hp} @ {pos}");
+                var slot = _slotService.GetSlot(enemy);
+                var slotStr = slot.HasValue ? $"Slot {slot.Value.Type}[{slot.Value.Index}]" : "no slot";
+                var label = new Label($"  {def.Name} ({enemy.Value}) HP={hp} @ {slotStr}");
                 label.style.fontSize = 14;
                 label.style.color = Color.green;
                 label.style.marginBottom = 4;
@@ -171,11 +167,11 @@ namespace TextRPG.Core.Encounter.Scenarios
             _subscriptions.Clear();
 
             (_encounterService as IDisposable)?.Dispose();
-            (_combatGrid as IDisposable)?.Dispose();
+            (_slotService as IDisposable)?.Dispose();
             (_entityStats as IDisposable)?.Dispose();
             (_turnService as IDisposable)?.Dispose();
             _encounterService = null;
-            _combatGrid = null;
+            _slotService = null;
             _entityStats = null;
             _turnService = null;
             _eventBus = null;

@@ -16,7 +16,7 @@ namespace TextRPG.Core.StatusEffect.Handlers
             if (definition.DamagePerTick.HasValue)
             {
                 var damage = definition.DamagePerTick.Value * instance.StackCount;
-                ctx.EntityStats.ApplyDamage(target, damage);
+                ctx.EntityStats.ApplyDamage(target, damage, instance.Source);
                 ctx.EventBus.Publish(new StatusEffectDamageEvent(target, StatusEffectType.Burning, damage));
             }
         }

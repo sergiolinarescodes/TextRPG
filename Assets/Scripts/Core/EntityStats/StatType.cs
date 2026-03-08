@@ -9,6 +9,8 @@ namespace TextRPG.Core.EntityStats
         PhysicalDefense,
         MagicDefense,
         Luck,
-        MovementPoints
+        MaxMana,
+        ManaRegen,
+        DamageReduction
     }
 }

@@ -8,13 +8,13 @@ namespace TextRPG.Core.StatusEffect.Handlers
 
         public override void OnTick(EntityId target, StatusEffectInstance instance, IStatusEffectHandlerContext ctx)
         {
-            var definition = StatusEffectDefinitions.Get(StatusEffectType.Poisoned);
-            if (definition.DamagePerTick.HasValue)
-            {
-                var damage = definition.DamagePerTick.Value * instance.StackCount;
-                ctx.EntityStats.ApplyDamage(target, damage);
-                ctx.EventBus.Publish(new StatusEffectDamageEvent(target, StatusEffectType.Poisoned, damage));
-            }
+            var damage = 2 * instance.StackCount;
+            ctx.EntityStats.ApplyDamage(target, damage, instance.Source);
+            ctx.EventBus.Publish(new StatusEffectDamageEvent(target, StatusEffectType.Poisoned, damage));
+
+            instance.StackCount--;
+            if (instance.StackCount <= 0)
+                instance.RemainingDuration = 0;
         }
     }
 }

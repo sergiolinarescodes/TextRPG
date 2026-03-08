@@ -23,7 +23,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
                 var target = context.Targets[i];
                 var targetDefense = _entityStats.GetStat(target, StatType.PhysicalDefense);
                 var damage = Math.Max(1, context.Value * sourceStrength / Math.Max(1, targetDefense));
-                _entityStats.ApplyDamage(target, damage);
+                _entityStats.ApplyDamage(target, damage, context.Source);
             }
         }
     }

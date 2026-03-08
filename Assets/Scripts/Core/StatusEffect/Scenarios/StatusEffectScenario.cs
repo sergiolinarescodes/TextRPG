@@ -70,7 +70,7 @@ namespace TextRPG.Core.StatusEffect.Scenarios
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectAppliedEvent>(e =>
             {
                 _effectApplied = true;
-                Debug.Log($"[StatusEffectScenario] {e.Type} applied to {e.Target.Value} for {e.Duration} turns");
+                Debug.Log($"[StatusEffectScenario] {e.Type} applied to {e.Target.Value} {(e.Duration < 0 ? "permanently" : $"for {e.Duration} turns")}");
             }));
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectDamageEvent>(e =>
             {
@@ -78,7 +78,7 @@ namespace TextRPG.Core.StatusEffect.Scenarios
                 Debug.Log($"[StatusEffectScenario] {e.Type} dealt {e.Damage} damage to {e.Target.Value}");
             }));
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectTickedEvent>(e =>
-                Debug.Log($"[StatusEffectScenario] {e.Type} ticked on {e.Target.Value}, {e.RemainingDuration} turns left")));
+                Debug.Log($"[StatusEffectScenario] {e.Type} ticked on {e.Target.Value}{(e.RemainingDuration < 0 ? "" : $", {e.RemainingDuration} turns left")}")));
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectExpiredEvent>(e =>
             {
                 _effectExpired = true;
@@ -146,7 +146,8 @@ namespace TextRPG.Core.StatusEffect.Scenarios
             {
                 foreach (var effect in effects)
                 {
-                    var label = new Label($"  {effect.Type} — {effect.RemainingDuration} turns left (x{effect.StackCount})");
+                    var durationText = effect.IsPermanent ? "permanent" : $"{effect.RemainingDuration} turns left";
+                    var label = new Label($"  {effect.Type} — {durationText} (x{effect.StackCount})");
                     label.style.fontSize = 14;
                     label.style.color = new Color(0.8f, 0.6f, 0.2f);
                     label.style.marginBottom = 4;

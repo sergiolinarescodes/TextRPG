@@ -40,14 +40,15 @@ DB_PATH = os.path.join(
 VALID_ACTIONS = {
     "Water", "Fire", "Earth", "Wind", "Push", "Damage", "Slow", "Burn",
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
-    "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion", "Move",
-    "Teleport", "MoveRandom", "MoveNearAlly", "MoveNearEnemy", "MoveFlank",
-    "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck", "BuffMovement",
-    "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck", "DebuffMovement",
+    "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
+    "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
+    "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
+    "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
 }
 
 VALID_TARGETS = {
     "Self", "SingleEnemy", "AreaEnemies", "AreaAll", "AllAllies", "AllAlliesAndSelf",
+    "AllEnemies", "All",
     "Melee", "Area",
     "RandomEnemy", "RandomAlly", "RandomAny",
     "LowestHealthEnemy", "HighestHealthEnemy",
@@ -57,13 +58,24 @@ VALID_TARGETS = {
     "RandomLowestHealthEnemy", "RandomHighestHealthEnemy",
     "RandomEnemyWithStatus", "RandomEnemyWithoutStatus",
     "AllEnemiesWithStatus", "AllEnemiesWithoutStatus",
-    "AllBurningEnemies", "AllWetEnemies", "AllPoisonedEnemies",
-    "AllFrozenEnemies", "AllStunnedEnemies", "AllCursedEnemies", "AllFearfulEnemies",
-    "RandomBurningEnemy", "RandomWetEnemy", "RandomPoisonedEnemy",
-    "RandomFrozenEnemy", "RandomStunnedEnemy",
-    "LowestHealthBurningEnemy", "LowestHealthPoisonedEnemy", "LowestHealthWetEnemy",
     "HalfEnemiesRandom", "TwoRandomEnemies", "ThreeRandomEnemies",
 }
+
+VALID_STATUS_EFFECTS = {
+    "Burning", "Wet", "Poisoned", "Frozen", "Slowed", "Cursed",
+    "Buffed", "Shielded", "ExtraTurn", "Stun", "Concussion", "Fear",
+    "Bleeding", "Concentrated",
+    "Growing", "Thorns", "Reflecting", "Hardening",
+}
+
+
+def is_valid_target(target):
+    if target in VALID_TARGETS:
+        return True
+    if '+' in target:
+        base, status = target.split('+', 1)
+        return base in VALID_TARGETS and status in VALID_STATUS_EFFECTS
+    return False
 
 VALID_AREAS = {
     "Single", "Cross", "Square3x3", "Diamond2", "Line3", "VerticalLine",
@@ -96,7 +108,7 @@ def main():
         processed_rows.append((word,))
 
         target = entry.get("target", "SingleEnemy")
-        if target not in VALID_TARGETS:
+        if not is_valid_target(target):
             print(f"Warning: unknown target '{target}' for '{word}', defaulting to SingleEnemy", file=sys.stderr)
             target = "SingleEnemy"
         cost = max(0, min(10, int(entry.get("cost", 0))))
@@ -107,7 +119,7 @@ def main():
             area = "Single"
         meta_rows.append((word, target, cost, range_val, area))
 
-        for action in entry.get("actions", []):
+        for seq, action in enumerate(entry.get("actions", [])):
             action_name = action["action"]
             if action_name not in VALID_ACTIONS:
                 print(f"Warning: unknown action '{action_name}' for '{word}', skipping", file=sys.stderr)
@@ -117,14 +129,14 @@ def main():
             act_target = action.get("target")
             act_range = action.get("range")
             act_area = action.get("area")
-            if act_target is not None and act_target not in VALID_TARGETS:
+            if act_target is not None and not is_valid_target(act_target):
                 print(f"Warning: unknown action target '{act_target}' for '{word}:{action_name}', ignoring", file=sys.stderr)
                 act_target = None
             if act_area is not None and act_area not in VALID_AREAS:
                 print(f"Warning: unknown action area '{act_area}' for '{word}:{action_name}', ignoring", file=sys.stderr)
                 act_area = None
             act_assoc = action.get("assoc_word", "")
-            action_rows.append((word, action_name, value, act_target, act_range, act_area, act_assoc))
+            action_rows.append((word, action_name, value, act_target, act_range, act_area, act_assoc, seq))
 
         for tag in entry.get("tags", []):
             tag_upper = tag.upper()
@@ -135,7 +147,7 @@ def main():
 
     conn = sqlite3.connect(DB_PATH)
     conn.executemany(
-        "INSERT OR REPLACE INTO word_actions (word, action_name, value, target, range, area, assoc_word) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO word_actions (word, action_name, value, target, range, area, assoc_word, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         action_rows,
     )
     conn.executemany(

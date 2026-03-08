@@ -30,6 +30,8 @@ namespace TextRPG.Core.StatusEffect
             _interactionTable = interactionTable ?? new StatusEffectInteractionTable();
             Subscribe<TurnEndedEvent>(OnTurnEnded);
             Subscribe<TurnStartedEvent>(OnTurnStarted);
+            Subscribe<EntityStats.HealedEvent>(OnHealed);
+            Subscribe<EntityStats.DamageTakenEvent>(OnDamageTaken);
         }
 
         public void ApplyEffect(EntityId target, StatusEffectType type, int duration, EntityId source)
@@ -54,8 +56,13 @@ namespace TextRPG.Core.StatusEffect
                         return;
 
                     case StackPolicy.StackIntensity:
-                        existing.RemainingDuration = Math.Max(existing.RemainingDuration, duration);
+                        if (existing.IsPermanent || duration < 0)
+                            existing.RemainingDuration = StatusEffectInstance.PermanentDuration;
+                        else
+                            existing.RemainingDuration = Math.Max(existing.RemainingDuration, duration);
                         existing.StackCount++;
+                        if (_handlerRegistry.TryGet(type, out var stackHandler))
+                            stackHandler.OnApply(target, existing, _handlerContext);
                         Publish(new StatusEffectAppliedEvent(target, type, existing.RemainingDuration, source));
                         return;
 
@@ -106,7 +113,11 @@ namespace TextRPG.Core.StatusEffect
                 return;
 
             foreach (var instance in list)
+            {
+                if (_handlerRegistry.TryGet(instance.Type, out var handler))
+                    handler.OnRemove(target, instance, _handlerContext);
                 RemoveStatModifiers(target, instance);
+            }
 
             list.Clear();
         }
@@ -131,6 +142,35 @@ namespace TextRPG.Core.StatusEffect
             return instance?.StackCount ?? 0;
         }
 
+        public void DecrementStack(EntityId target, StatusEffectType type)
+        {
+            if (!_effects.TryGetValue(target, out var list))
+                return;
+            var instance = list.Find(e => e.Type == type);
+            if (instance == null)
+                return;
+            instance.StackCount--;
+            if (instance.StackCount <= 0)
+                RemoveEffect(target, type);
+        }
+
+        private void OnDamageTaken(EntityStats.DamageTakenEvent e)
+        {
+            if (e.DamageSource == null) return;
+            if (!HasEffect(e.EntityId, StatusEffectType.Thorns)) return;
+            var stacks = GetStackCount(e.EntityId, StatusEffectType.Thorns);
+            _entityStats.ApplyDamage(e.DamageSource.Value, stacks);
+        }
+
+        private void OnHealed(EntityStats.HealedEvent e)
+        {
+            if (!_effects.TryGetValue(e.EntityId, out var list))
+                return;
+            var bleeding = list.Find(x => x.Type == StatusEffectType.Bleeding);
+            if (bleeding != null)
+                bleeding.WasHealedThisTurn = true;
+        }
+
         private void OnTurnStarted(TurnStartedEvent e)
         {
             var entity = e.EntityId;
@@ -144,12 +184,27 @@ namespace TextRPG.Core.StatusEffect
             if (!_effects.TryGetValue(entity, out var list))
                 return;
 
+            var snapshot = new List<StatusEffectInstance>(list);
             var expired = new List<StatusEffectInstance>();
 
-            foreach (var instance in list)
+            foreach (var instance in snapshot)
             {
+                // Handler's OnTick may have removed this instance (e.g. BleedingHandler)
+                if (!list.Contains(instance))
+                    continue;
+
                 if (_handlerRegistry.TryGet(instance.Type, out var handler))
                     handler.OnTick(entity, instance, _handlerContext);
+
+                // Re-check after OnTick in case handler removed the instance
+                if (!list.Contains(instance))
+                    continue;
+
+                if (instance.IsPermanent)
+                {
+                    Publish(new StatusEffectTickedEvent(entity, instance.Type, instance.RemainingDuration));
+                    continue;
+                }
 
                 instance.RemainingDuration--;
                 if (instance.RemainingDuration <= 0)
@@ -164,6 +219,9 @@ namespace TextRPG.Core.StatusEffect
 
             foreach (var instance in expired)
             {
+                if (!list.Contains(instance))
+                    continue;
+
                 if (_handlerRegistry.TryGet(instance.Type, out var handler))
                     handler.OnExpire(entity, instance, _handlerContext);
 

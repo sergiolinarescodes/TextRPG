@@ -2,6 +2,8 @@ using UnityEngine;
 
 namespace TextRPG.Core.Encounter
 {
+    public sealed record PassiveEntry(string PassiveId, int Value);
+
     public sealed record EnemyDefinition(
         string Name,
         int MaxHealth,
@@ -10,8 +12,10 @@ namespace TextRPG.Core.Encounter
         int PhysicalDefense,
         int MagicDefense,
         int Luck,
-        int MovementPoints,
         Color Color,
-        string[] Abilities
+        string[] Abilities,
+        int StartingShield = 0,
+        string UnitType = "enemy",
+        PassiveEntry[] Passives = null
     );
 }

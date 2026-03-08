@@ -1,15 +1,13 @@
 using System;
 using System.Collections.Generic;
-using TextRPG.Core.CombatGrid;
+using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
-using TextRPG.Core.UnitRendering;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
-using Unidad.Core.Grid;
 using Unidad.Core.Testing;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -23,7 +21,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private IEntityStatsService _entityStats;
         private ITurnService _turnService;
         private IStatusEffectService _statusEffects;
-        private ICombatGridService _combatGrid;
+        private ICombatSlotService _slotService;
         private IActionExecutionService _executionService;
         private CombatContext _combatContext;
         private EnemyWordResolver _resolver;
@@ -58,6 +56,37 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             RebuildAll(); RunStatModifierGroup();
             RebuildAll(); RunComboGroup();
             RebuildAll(); RunTargetTypeGroup();
+            RebuildAll(); RunThinkingGroup();
+            RebuildAll(); RunManaCostGroup();
+            RebuildAll(); RunShieldInteractionGroup();
+            RebuildAll(); RunElementalInteractionGroup();
+            RebuildAll(); RunDebuffDamageGroup();
+            RebuildAll(); RunBurnTickGroup();
+            RebuildAll(); RunManaInteractionGroup();
+            RebuildAll(); RunDeathEdgeCaseGroup();
+            RebuildAll(); RunPoisonedGroup();
+            RebuildAll(); RunFrozenGroup();
+            RebuildAll(); RunStunGroup();
+            RebuildAll(); RunStatusStatModifierGroup();
+            RebuildAll(); RunStatusLifecycleGroup();
+            RebuildAll(); RunDamageUnderModifiersGroup();
+            RebuildAll(); RunShieldAdvancedGroup();
+            RebuildAll(); RunHealEdgeCaseGroup();
+            RebuildAll(); RunTargetTypeCoverageGroup();
+            RebuildAll(); RunAdvancedComboGroup();
+            RebuildAll(); RunStatModifierStackingGroup();
+            RebuildAll(); RunMultiDoTGroup();
+            RebuildAll(); RunManaRegenGroup();
+            RebuildAll(); RunConcentrateGroup();
+            RebuildAll(); RunPoisonActionGroup();
+            RebuildAll(); RunBleedGroup();
+            RebuildAll(); RunDuplicateActionGroup();
+            RebuildAll(); RunCompositeTargetGroup();
+            RebuildAll(); RunShieldOnSpawnGroup();
+            RebuildAll(); RunGrowGroup();
+            RebuildAll(); RunThornsGroup();
+            RebuildAll(); RunReflectGroup();
+            RebuildAll(); RunHardeningGroup();
 
             BuildUI();
         }
@@ -73,9 +102,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _entityStats = new EntityStatsService(_eventBus);
             _turnService = new TurnService(_eventBus);
 
-            var unitService = new UnitService(_eventBus);
-            _combatGrid = new CombatGridService(_eventBus, unitService);
-            _combatGrid.Initialize(8, 8);
+            _slotService = new CombatSlotService(_eventBus);
+            _slotService.Initialize();
 
             var effectHandlerRegistry = StatusEffectSystemInstaller.CreateHandlerRegistry();
             var handlerContext = new StatusEffectHandlerContext(_entityStats, _turnService, _eventBus);
@@ -86,7 +114,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _combatContext.SetSourceEntity(_hero);
             _combatContext.SetEnemies(new[] { _enemyA, _enemyB, _enemyC, _enemyD });
             _combatContext.SetAllies(new[] { _allyA });
-            _combatContext.SetGrid(_combatGrid);
+            _combatContext.SetSlotService(_slotService);
             _combatContext.SetEntityStats(_entityStats);
             _combatContext.SetStatusEffects(_statusEffects);
 
@@ -94,7 +122,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 _eventBus, _entityStats, _statusEffects, _combatContext, _turnService);
 
             _resolver = new EnemyWordResolver();
-            _executionService = new ActionExecutionService(_eventBus, _resolver, actionHandlerRegistry, _combatContext);
+            _executionService = new ActionExecutionService(_eventBus, _resolver, actionHandlerRegistry, _combatContext, _entityStats, _statusEffects);
 
             RegisterEntities();
         }
@@ -116,12 +144,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
             _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
 
-            _combatGrid.RegisterCombatant(_hero, new UnitDefinition(new UnitId("hero"), "HERO", 100, 12, 8, 8, Color.cyan), new GridPosition(3, 3));
-            _combatGrid.RegisterCombatant(_enemyA, new UnitDefinition(new UnitId("enemy_a"), "ENEMY_A", 80, 8, 6, 6, Color.red), new GridPosition(4, 3));
-            _combatGrid.RegisterCombatant(_enemyB, new UnitDefinition(new UnitId("enemy_b"), "ENEMY_B", 60, 6, 4, 4, Color.red), new GridPosition(3, 4));
-            _combatGrid.RegisterCombatant(_enemyC, new UnitDefinition(new UnitId("enemy_c"), "ENEMY_C", 100, 10, 8, 8, Color.red), new GridPosition(5, 3));
-            _combatGrid.RegisterCombatant(_enemyD, new UnitDefinition(new UnitId("enemy_d"), "ENEMY_D", 40, 4, 3, 3, Color.red), new GridPosition(3, 5));
-            _combatGrid.RegisterCombatant(_allyA, new UnitDefinition(new UnitId("ally_a"), "ALLY_A", 70, 7, 5, 5, Color.green), new GridPosition(2, 3));
+            _slotService.RegisterEnemy(_enemyA, 0);
+            _slotService.RegisterEnemy(_enemyB, 1);
+            _slotService.RegisterEnemy(_enemyC, 2);
         }
 
         private void SoftReset()
@@ -460,6 +485,19 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 $"Enemy HP={HP(_enemyA)}(exp {80 - mixedDmg}), Hero str={Stat(_hero, StatType.Strength)}(exp 15)");
         }
 
+        private int Mana(EntityId id) => _entityStats.GetCurrentMana(id);
+        private int Shield(EntityId id) => _entityStats.GetCurrentShield(id);
+
+        private void AdvanceTurns(int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                _turnService.BeginTurn();
+                if (_turnService.IsTurnActive)
+                    _turnService.EndTurn();
+            }
+        }
+
         // ── Group 9: Target Types ──────────────────────────────────
 
         private void RunTargetTypeGroup()
@@ -482,7 +520,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Burning, 3, _hero);
             _resolver.RegisterWord("test_burning",
                 new List<WordActionMapping> { new("Damage", 1) },
-                new WordMeta("AllBurningEnemies", 0, 0, AreaShape.Single));
+                new WordMeta("AllEnemies+Burning", 0, 0, AreaShape.Single));
             Exec("test_burning");
             int bDmgA = Math.Max(1, 1 * 12 / 4); // 3
             int bDmgC = Math.Max(1, 1 * 12 / 6); // 2
@@ -506,6 +544,1431 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             Check("Target melee: only adjacent enemies hit",
                 meleeOk,
                 $"A={HP(_enemyA)}(exp {80 - mDmgA}), B={HP(_enemyB)}(exp {60 - mDmgB}), C={HP(_enemyC)}(exp 100), D={HP(_enemyD)}(exp 40)");
+        }
+
+        // ── Group 10: Thinking ──────────────────────────────────────
+
+        private void RunThinkingGroup()
+        {
+            // Spend 3 mana (5→2), then Thinking(3) → mana restored to 5
+            _entityStats.TrySpendMana(_hero, 3);
+            Check("Thinking setup: mana reduced to 2",
+                Mana(_hero) == 2,
+                $"Expected mana=2, got {Mana(_hero)}");
+
+            _resolver.RegisterWord("test_thinking",
+                new List<WordActionMapping> { new("Thinking", 3) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_thinking");
+            Check("Thinking: mana restored to 5",
+                Mana(_hero) == 5,
+                $"Expected mana=5, got {Mana(_hero)}");
+
+            SoftReset();
+
+            // Thinking(99) at full mana → capped at MaxMana (10)
+            _resolver.RegisterWord("test_thinking_cap",
+                new List<WordActionMapping> { new("Thinking", 99) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_thinking_cap");
+            Check("Thinking capped: mana does not exceed MaxMana",
+                Mana(_hero) == 10,
+                $"Expected mana=10, got {Mana(_hero)}");
+        }
+
+        // ── Group 11: Mana Cost ──────────────────────────────────────
+
+        private void RunManaCostGroup()
+        {
+            // Word with cost=3 → mana deducted from 5 to 2
+            _resolver.RegisterWord("test_mana_cost",
+                new List<WordActionMapping> { new("Heal", 1) },
+                new WordMeta("Self", 3, 0, AreaShape.Single));
+            Exec("test_mana_cost");
+            Check("Mana cost: deducted from 5 to 2",
+                Mana(_hero) == 2,
+                $"Expected mana=2, got {Mana(_hero)}");
+
+            // Word with cost=6 when mana=2 → rejected
+            bool rejected = false;
+            _subscriptions.Add(_eventBus.Subscribe<WordRejectedEvent>(e => rejected = true));
+            _resolver.RegisterWord("test_mana_reject",
+                new List<WordActionMapping> { new("Heal", 1) },
+                new WordMeta("Self", 6, 0, AreaShape.Single));
+            int hpBefore = HP(_hero);
+            Exec("test_mana_reject");
+            Check("Mana insufficient: word rejected",
+                rejected && Mana(_hero) == 2 && HP(_hero) == hpBefore,
+                $"Rejected={rejected}, mana={Mana(_hero)}(exp 2), HP unchanged={HP(_hero) == hpBefore}");
+        }
+
+        // ── Group 12: Shield + Damage Interaction ──────────────────
+
+        private void RunShieldInteractionGroup()
+        {
+            // Shield(3) on hero, then Damage(10) from enemy_a perspective
+            // Apply shield directly, then apply damage
+            _entityStats.ApplyShield(_hero, 3);
+            _entityStats.ApplyDamage(_hero, 10);
+            Check("Shield absorbs partial: shield takes 3, HP takes 7",
+                HP(_hero) == 93 && _entityStats.GetCurrentShield(_hero) == 0,
+                $"HP={HP(_hero)}(exp 93), Shield={_entityStats.GetCurrentShield(_hero)}(exp 0)");
+
+            SoftReset();
+
+            // Shield(20) on hero, Damage(2) → HP unchanged, shield reduced to 18
+            _entityStats.ApplyShield(_hero, 20);
+            _entityStats.ApplyDamage(_hero, 2);
+            Check("Shield blocks fully: HP unchanged, shield reduced",
+                HP(_hero) == 100 && _entityStats.GetCurrentShield(_hero) == 18,
+                $"HP={HP(_hero)}(exp 100), Shield={_entityStats.GetCurrentShield(_hero)}(exp 18)");
+
+            // Eat leftover shield, heal back
+            var leftover = Shield(_hero);
+            if (leftover > 0) _entityStats.ApplyDamage(_hero, leftover);
+            SoftReset();
+
+            // Multiple shield stacks: Shield(2) + Shield(3) → total 5
+            _entityStats.ApplyShield(_hero, 2);
+            _entityStats.ApplyShield(_hero, 3);
+            Check("Multiple shield stacks: total 5",
+                Shield(_hero) == 5,
+                $"Shield={Shield(_hero)}(exp 5)");
+        }
+
+        // ── Group 13: Elemental Interactions ────────────────────────
+
+        private void RunElementalInteractionGroup()
+        {
+            // Burn removes Frozen: apply Frozen, then Burn → Frozen removed
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Frozen, 5, _hero);
+            Check("Elemental setup: enemy has Frozen",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Frozen),
+                "Enemy_a should have Frozen");
+
+            _resolver.RegisterWord("test_burn_frozen",
+                new List<WordActionMapping> { new("Burn", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_burn_frozen");
+            Check("Burn removes Frozen: Frozen gone, Burning applied",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Frozen) &&
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Burning),
+                $"Frozen={_statusEffects.HasEffect(_enemyA, StatusEffectType.Frozen)}, Burning={_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning)}");
+
+            SoftReset();
+
+            // Shock wet chain: enemy_a at (4,3), enemy_c at (5,3) adjacent
+            // Wet enemy_c, shock enemy_a → chain to enemy_c with 2x multiplier
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Wet, 5, _hero);
+            _resolver.RegisterWord("test_shock_wet_chain",
+                new List<WordActionMapping> { new("Shock", 4) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_shock_wet_chain");
+            // enemy_a: 4 damage (dry), enemy_c: chain = 4 * 2 (wet) = 8
+            Check("Shock wet chain: wet adjacent takes doubled chain damage",
+                HP(_enemyA) == 76 && HP(_enemyC) == 92,
+                $"A HP={HP(_enemyA)}(exp 76), C HP={HP(_enemyC)}(exp 92)");
+        }
+
+        // ── Group 14: Debuff → Damage Amplification ────────────────
+
+        private void RunDebuffDamageGroup()
+        {
+            // DebuffPhysicalDefense(2) on enemy_a: pDef 4→2
+            // Then Damage(2): Max(1, 2*12/2) = 12 vs normal Max(1, 2*12/4) = 6
+            _resolver.RegisterWord("test_debuff_then_dmg_debuff",
+                new List<WordActionMapping> { new("DebuffPhysicalDefense", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_debuff_then_dmg_debuff");
+            Check("Debuff setup: enemy pDef reduced to 2",
+                Stat(_enemyA, StatType.PhysicalDefense) == 2,
+                $"pDef={Stat(_enemyA, StatType.PhysicalDefense)}(exp 2)");
+
+            _resolver.RegisterWord("test_debuff_then_dmg_hit",
+                new List<WordActionMapping> { new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_debuff_then_dmg_hit");
+            int amplifiedDmg = Math.Max(1, 2 * 12 / 2); // 12
+            Check("Debuff then Damage: amplified damage dealt",
+                HP(_enemyA) == 80 - amplifiedDmg,
+                $"HP={HP(_enemyA)}(exp {80 - amplifiedDmg})");
+        }
+
+        // ── Group 15: Burn DoT Tick ─────────────────────────────────
+
+        private void RunBurnTickGroup()
+        {
+            // Apply Burning(3 duration) to enemy_a, then advance to enemy_a's turn
+            // BurningHandler.OnTick deals DamagePerTick(3) * stackCount(1) = 3 on TurnEnded
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            int hpBefore = HP(_enemyA);
+
+            // Begin hero turn (index 0) and end it → triggers TurnEnded for hero (no burn)
+            _turnService.BeginTurn();
+            _turnService.EndTurn();
+
+            // Now it's enemy_a's turn (index 1)
+            _turnService.BeginTurn();
+            _turnService.EndTurn(); // TurnEnded triggers OnTick for enemy_a's burning
+
+            int dotDamage = 3; // DamagePerTick=3, stackCount=1
+            Check("Burn DoT tick: HP reduced by DoT on turn end",
+                HP(_enemyA) == hpBefore - dotDamage,
+                $"HP={HP(_enemyA)}(exp {hpBefore - dotDamage})");
+        }
+
+        // ── Group 16: Multi-Action Mana Interactions ────────────────
+
+        private void RunManaInteractionGroup()
+        {
+            // Combo word Damage(1)+Heal(1) with cost=2 → mana deducted, both execute
+            _entityStats.ApplyDamage(_hero, 10); // hero to 90 HP
+            _resolver.RegisterWord("test_mana_combo",
+                new List<WordActionMapping> { new("Damage", 1), new("Heal", 1, Target: "Self") },
+                new WordMeta("SingleEnemy", 2, 0, AreaShape.Single));
+            Exec("test_mana_combo");
+            int comboDmg = Math.Max(1, 1 * 12 / 4); // 3
+            Check("Mana combo: cost deducted, both actions execute",
+                Mana(_hero) == 3 && HP(_enemyA) < 80 && HP(_hero) == 91,
+                $"Mana={Mana(_hero)}(exp 3), EnemyA HP={HP(_enemyA)}(exp {80 - comboDmg}), Hero HP={HP(_hero)}(exp 91)");
+
+            SoftReset();
+
+            // Thinking restores mana then expensive word succeeds
+            // Drain all mana first (SoftReset doesn't reset mana)
+            _entityStats.TrySpendMana(_hero, Mana(_hero));
+            _resolver.RegisterWord("test_think_restore",
+                new List<WordActionMapping> { new("Thinking", 5) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_think_restore");
+            Check("Thinking restores: mana back to 5",
+                Mana(_hero) == 5,
+                $"Mana={Mana(_hero)}(exp 5)");
+
+            _resolver.RegisterWord("test_expensive_after",
+                new List<WordActionMapping> { new("Heal", 1) },
+                new WordMeta("Self", 3, 0, AreaShape.Single));
+            _entityStats.ApplyDamage(_hero, 10);
+            Exec("test_expensive_after");
+            Check("Expensive word after Thinking: succeeds with mana",
+                Mana(_hero) == 2 && HP(_hero) == 91,
+                $"Mana={Mana(_hero)}(exp 2), HP={HP(_hero)}(exp 91)");
+        }
+
+        // ── Group 17: Death Edge Cases ──────────────────────────────
+
+        private void RunDeathEdgeCaseGroup()
+        {
+            // Kill enemy: Damage huge amount → HP=0
+            _entityStats.ApplyDamage(_enemyD, 9999);
+            Check("Death setup: enemy_d is dead",
+                HP(_enemyD) == 0,
+                $"HP={HP(_enemyD)}(exp 0)");
+
+            // Damage already-dead entity → no crash, HP stays 0
+            _entityStats.ApplyDamage(_enemyD, 50);
+            Check("Damage dead entity: no crash, HP stays 0",
+                HP(_enemyD) == 0,
+                $"HP={HP(_enemyD)}(exp 0)");
+
+            SoftReset();
+
+            // Heal after near-death: take 95 damage (HP=5), then heal 10 → HP=15
+            _entityStats.ApplyDamage(_hero, 95);
+            Check("Near-death setup: hero at 5 HP",
+                HP(_hero) == 5,
+                $"HP={HP(_hero)}(exp 5)");
+
+            _resolver.RegisterWord("test_heal_near_death",
+                new List<WordActionMapping> { new("Heal", 10) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_heal_near_death");
+            Check("Heal after near-death: HP correctly restored",
+                HP(_hero) == 15,
+                $"HP={HP(_hero)}(exp 15)");
+        }
+
+        // ── Group 18: Poisoned DoT & Stacking ───────────────────────
+
+        private void RunPoisonedGroup()
+        {
+            // Poisoned tick: DamagePerTick=2 * stackCount=1 = 2
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            AdvanceTurns(2); // hero + enemy_a → tick on enemy_a TurnEnded
+            Check("Poisoned tick: 2 damage per tick",
+                HP(_enemyA) == 78,
+                $"HP={HP(_enemyA)}(exp 78)");
+
+            SoftReset();
+
+            // Poisoned stacking: StackIntensity → stackCount=2 → 4 dmg/tick
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            Check("Poisoned stacking: stackCount=2",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Poisoned) == 2,
+                $"stackCount={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Poisoned)}(exp 2)");
+            AdvanceTurns(2);
+            Check("Poisoned stacking tick: 4 damage (2*2)",
+                HP(_enemyA) == 76,
+                $"HP={HP(_enemyA)}(exp 76)");
+
+            SoftReset();
+
+            // Heal poisoned entity: HP restores but poison persists
+            _entityStats.ApplyDamage(_enemyA, 20);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            _entityStats.ApplyHeal(_enemyA, 10);
+            Check("Heal poisoned: HP restored, poison persists",
+                HP(_enemyA) == 70 && _statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned),
+                $"HP={HP(_enemyA)}(exp 70), Poisoned={_statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned)}");
+        }
+
+        // ── Group 19: Frozen Mechanics ──────────────────────────────
+
+        private void RunFrozenGroup()
+        {
+            // Frozen grants +999 pDef/mDef → damage becomes 1
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Frozen, 5, _hero);
+            int frozenDef = Stat(_enemyA, StatType.PhysicalDefense);
+            Check("Frozen defense: pDef boosted to 1003",
+                frozenDef == 1003,
+                $"pDef={frozenDef}(exp 1003)");
+
+            _resolver.RegisterWord("test_dmg_frozen",
+                new List<WordActionMapping> { new("Damage", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_dmg_frozen");
+            Check("Frozen target: damage clamped to 1",
+                HP(_enemyA) == 79,
+                $"HP={HP(_enemyA)}(exp 79)");
+
+            SoftReset();
+
+            // Frozen skips turn
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Frozen, 5, _hero);
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn();
+            _turnService.BeginTurn(); // enemy_a → auto-ends (frozen)
+            Check("Frozen skip: turn auto-ended",
+                !_turnService.IsTurnActive && _turnService.CurrentEntity.Equals(_enemyB),
+                $"IsTurnActive={_turnService.IsTurnActive}, CurrentEntity={_turnService.CurrentEntity.Value}(exp enemy_b)");
+
+            SoftReset();
+
+            // Frozen Ignore stacking: apply twice → still 1 instance
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Frozen, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Frozen, 5, _hero);
+            Check("Frozen ignore stacking: still 1 stack, original duration",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Frozen) == 1,
+                $"stackCount={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Frozen)}(exp 1)");
+
+            SoftReset();
+
+            // Burn removes Frozen → defense reverts
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Frozen, 5, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            Check("Burn removes Frozen: pDef reverts to base",
+                Stat(_enemyA, StatType.PhysicalDefense) == 4 && !_statusEffects.HasEffect(_enemyA, StatusEffectType.Frozen),
+                $"pDef={Stat(_enemyA, StatType.PhysicalDefense)}(exp 4), Frozen={_statusEffects.HasEffect(_enemyA, StatusEffectType.Frozen)}");
+        }
+
+        // ── Group 20: Stun Mechanics ────────────────────────────────
+
+        private void RunStunGroup()
+        {
+            // Stun skips turn
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Stun, 3, _hero);
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn();
+            _turnService.BeginTurn(); // enemy_a → auto-ends (stun)
+            Check("Stun skip: turn auto-ended",
+                !_turnService.IsTurnActive && _turnService.CurrentEntity.Equals(_enemyB),
+                $"IsTurnActive={_turnService.IsTurnActive}, CurrentEntity={_turnService.CurrentEntity.Value}(exp enemy_b)");
+
+            SoftReset();
+
+            // Stun RefreshDuration: reapply refreshes duration
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Stun, 2, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Stun, 5, _hero);
+            var stunEffects = _statusEffects.GetEffects(_enemyA);
+            var stunInstance = stunEffects[0];
+            Check("Stun RefreshDuration: duration refreshed to 5",
+                stunInstance.RemainingDuration == 5 && _statusEffects.GetStackCount(_enemyA, StatusEffectType.Stun) == 1,
+                $"Duration={stunInstance.RemainingDuration}(exp 5), stacks={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Stun)}(exp 1)");
+        }
+
+        // ── Group 21: Status Effect Stat Modifiers ──────────────────
+
+        private void RunStatusStatModifierGroup()
+        {
+            // Slowed: MagicPower -3
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Slowed, 3, _hero);
+            Check("Slowed: MagicPower reduced by 3",
+                Stat(_enemyA, StatType.MagicPower) == 3,
+                $"MagicPower={Stat(_enemyA, StatType.MagicPower)}(exp 3)");
+
+            SoftReset();
+
+            // Cursed: Luck -5
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Cursed, 3, _hero);
+            Check("Cursed: Luck reduced by 5",
+                Stat(_enemyA, StatType.Luck) == -3,
+                $"Luck={Stat(_enemyA, StatType.Luck)}(exp -3)");
+
+            SoftReset();
+
+            // Buffed status: Strength +5
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Buffed, 3, _hero);
+            Check("Buffed status: Strength increased by 5",
+                Stat(_enemyA, StatType.Strength) == 13,
+                $"Strength={Stat(_enemyA, StatType.Strength)}(exp 13)");
+
+            SoftReset();
+
+            // Shielded status: PhysicalDefense +5
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Shielded, 3, _hero);
+            Check("Shielded status: PhysicalDefense increased by 5",
+                Stat(_enemyA, StatType.PhysicalDefense) == 9,
+                $"pDef={Stat(_enemyA, StatType.PhysicalDefense)}(exp 9)");
+
+            SoftReset();
+
+            // Fear: Str-1, MagicPower-1, pDef-1, mDef-1
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Fear, 3, _hero);
+            bool fearOk = Stat(_enemyA, StatType.Strength) == 7 &&
+                           Stat(_enemyA, StatType.MagicPower) == 5 &&
+                           Stat(_enemyA, StatType.PhysicalDefense) == 3 &&
+                           Stat(_enemyA, StatType.MagicDefense) == 2;
+            Check("Fear: all 4 stats reduced by 1",
+                fearOk,
+                $"Str={Stat(_enemyA, StatType.Strength)}(7), Magic={Stat(_enemyA, StatType.MagicPower)}(5), pDef={Stat(_enemyA, StatType.PhysicalDefense)}(3), mDef={Stat(_enemyA, StatType.MagicDefense)}(2)");
+
+            // Fear stacking: StackIntensity → stackCount increases but modifiers stay
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Fear, 3, _hero);
+            Check("Fear stacking: stackCount=2, stats still -1 each",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Fear) == 2 &&
+                Stat(_enemyA, StatType.Strength) == 7,
+                $"stacks={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Fear)}(exp 2), Str={Stat(_enemyA, StatType.Strength)}(exp 7)");
+        }
+
+        // ── Group 22: Status Effect Lifecycle ───────────────────────
+
+        private void RunStatusLifecycleGroup()
+        {
+            // Burning(1) expires after 1 tick (DoT fires, then effect removed)
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 1, _hero);
+            AdvanceTurns(2); // hero + enemy_a → tick: -3, duration 1→0 → expired
+            Check("Burning expires: effect removed after 1 tick, DoT dealt",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning) && HP(_enemyA) == 77,
+                $"HasBurning={_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning)}, HP={HP(_enemyA)}(exp 77)");
+
+            SoftReset();
+
+            // Manual removal: apply and remove → gone
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Wet, 5, _hero);
+            _statusEffects.RemoveEffect(_enemyA, StatusEffectType.Wet);
+            Check("Manual removal: effect removed",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Wet),
+                "Wet still present after removal");
+
+            SoftReset();
+
+            // RefreshDuration: Burning(2) then Burning(5) → duration refreshed
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 2, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 5, _hero);
+            var effects = _statusEffects.GetEffects(_enemyA);
+            Check("RefreshDuration: duration refreshed to 5",
+                effects.Count == 1 && effects[0].RemainingDuration == 5,
+                $"Count={effects.Count}(exp 1), Duration={effects[0].RemainingDuration}(exp 5)");
+
+            SoftReset();
+
+            // StackIntensity: Poisoned(3) then Poisoned(2) → stackCount=2, duration=max(3,2)=3
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 2, _hero);
+            var poisonEffects = _statusEffects.GetEffects(_enemyA);
+            Check("StackIntensity: stackCount=2, duration=max",
+                poisonEffects[0].StackCount == 2 && poisonEffects[0].RemainingDuration == 3,
+                $"stacks={poisonEffects[0].StackCount}(exp 2), duration={poisonEffects[0].RemainingDuration}(exp 3)");
+        }
+
+        // ── Group 23: Damage Under Stat Modifiers ───────────────────
+
+        private void RunDamageUnderModifiersGroup()
+        {
+            // BuffStrength on hero then Damage: str 12→15, Damage(2) → Max(1,2*15/4)=7
+            _resolver.RegisterWord("test_buff_then_dmg_buff",
+                new List<WordActionMapping> { new("BuffStrength", 3) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_buff_then_dmg_buff");
+            _resolver.RegisterWord("test_buff_then_dmg_hit",
+                new List<WordActionMapping> { new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_buff_then_dmg_hit");
+            Check("Buff then Damage: increased damage",
+                HP(_enemyA) == 73,
+                $"HP={HP(_enemyA)}(exp 73)");
+
+            SoftReset();
+
+            // Damage against Shielded-status target: pDef 4+5=9
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Shielded, 5, _hero);
+            int sStr = Stat(_hero, StatType.Strength);
+            int sDmg = Math.Max(1, 2 * sStr / 9);
+            _resolver.RegisterWord("test_dmg_vs_shielded",
+                new List<WordActionMapping> { new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_dmg_vs_shielded");
+            Check("Damage vs Shielded status: reduced damage (pDef+5)",
+                HP(_enemyA) == 80 - sDmg,
+                $"HP={HP(_enemyA)}(exp {80 - sDmg})");
+
+            SoftReset();
+
+            // Damage against Feared target: pDef 4-1=3
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Fear, 3, _hero);
+            int fStr = Stat(_hero, StatType.Strength);
+            int fDmg = Math.Max(1, 2 * fStr / 3);
+            _resolver.RegisterWord("test_dmg_vs_fear",
+                new List<WordActionMapping> { new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_dmg_vs_fear");
+            Check("Damage vs Feared target: increased damage (pDef-1)",
+                HP(_enemyA) == 80 - fDmg,
+                $"HP={HP(_enemyA)}(exp {80 - fDmg})");
+
+            SoftReset();
+
+            // Minimum damage guarantee: Frozen enemy_c (pDef 6+999=1005), Damage(1) → 1
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Frozen, 5, _hero);
+            _resolver.RegisterWord("test_min_dmg",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("HighestDefenseEnemy", 0, 0, AreaShape.Single));
+            Exec("test_min_dmg");
+            Check("Minimum damage: floor of 1 against extreme defense",
+                HP(_enemyC) == 99,
+                $"HP={HP(_enemyC)}(exp 99)");
+        }
+
+        // ── Group 24: Shield Advanced ───────────────────────────────
+
+        private void RunShieldAdvancedGroup()
+        {
+            // Shield handler on SingleEnemy: enemy gets shield
+            _resolver.RegisterWord("test_shield_enemy",
+                new List<WordActionMapping> { new("Shield", 5) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_shield_enemy");
+            Check("Shield on enemy: enemy_a gets 5 shield",
+                Shield(_enemyA) == 5,
+                $"Shield={Shield(_enemyA)}(exp 5)");
+
+            // Shield on AllAlliesAndSelf: hero + ally both get shield
+            _resolver.RegisterWord("test_shield_allies",
+                new List<WordActionMapping> { new("Shield", 3) },
+                new WordMeta("AllAlliesAndSelf", 0, 0, AreaShape.Single));
+            Exec("test_shield_allies");
+            Check("Shield AllAlliesAndSelf: hero and ally both shielded",
+                Shield(_hero) == 3 && Shield(_allyA) == 3,
+                $"Hero shield={Shield(_hero)}(exp 3), Ally shield={Shield(_allyA)}(exp 3)");
+
+            // Shield drain across multiple hits
+            _entityStats.ApplyDamage(_hero, 100); // eat hero shield + HP to reset
+            _entityStats.ApplyHeal(_hero, 100);
+            _entityStats.ApplyShield(_hero, 5);
+            _entityStats.ApplyDamage(_hero, 3); // shield 5→2, HP=100
+            _entityStats.ApplyDamage(_hero, 3); // shield 2→0, HP takes 1 → 99
+            Check("Shield drain: absorbs across multiple hits",
+                HP(_hero) == 99 && Shield(_hero) == 0,
+                $"HP={HP(_hero)}(exp 99), Shield={Shield(_hero)}(exp 0)");
+
+            // Shield doesn't interfere with healing
+            _entityStats.ApplyShield(_hero, 5);
+            _entityStats.ApplyDamage(_hero, 10); // shield absorbs 5, HP takes 5 → 94
+            _entityStats.ApplyHeal(_hero, 5); // HP 94→99, shield stays 0
+            Check("Shield + heal: heal restores HP independently of shield",
+                HP(_hero) == 99 && Shield(_hero) == 0,
+                $"HP={HP(_hero)}(exp 99), Shield={Shield(_hero)}(exp 0)");
+        }
+
+        // ── Group 25: Heal Edge Cases ───────────────────────────────
+
+        private void RunHealEdgeCaseGroup()
+        {
+            // Heal poisoned entity: HP restored, poison still active
+            _entityStats.ApplyDamage(_enemyA, 20);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            _resolver.RegisterWord("test_heal_poisoned",
+                new List<WordActionMapping> { new("Heal", 10) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_heal_poisoned");
+            // HealActionHandler halves healing on poisoned targets: Max(1, 10/2) = 5
+            Check("Heal poisoned entity: HP restored (halved by poison), poison persists",
+                HP(_enemyA) == 65 && _statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned),
+                $"HP={HP(_enemyA)}(exp 65), Poisoned={_statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned)}");
+
+            SoftReset();
+
+            // Heal AllAllies: only ally healed, hero unchanged
+            _entityStats.ApplyDamage(_hero, 20);
+            _entityStats.ApplyDamage(_allyA, 20);
+            _resolver.RegisterWord("test_heal_all_allies",
+                new List<WordActionMapping> { new("Heal", 5) },
+                new WordMeta("AllAllies", 0, 0, AreaShape.Single));
+            Exec("test_heal_all_allies");
+            Check("Heal AllAllies: only ally healed, hero excluded",
+                HP(_hero) == 80 && HP(_allyA) == 55,
+                $"Hero HP={HP(_hero)}(exp 80), Ally HP={HP(_allyA)}(exp 55)");
+
+            SoftReset();
+
+            // Heal SingleEnemy: heals an enemy
+            _entityStats.ApplyDamage(_enemyA, 20);
+            _resolver.RegisterWord("test_heal_enemy",
+                new List<WordActionMapping> { new("Heal", 5) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_heal_enemy");
+            Check("Heal SingleEnemy: enemy HP restored",
+                HP(_enemyA) == 65,
+                $"HP={HP(_enemyA)}(exp 65)");
+
+            SoftReset();
+
+            // Heal dead entity: HP goes from 0 to heal amount
+            _entityStats.ApplyDamage(_enemyD, 9999);
+            _entityStats.ApplyHeal(_enemyD, 5);
+            Check("Heal dead entity: HP restored from 0",
+                HP(_enemyD) == 5,
+                $"HP={HP(_enemyD)}(exp 5)");
+        }
+
+        // ── Group 26: Target Type Coverage ──────────────────────────
+
+        private void RunTargetTypeCoverageGroup()
+        {
+            // HighestHealthEnemy: enemy_c HP=100
+            _resolver.RegisterWord("test_highest_hp",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("HighestHealthEnemy", 0, 0, AreaShape.Single));
+            Exec("test_highest_hp");
+            Check("Target HighestHealthEnemy: enemy_c (HP=100) hit",
+                HP(_enemyC) == 98 && HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyD) == 40,
+                $"C={HP(_enemyC)}(exp 98), A={HP(_enemyA)}(80), B={HP(_enemyB)}(60), D={HP(_enemyD)}(40)");
+
+            SoftReset();
+
+            // LowestDefenseEnemy: enemy_d pDef=2
+            _resolver.RegisterWord("test_lowest_def",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("LowestDefenseEnemy", 0, 0, AreaShape.Single));
+            Exec("test_lowest_def");
+            Check("Target LowestDefenseEnemy: enemy_d (pDef=2) hit",
+                HP(_enemyD) == 34 && HP(_enemyA) == 80,
+                $"D={HP(_enemyD)}(exp 34), A={HP(_enemyA)}(80)");
+
+            SoftReset();
+
+            // HighestDefenseEnemy: enemy_c pDef=6
+            _resolver.RegisterWord("test_highest_def",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("HighestDefenseEnemy", 0, 0, AreaShape.Single));
+            Exec("test_highest_def");
+            Check("Target HighestDefenseEnemy: enemy_c (pDef=6) hit",
+                HP(_enemyC) == 98 && HP(_enemyA) == 80,
+                $"C={HP(_enemyC)}(exp 98), A={HP(_enemyA)}(80)");
+
+            SoftReset();
+
+            // HighestStrengthEnemy: enemy_c str=10
+            _resolver.RegisterWord("test_highest_str",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("HighestStrengthEnemy", 0, 0, AreaShape.Single));
+            Exec("test_highest_str");
+            Check("Target HighestStrengthEnemy: enemy_c (str=10) hit",
+                HP(_enemyC) == 98 && HP(_enemyA) == 80,
+                $"C={HP(_enemyC)}(exp 98), A={HP(_enemyA)}(80)");
+
+            SoftReset();
+
+            // AllEnemiesWithStatus: burn enemy_a+c → only those hit
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Burning, 3, _hero);
+            _resolver.RegisterWord("test_with_status",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("AllEnemiesWithStatus", 0, 0, AreaShape.Single));
+            Exec("test_with_status");
+            Check("Target AllEnemiesWithStatus: only enemies with effects hit",
+                HP(_enemyA) < 80 && HP(_enemyC) < 100 && HP(_enemyB) == 60 && HP(_enemyD) == 40,
+                $"A={HP(_enemyA)}, C={HP(_enemyC)}, B={HP(_enemyB)}(60), D={HP(_enemyD)}(40)");
+
+            SoftReset();
+
+            // AllEnemiesWithoutStatus: burn enemy_a+c → B+D hit
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Burning, 3, _hero);
+            _resolver.RegisterWord("test_without_status",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("AllEnemiesWithoutStatus", 0, 0, AreaShape.Single));
+            Exec("test_without_status");
+            Check("Target AllEnemiesWithoutStatus: only unaffected enemies hit",
+                HP(_enemyA) == 80 && HP(_enemyC) == 100 && HP(_enemyB) < 60 && HP(_enemyD) < 40,
+                $"A={HP(_enemyA)}(80), C={HP(_enemyC)}(100), B={HP(_enemyB)}, D={HP(_enemyD)}");
+
+            SoftReset();
+
+            // AllWetEnemies: wet enemy_b → only enemy_b hit
+            _statusEffects.ApplyEffect(_enemyB, StatusEffectType.Wet, 3, _hero);
+            _resolver.RegisterWord("test_all_wet",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("AllEnemies+Wet", 0, 0, AreaShape.Single));
+            Exec("test_all_wet");
+            Check("Target AllWetEnemies: only wet enemy hit",
+                HP(_enemyB) == 56 && HP(_enemyA) == 80 && HP(_enemyC) == 100 && HP(_enemyD) == 40,
+                $"B={HP(_enemyB)}(exp 56), others unchanged");
+
+            SoftReset();
+
+            // AllStunnedEnemies: stun enemy_d → only enemy_d hit
+            _statusEffects.ApplyEffect(_enemyD, StatusEffectType.Stun, 3, _hero);
+            _resolver.RegisterWord("test_all_stunned",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("AllEnemies+Stun", 0, 0, AreaShape.Single));
+            Exec("test_all_stunned");
+            Check("Target AllStunnedEnemies: only stunned enemy hit",
+                HP(_enemyD) == 34 && HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyC) == 100,
+                $"D={HP(_enemyD)}(exp 34), others unchanged");
+
+            SoftReset();
+
+            // AllFearfulEnemies: fear enemy_a → only enemy_a hit
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Fear, 3, _hero);
+            _resolver.RegisterWord("test_all_fear",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("AllEnemies+Fear", 0, 0, AreaShape.Single));
+            Exec("test_all_fear");
+            // Fear reduces pDef by 1: 4→3. Damage(1): Max(1, 12/3)=4
+            Check("Target AllFearfulEnemies: only feared enemy hit",
+                HP(_enemyA) == 76 && HP(_enemyB) == 60,
+                $"A={HP(_enemyA)}(exp 76), B={HP(_enemyB)}(60)");
+
+            SoftReset();
+
+            // HalfEnemiesRandom: 4 enemies → Max(1, 4/2) = 2 hit (use Shield to count)
+            _resolver.RegisterWord("test_half_random",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("HalfEnemiesRandom", 0, 0, AreaShape.Single));
+            Exec("test_half_random");
+            int halfCount = (Shield(_enemyA) > 0 ? 1 : 0) + (Shield(_enemyB) > 0 ? 1 : 0) +
+                            (Shield(_enemyC) > 0 ? 1 : 0) + (Shield(_enemyD) > 0 ? 1 : 0);
+            Check("Target HalfEnemiesRandom: exactly 2 enemies targeted",
+                halfCount == 2,
+                $"hitCount={halfCount}(exp 2)");
+
+            SoftReset();
+
+            // TwoRandomEnemies: exactly 2 — clear shields from previous test first
+            foreach (var e in new[] { _enemyA, _enemyB, _enemyC, _enemyD })
+            {
+                var s = Shield(e);
+                if (s > 0) _entityStats.ApplyDamage(e, s);
+            }
+            SoftReset();
+            _resolver.RegisterWord("test_two_random",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("TwoRandomEnemies", 0, 0, AreaShape.Single));
+            Exec("test_two_random");
+            int twoCount = (Shield(_enemyA) > 0 ? 1 : 0) + (Shield(_enemyB) > 0 ? 1 : 0) +
+                           (Shield(_enemyC) > 0 ? 1 : 0) + (Shield(_enemyD) > 0 ? 1 : 0);
+            Check("Target TwoRandomEnemies: exactly 2 enemies targeted",
+                twoCount == 2,
+                $"hitCount={twoCount}(exp 2)");
+
+            // ThreeRandomEnemies: exactly 3 — clear shields first
+            foreach (var e in new[] { _enemyA, _enemyB, _enemyC, _enemyD })
+            {
+                var s = Shield(e);
+                if (s > 0) _entityStats.ApplyDamage(e, s);
+            }
+            SoftReset();
+            _resolver.RegisterWord("test_three_random",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("ThreeRandomEnemies", 0, 0, AreaShape.Single));
+            Exec("test_three_random");
+            int threeCount = (Shield(_enemyA) > 0 ? 1 : 0) + (Shield(_enemyB) > 0 ? 1 : 0) +
+                             (Shield(_enemyC) > 0 ? 1 : 0) + (Shield(_enemyD) > 0 ? 1 : 0);
+            Check("Target ThreeRandomEnemies: exactly 3 enemies targeted",
+                threeCount == 3,
+                $"hitCount={threeCount}(exp 3)");
+        }
+
+        // ── Group 27: Advanced Combos ───────────────────────────────
+
+        private void RunAdvancedComboGroup()
+        {
+            // Heal+Damage: self heal + enemy damage
+            _entityStats.ApplyDamage(_hero, 20);
+            _resolver.RegisterWord("test_combo_heal_dmg",
+                new List<WordActionMapping>
+                {
+                    new("Heal", 5, Target: "Self"),
+                    new("Damage", 2, Target: "SingleEnemy")
+                },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_combo_heal_dmg");
+            Check("Combo Heal+Damage: hero healed, enemy damaged",
+                HP(_hero) == 85 && HP(_enemyA) == 74,
+                $"Hero HP={HP(_hero)}(exp 85), Enemy HP={HP(_enemyA)}(exp 74)");
+
+            SoftReset();
+
+            // Shield+Damage: protect self while attacking
+            _resolver.RegisterWord("test_combo_shield_dmg",
+                new List<WordActionMapping>
+                {
+                    new("Shield", 5, Target: "Self"),
+                    new("Damage", 2, Target: "SingleEnemy")
+                },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_combo_shield_dmg");
+            Check("Combo Shield+Damage: hero shielded, enemy damaged",
+                Shield(_hero) == 5 && HP(_enemyA) == 74,
+                $"Hero shield={Shield(_hero)}(exp 5), Enemy HP={HP(_enemyA)}(exp 74)");
+
+            SoftReset();
+
+            // Debuff+Damage in one word: debuff applies first, amplified damage
+            _resolver.RegisterWord("test_combo_debuff_dmg",
+                new List<WordActionMapping>
+                {
+                    new("DebuffPhysicalDefense", 2, Target: "SingleEnemy"),
+                    new("Damage", 2, Target: "SingleEnemy")
+                },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_combo_debuff_dmg");
+            // pDef 4→2, Damage: Max(1, 2*12/2)=12
+            Check("Combo Debuff+Damage: debuff amplifies damage in same word",
+                HP(_enemyA) == 68,
+                $"HP={HP(_enemyA)}(exp 68)");
+
+            SoftReset();
+
+            // Multiple buffs in one word
+            _resolver.RegisterWord("test_combo_multi_buff",
+                new List<WordActionMapping>
+                {
+                    new("BuffStrength", 2, Target: "Self"),
+                    new("BuffMagicPower", 3, Target: "Self")
+                },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_combo_multi_buff");
+            Check("Combo multi-buff: both stats increased",
+                Stat(_hero, StatType.Strength) == 14 && Stat(_hero, StatType.MagicPower) == 11,
+                $"Str={Stat(_hero, StatType.Strength)}(exp 14), Magic={Stat(_hero, StatType.MagicPower)}(exp 11)");
+
+            SoftReset();
+
+            // Burn+Water in one word: both effects applied
+            _resolver.RegisterWord("test_combo_burn_water",
+                new List<WordActionMapping> { new("Burn", 3), new("Water", 4) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_combo_burn_water");
+            Check("Combo Burn+Water: both Burning and Wet applied",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Burning) &&
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Wet),
+                $"Burning={_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning)}, Wet={_statusEffects.HasEffect(_enemyA, StatusEffectType.Wet)}");
+        }
+
+        // ── Group 28: Stat Modifier Stacking ────────────────────────
+
+        private void RunStatModifierStackingGroup()
+        {
+            // Double buff: BuffStrength(3) twice → str 12+3+3=18
+            _resolver.RegisterWord("test_double_buff",
+                new List<WordActionMapping> { new("BuffStrength", 3) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_double_buff");
+            Exec("test_double_buff");
+            Check("Double buff: both modifiers stack additively",
+                Stat(_hero, StatType.Strength) == 18,
+                $"Str={Stat(_hero, StatType.Strength)}(exp 18)");
+
+            SoftReset();
+
+            // Buff+Debuff: BuffStrength(3) + DebuffStrength(1) → net +2 from baseline
+            int strBaseline = Stat(_hero, StatType.Strength);
+            _resolver.RegisterWord("test_buff_for_net",
+                new List<WordActionMapping> { new("BuffStrength", 3) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_buff_for_net");
+            _resolver.RegisterWord("test_debuff_for_net",
+                new List<WordActionMapping> { new("DebuffStrength", 1) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_debuff_for_net");
+            int expectedNet = strBaseline + 3 - 1;
+            Check("Buff+Debuff: net modifier applied",
+                Stat(_hero, StatType.Strength) == expectedNet,
+                $"Str={Stat(_hero, StatType.Strength)}(exp {expectedNet})");
+
+            SoftReset();
+
+            // Debuff to negative defense: DebuffPhysicalDefense(10) on enemy_d (pDef=2→-8)
+            _resolver.RegisterWord("test_debuff_neg",
+                new List<WordActionMapping> { new("DebuffPhysicalDefense", 10) },
+                new WordMeta("LowestDefenseEnemy", 0, 0, AreaShape.Single));
+            Exec("test_debuff_neg");
+            Check("Debuff to negative: stat goes below zero",
+                Stat(_enemyD, StatType.PhysicalDefense) == -8,
+                $"pDef={Stat(_enemyD, StatType.PhysicalDefense)}(exp -8)");
+            _resolver.RegisterWord("test_dmg_neg_def",
+                new List<WordActionMapping> { new("Damage", 1) },
+                new WordMeta("LowestDefenseEnemy", 0, 0, AreaShape.Single));
+            var negStr = Stat(_hero, StatType.Strength);
+            var negDefClamped = Math.Max(1, Stat(_enemyD, StatType.PhysicalDefense));
+            var negDmg = Math.Max(1, 1 * negStr / negDefClamped);
+            var expHpNeg = HP(_enemyD) - negDmg;
+            Exec("test_dmg_neg_def");
+            Check("Damage vs negative defense: Max(1,def) clamps, massive damage",
+                HP(_enemyD) == expHpNeg,
+                $"HP={HP(_enemyD)}(exp {expHpNeg})");
+        }
+
+        // ── Group 29: Multi-Turn DoT & Status ───────────────────────
+
+        private void RunMultiDoTGroup()
+        {
+            // Burning over 2 turns: 3 damage per tick × 2 = 6 total
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            AdvanceTurns(2); // hero + enemy_a → tick 1: -3
+            AdvanceTurns(6); // enemy_b, c, d, ally_a, hero, enemy_a → tick 2: -3
+            Check("Burning 2 ticks: 6 total damage",
+                HP(_enemyA) == 74,
+                $"HP={HP(_enemyA)}(exp 74)");
+
+            SoftReset();
+
+            // Dual DoTs: Burning(3) + Poisoned(2) = 5 per tick
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            AdvanceTurns(2);
+            Check("Dual DoTs: Burning(3) + Poisoned(2) = 5 damage per tick",
+                HP(_enemyA) == 75,
+                $"HP={HP(_enemyA)}(exp 75)");
+
+            SoftReset();
+
+            // Removed effect doesn't tick
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            _statusEffects.RemoveEffect(_enemyA, StatusEffectType.Burning);
+            AdvanceTurns(2);
+            Check("Removed DoT: no damage after removal",
+                HP(_enemyA) == 80,
+                $"HP={HP(_enemyA)}(exp 80)");
+        }
+
+        // ── Group 30: Mana Regen & Edge Cases ───────────────────────
+
+        private void RunManaRegenGroup()
+        {
+            // Mana regen on turn start: hero starts mana=5, regen=2 → 7
+            _turnService.BeginTurn(); // hero → regen fires
+            Check("Mana regen on turn start: 5→7",
+                Mana(_hero) == 7,
+                $"Mana={Mana(_hero)}(exp 7)");
+            _turnService.EndTurn();
+
+            // Advance to next hero turn
+            AdvanceTurns(5); // enemy_a through ally_a
+
+            // Mana regen capped at MaxMana: set to 9, regen 2 → capped at 10
+            _entityStats.ApplyMana(_hero, 2); // 7→9
+            _turnService.BeginTurn(); // hero → regen 2 → 9+2=11 capped at 10
+            Check("Mana regen capped: does not exceed MaxMana",
+                Mana(_hero) == 10,
+                $"Mana={Mana(_hero)}(exp 10)");
+            _turnService.EndTurn();
+
+            // Zero-cost word: cost=0 → no mana deducted, action executes
+            _entityStats.ApplyDamage(_hero, 5); // HP 100→95
+            int manaBefore = Mana(_hero);
+            _resolver.RegisterWord("test_zero_cost",
+                new List<WordActionMapping> { new("Heal", 1) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_zero_cost");
+            Check("Zero cost word: mana unchanged, action executes",
+                Mana(_hero) == manaBefore && HP(_hero) == 96,
+                $"Mana={Mana(_hero)}(exp {manaBefore}), HP={HP(_hero)}(exp 96)");
+        }
+
+        // ── Group 31: Concentrate ────────────────────────────────────
+
+        private void RunConcentrateGroup()
+        {
+            // Concentrate(3) → Self → mana restored by 3
+            _entityStats.TrySpendMana(_hero, 3); // 5→2
+            _resolver.RegisterWord("test_concentrate",
+                new List<WordActionMapping> { new("Concentrate", 3) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_concentrate");
+            Check("Concentrate: mana restored",
+                Mana(_hero) == 5,
+                $"Mana={Mana(_hero)}(exp 5)");
+
+            // Concentrated status applied
+            Check("Concentrate: Concentrated effect applied",
+                _statusEffects.HasEffect(_hero, StatusEffectType.Concentrated),
+                $"HasConcentrated={_statusEffects.HasEffect(_hero, StatusEffectType.Concentrated)}");
+
+            // Concentrated tick → Strength modifier added
+            int strBefore = Stat(_hero, StatType.Strength);
+            int stacks = _statusEffects.GetStackCount(_hero, StatusEffectType.Concentrated);
+            _turnService.BeginTurn(); // hero turn
+            _turnService.EndTurn(); // triggers OnTick → adds Strength modifier
+            Check("Concentrate tick: Strength increased by stack count",
+                Stat(_hero, StatType.Strength) == strBefore + stacks,
+                $"Str={Stat(_hero, StatType.Strength)}(exp {strBefore + stacks})");
+
+            SoftReset();
+
+            // Concentrated expires → modifier removed
+            var strBaseline = Stat(_hero, StatType.Strength);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Concentrated, 1, _hero);
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn(); // tick: adds modifier, duration 1→0 → expire removes modifier
+            Check("Concentrate expire: Strength reverts",
+                Stat(_hero, StatType.Strength) == strBaseline,
+                $"Str={Stat(_hero, StatType.Strength)}(exp {strBaseline})");
+        }
+
+        // ── Group 32: Poison Action ─────────────────────────────────
+
+        private void RunPoisonActionGroup()
+        {
+            // Poison(3) → SingleEnemy → Poisoned applied with duration=3
+            _resolver.RegisterWord("test_poison_action",
+                new List<WordActionMapping> { new("Poison", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_poison_action");
+            Check("Poison action: Poisoned effect applied",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned),
+                $"HasPoisoned={_statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned)}");
+
+            // Poisoned tick: damage = 2 * stackCount(1) = 2
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            AdvanceTurns(2); // hero + enemy_a → tick on enemy_a
+            Check("Poison action tick: 2 damage dealt",
+                HP(_enemyA) == 78,
+                $"HP={HP(_enemyA)}(exp 78)");
+
+            // Stack decays: stackCount 1→0 after tick → duration forced to 0
+            Check("Poison action decay: stacks decreased",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Poisoned) == 0 ||
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned),
+                $"Stacks={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Poisoned)}");
+
+            SoftReset();
+
+            // Heal halved while poisoned: Poison enemy, then heal
+            _entityStats.ApplyDamage(_enemyA, 20);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 5, _hero);
+            _resolver.RegisterWord("test_heal_while_poisoned",
+                new List<WordActionMapping> { new("Heal", 6) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_heal_while_poisoned");
+            // Heal halved: Max(1, 6/2) = 3
+            Check("Heal halved while poisoned: heal amount reduced",
+                HP(_enemyA) == 63,
+                $"HP={HP(_enemyA)}(exp 63)");
+        }
+
+        // ── Group 33: Bleed ─────────────────────────────────────────
+
+        private void RunBleedGroup()
+        {
+            // Bleed(3) → SingleEnemy → Bleeding applied
+            _resolver.RegisterWord("test_bleed_action",
+                new List<WordActionMapping> { new("Bleed", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_bleed_action");
+            Check("Bleed action: Bleeding effect applied",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding),
+                $"HasBleeding={_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding)}");
+
+            // Bleeding tick: damage = stackCount(1)
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            AdvanceTurns(2);
+            Check("Bleed tick 1: damage = 1 (stackCount=1)",
+                HP(_enemyA) == 79,
+                $"HP={HP(_enemyA)}(exp 79)");
+
+            // Stacks grow if untreated: stackCount 1→2 after tick
+            Check("Bleed grows: stacks increased",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Bleeding) == 2,
+                $"Stacks={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Bleeding)}(exp 2)");
+
+            // Second tick: damage = 2 (stackCount=2), then stacks→3
+            AdvanceTurns(6); // enemy_b, c, d, ally_a, hero, enemy_a
+            Check("Bleed tick 2: damage = 2 (stackCount=2)",
+                HP(_enemyA) == 77,
+                $"HP={HP(_enemyA)}(exp 77)");
+
+            SoftReset();
+
+            // Heal reduces bleeding stacks
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Bleeding, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Bleeding, StatusEffectInstance.PermanentDuration, _hero); // stack to 2
+            _entityStats.ApplyDamage(_enemyA, 10); // HP 80→70
+            _entityStats.ApplyHeal(_enemyA, 5); // HP 75, sets WasHealedThisTurn
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            AdvanceTurns(2); // tick: damage=2, then stacks -= 2 → 0 → removed
+            Check("Bleed healed: stacks reduced on heal",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding),
+                $"HasBleeding={_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding)}");
+        }
+
+        // ── Group 34: Duplicate Actions ─────────────────────────────
+
+        private void RunDuplicateActionGroup()
+        {
+            // Heal(1)+Heal(1) → Self → heals twice (total 2)
+            _entityStats.ApplyDamage(_hero, 10);
+            _resolver.RegisterWord("test_double_heal",
+                new List<WordActionMapping> { new("Heal", 1), new("Heal", 1) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_double_heal");
+            Check("Duplicate Heal: heals twice",
+                HP(_hero) == 92,
+                $"HP={HP(_hero)}(exp 92)");
+
+            SoftReset();
+
+            // Damage(2)+Damage(2) → SingleEnemy → damages twice
+            _resolver.RegisterWord("test_double_damage",
+                new List<WordActionMapping> { new("Damage", 2), new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            int singleDmg = Math.Max(1, 2 * 12 / 4); // 6
+            Exec("test_double_damage");
+            Check("Duplicate Damage: damages twice",
+                HP(_enemyA) == 80 - singleDmg * 2,
+                $"HP={HP(_enemyA)}(exp {80 - singleDmg * 2})");
+        }
+
+        // ── Group 35: Composite Target Types ────────────────────────
+
+        private void RunCompositeTargetGroup()
+        {
+            // AllEnemies+Burning: burn enemy_a + enemy_c → only those targeted
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Burning, 3, _hero);
+            _resolver.RegisterWord("test_composite_burning",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("AllEnemies+Burning", 0, 0, AreaShape.Single));
+            Exec("test_composite_burning");
+            Check("Composite AllEnemies+Burning: only burning enemies targeted",
+                Shield(_enemyA) == 1 && Shield(_enemyC) == 1 && Shield(_enemyB) == 0 && Shield(_enemyD) == 0,
+                $"A shield={Shield(_enemyA)}(1), C shield={Shield(_enemyC)}(1), B={Shield(_enemyB)}(0), D={Shield(_enemyD)}(0)");
+
+            SoftReset();
+            foreach (var e in new[] { _enemyA, _enemyB, _enemyC, _enemyD })
+                if (Shield(e) > 0) _entityStats.ApplyDamage(e, Shield(e));
+            SoftReset();
+
+            // RandomEnemy+Wet: wet enemy_b only → must target enemy_b
+            _statusEffects.ApplyEffect(_enemyB, StatusEffectType.Wet, 3, _hero);
+            _resolver.RegisterWord("test_composite_wet",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("RandomEnemy+Wet", 0, 0, AreaShape.Single));
+            Exec("test_composite_wet");
+            Check("Composite RandomEnemy+Wet: only wet enemy targeted",
+                Shield(_enemyB) == 1 && Shield(_enemyA) == 0 && Shield(_enemyC) == 0 && Shield(_enemyD) == 0,
+                $"B shield={Shield(_enemyB)}(1), A={Shield(_enemyA)}(0)");
+
+            SoftReset();
+            foreach (var e in new[] { _enemyA, _enemyB, _enemyC, _enemyD })
+                if (Shield(e) > 0) _entityStats.ApplyDamage(e, Shield(e));
+            SoftReset();
+
+            // LowestHealthEnemy+Poisoned: poison enemy_a(80) + enemy_d(40) → target enemy_d
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
+            _statusEffects.ApplyEffect(_enemyD, StatusEffectType.Poisoned, 3, _hero);
+            _resolver.RegisterWord("test_composite_poisoned_lowest",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("LowestHealthEnemy+Poisoned", 0, 0, AreaShape.Single));
+            Exec("test_composite_poisoned_lowest");
+            Check("Composite LowestHealthEnemy+Poisoned: lowest-HP poisoned enemy targeted",
+                Shield(_enemyD) == 1 && Shield(_enemyA) == 0,
+                $"D shield={Shield(_enemyD)}(1), A shield={Shield(_enemyA)}(0)");
+        }
+
+        // ── Group 36: Shield on Spawn ───────────────────────────────
+
+        private void RunShieldOnSpawnGroup()
+        {
+            // Entity registered with startingShield=10
+            var shielded = new EntityId("shielded_unit");
+            _entityStats.RegisterEntity(shielded, maxHealth: 50, strength: 5, magicPower: 0,
+                physicalDefense: 4, magicDefense: 2, luck: 0, startingShield: 10);
+            Check("Shield on spawn: entity starts with shield",
+                Shield(shielded) == 10,
+                $"Shield={Shield(shielded)}(exp 10)");
+
+            // Damage absorbed by starting shield: 7 dmg → shield 10→3, HP=50
+            _entityStats.ApplyDamage(shielded, 7);
+            Check("Shield on spawn: damage absorbed by shield",
+                Shield(shielded) == 3 && HP(shielded) == 50,
+                $"Shield={Shield(shielded)}(exp 3), HP={HP(shielded)}(exp 50)");
+
+            // Damage exceeds shield: 5 dmg → shield 3→0, HP takes 2 → 48
+            _entityStats.ApplyDamage(shielded, 5);
+            Check("Shield on spawn: overflow hits HP",
+                Shield(shielded) == 0 && HP(shielded) == 48,
+                $"Shield={Shield(shielded)}(exp 0), HP={HP(shielded)}(exp 48)");
+
+            SoftReset();
+
+            // Shield on player: register with startingShield
+            var player = new EntityId("shielded_player");
+            _entityStats.RegisterEntity(player, maxHealth: 100, strength: 10, magicPower: 5,
+                physicalDefense: 5, magicDefense: 3, luck: 2, startingShield: 5);
+            Check("Shield on player spawn: player starts with shield",
+                Shield(player) == 5,
+                $"Shield={Shield(player)}(exp 5)");
+
+            // Shield stacks with action-applied shield
+            _entityStats.ApplyShield(player, 3);
+            Check("Shield stacks: spawn shield + action shield",
+                Shield(player) == 8,
+                $"Shield={Shield(player)}(exp 8)");
+
+            SoftReset();
+
+            // Entity with 0 starting shield (default)
+            var noshield = new EntityId("noshield_unit");
+            _entityStats.RegisterEntity(noshield, maxHealth: 30, strength: 3, magicPower: 0,
+                physicalDefense: 2, magicDefense: 1, luck: 0);
+            Check("No shield default: entity starts with 0 shield",
+                Shield(noshield) == 0,
+                $"Shield={Shield(noshield)}(exp 0)");
+        }
+
+        // ── Group 37: Grow ────────────────────────────────────────────
+
+        private void RunGrowGroup()
+        {
+            // Growing heals on tick by StackCount
+            _entityStats.ApplyDamage(_hero, 20); // HP 100→80
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Growing, 3, _hero);
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn(); // tick: heal by 1 (stackCount=1)
+            Check("Growing tick: heals by stackCount",
+                HP(_hero) == 81,
+                $"HP={HP(_hero)}(exp 81)");
+
+            SoftReset();
+
+            // Growing + Wet: bonus healing
+            _entityStats.ApplyDamage(_hero, 20); // HP 100→80
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Growing, 3, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Wet, 5, _hero);
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn(); // tick: heal by 1 + 2 = 3
+            Check("Growing + Wet: bonus heal (+2)",
+                HP(_hero) == 83,
+                $"HP={HP(_hero)}(exp 83)");
+
+            SoftReset();
+
+            // Growing expires after duration
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Growing, 1, _hero);
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn(); // tick, duration 1→0 → expired
+            Check("Growing expires after duration",
+                !_statusEffects.HasEffect(_hero, StatusEffectType.Growing),
+                $"HasGrowing={_statusEffects.HasEffect(_hero, StatusEffectType.Growing)}");
+        }
+
+        // ── Group 38: Thorns ─────────────────────────────────────────
+
+        private void RunThornsGroup()
+        {
+            // Thorns retaliates damage back to attacker
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Thorns, 5, _enemyA);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Thorns, 5, _enemyA);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Thorns, 5, _enemyA); // stacks=3
+            _resolver.RegisterWord("test_thorns_hit",
+                new List<WordActionMapping> { new("Damage", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_thorns_hit");
+            int dmgDealt = Math.Max(1, 3 * 12 / 4); // 9
+            Check("Thorns: attacker takes retaliation damage",
+                HP(_hero) == 100 - 3, // 3 stacks of thorns
+                $"HeroHP={HP(_hero)}(exp 97)");
+            Check("Thorns: target still takes damage",
+                HP(_enemyA) == 80 - dmgDealt,
+                $"EnemyHP={HP(_enemyA)}(exp {80 - dmgDealt})");
+
+            SoftReset();
+
+            // Thorns does NOT trigger on thorns retaliation (no infinite loop)
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Thorns, 5, _enemyA);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Thorns, 5, _hero);
+            int heroBefore = HP(_hero);
+            int enemyBefore = HP(_enemyA);
+            _resolver.RegisterWord("test_thorns_no_loop",
+                new List<WordActionMapping> { new("Damage", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_thorns_no_loop");
+            int dmg2 = Math.Max(1, 3 * 12 / 4); // 9
+            // Hero takes 1 (thorns from enemyA), enemy takes 9 (damage)
+            // Enemy thorns fires → hero takes 1 damage (no source → no counter-thorns)
+            Check("Thorns no loop: no infinite retaliation",
+                HP(_hero) == heroBefore - 1 && HP(_enemyA) == enemyBefore - dmg2,
+                $"HeroHP={HP(_hero)}(exp {heroBefore - 1}), EnemyHP={HP(_enemyA)}(exp {enemyBefore - dmg2})");
+
+            SoftReset();
+
+            // Thorns stacks: apply twice → stackCount=2
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Thorns, 5, _enemyA);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Thorns, 5, _enemyA);
+            Check("Thorns stacking: stackCount=2",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Thorns) == 2,
+                $"stacks={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Thorns)}(exp 2)");
+        }
+
+        // ── Group 39: Reflect ────────────────────────────────────────
+
+        private void RunReflectGroup()
+        {
+            // Reflect redirects single-target damage to caster
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Reflecting, StatusEffectInstance.PermanentDuration, _enemyA);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Reflecting, StatusEffectInstance.PermanentDuration, _enemyA); // 2 stacks
+            _resolver.RegisterWord("test_reflect_hit",
+                new List<WordActionMapping> { new("Damage", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            int heroStr = Stat(_hero, StatType.Strength);
+            int heroDef = Stat(_hero, StatType.PhysicalDefense);
+            int reflectedDmg = Math.Max(1, 3 * heroStr / Math.Max(1, heroDef));
+            Exec("test_reflect_hit");
+            Check("Reflect: damage redirected to caster",
+                HP(_hero) == 100 - reflectedDmg,
+                $"HeroHP={HP(_hero)}(exp {100 - reflectedDmg})");
+            Check("Reflect: target unharmed",
+                HP(_enemyA) == 80,
+                $"EnemyHP={HP(_enemyA)}(exp 80)");
+
+            // Stack decremented
+            Check("Reflect: stack decremented to 1",
+                _statusEffects.GetStackCount(_enemyA, StatusEffectType.Reflecting) == 1,
+                $"stacks={_statusEffects.GetStackCount(_enemyA, StatusEffectType.Reflecting)}(exp 1)");
+
+            SoftReset();
+
+            // Multi-target NOT reflected
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Reflecting, StatusEffectInstance.PermanentDuration, _enemyA);
+            _resolver.RegisterWord("test_reflect_multi",
+                new List<WordActionMapping> { new("Damage", 2) },
+                new WordMeta("AreaEnemies", 0, 0, AreaShape.Single));
+            Exec("test_reflect_multi");
+            // All enemies take damage (multi-target, not reflected)
+            Check("Reflect: multi-target NOT reflected",
+                HP(_enemyA) < 80 && HP(_enemyB) < 60,
+                $"EnemyA HP={HP(_enemyA)}, EnemyB HP={HP(_enemyB)}");
+            // Hero unharmed
+            Check("Reflect: hero unharmed on multi-target",
+                HP(_hero) == 100,
+                $"HeroHP={HP(_hero)}(exp 100)");
+
+            SoftReset();
+
+            // After all stacks consumed, Reflecting removed
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Reflecting, StatusEffectInstance.PermanentDuration, _enemyA);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Reflecting, StatusEffectInstance.PermanentDuration, _enemyA); // 2 stacks
+            _resolver.RegisterWord("test_reflect_consume1",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_reflect_consume1"); // reflected → stack 1
+            _resolver.RegisterWord("test_reflect_consume2",
+                new List<WordActionMapping> { new("Shield", 1) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_reflect_consume2"); // reflected → stack 0 → removed
+            Check("Reflect: removed after all stacks consumed",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Reflecting),
+                $"HasReflecting={_statusEffects.HasEffect(_enemyA, StatusEffectType.Reflecting)}");
+        }
+
+        // ── Group 40: Hardening ──────────────────────────────────────
+
+        private void RunHardeningGroup()
+        {
+            // Hardening reduces damage by StackCount
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero); // stacks=3
+            _entityStats.ApplyDamage(_hero, 5);
+            Check("Hardening: damage reduced (5-3=2)",
+                HP(_hero) == 98,
+                $"HP={HP(_hero)}(exp 98)");
+
+            SoftReset();
+
+            // Hardening decays on tick
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero); // stacks=3
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn(); // tick: stacks 3→2
+            Check("Hardening decay: stacks reduced to 2",
+                _statusEffects.GetStackCount(_hero, StatusEffectType.Hardening) == 2,
+                $"stacks={_statusEffects.GetStackCount(_hero, StatusEffectType.Hardening)}(exp 2)");
+
+            // Damage with decayed hardening: 5-2=3
+            _entityStats.ApplyDamage(_hero, 5);
+            Check("Hardening after decay: damage reduced (5-2=3)",
+                HP(_hero) == 97,
+                $"HP={HP(_hero)}(exp 97)");
+
+            SoftReset();
+
+            // Hardening reaches 0 and is removed after enough ticks
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero); // stacks=3
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            // Tick 1: 3→2
+            AdvanceTurns(2); // hero begin+end
+            AdvanceTurns(4); // enemy_a through ally_a
+            // Tick 2: 2→1
+            AdvanceTurns(2); // hero begin+end
+            AdvanceTurns(4);
+            // Tick 3: 1→0 → removed
+            AdvanceTurns(2);
+            Check("Hardening removed after 3 ticks",
+                !_statusEffects.HasEffect(_hero, StatusEffectType.Hardening),
+                $"HasHardening={_statusEffects.HasEffect(_hero, StatusEffectType.Hardening)}");
+
+            SoftReset();
+
+            // Hardening reduces DoT damage
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero);
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Hardening, StatusEffectInstance.PermanentDuration, _hero); // stacks=3, DamageReduction=3
+            _statusEffects.ApplyEffect(_hero, StatusEffectType.Burning, 3, _enemyA); // DoT 3 per tick
+            _turnService.SetTurnOrder(new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA });
+            _turnService.BeginTurn(); // hero
+            _turnService.EndTurn(); // tick: Hardening 3→2, Burning tick 3 - 3 reduction = 0 damage
+            // After hardening tick, stacks=2 → DamageReduction=2. Burning tick fires with DoT=3, reduced by old reduction.
+            // Actually: both tick in same OnTurnEnded. Order depends on apply order.
+            // Hardening ticks first (applied first) → stacks 3→2, DamageReduction updated to 2
+            // Then Burning ticks → damage 3, reduced by DamageReduction(2) = 1
+            Check("Hardening reduces DoT: Burning damage reduced",
+                HP(_hero) == 99,
+                $"HP={HP(_hero)}(exp 99)");
         }
 
         // ── UI ──────────────────────────────────────────────────────
@@ -571,12 +2034,12 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
             (_executionService as IDisposable)?.Dispose();
             (_statusEffects as IDisposable)?.Dispose();
-            (_combatGrid as IDisposable)?.Dispose();
+            (_slotService as IDisposable)?.Dispose();
             (_entityStats as IDisposable)?.Dispose();
             (_turnService as IDisposable)?.Dispose();
             _executionService = null;
             _statusEffects = null;
-            _combatGrid = null;
+            _slotService = null;
             _entityStats = null;
             _turnService = null;
             _combatContext = null;

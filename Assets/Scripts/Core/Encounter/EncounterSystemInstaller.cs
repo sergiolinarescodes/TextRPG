@@ -1,6 +1,6 @@
 using Reflex.Core;
 using TextRPG.Core.ActionExecution;
-using TextRPG.Core.CombatGrid;
+using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.Bootstrap;
@@ -18,10 +18,10 @@ namespace TextRPG.Core.Encounter
                 var eventBus = container.Resolve<IEventBus>();
                 var entityStats = container.Resolve<IEntityStatsService>();
                 var turnService = container.Resolve<ITurnService>();
-                var combatGrid = container.Resolve<ICombatGridService>();
+                var slotService = container.Resolve<ICombatSlotService>();
                 var combatContext = container.Resolve<ICombatContext>();
                 var enemyResolver = new EnemyWordResolver();
-                return (IEncounterService)new EncounterService(eventBus, entityStats, turnService, combatGrid, combatContext, enemyResolver);
+                return (IEncounterService)new EncounterService(eventBus, entityStats, turnService, slotService, combatContext, enemyResolver);
             }, typeof(IEncounterService));
         }
 

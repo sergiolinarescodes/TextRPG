@@ -13,6 +13,12 @@ namespace TextRPG.Core.StatusEffect
         ExtraTurn,
         Stun,
         Concussion,
-        Fear
+        Fear,
+        Bleeding,
+        Concentrated,
+        Growing,
+        Thorns,
+        Reflecting,
+        Hardening
     }
 }

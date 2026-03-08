@@ -15,7 +15,7 @@ namespace TextRPG.Core.UnitRendering
         private readonly int _gridHeight;
         private readonly HashSet<string> _excludedHealthBarUnitIds;
         private readonly List<VisualElement> _cells = new();
-        private readonly List<List<Label>> _cellLabels = new();
+        private readonly List<List<VisualElement>> _cellLabels = new();
 
         public IReadOnlyList<VisualElement> Cells => _cells;
 
@@ -51,7 +51,7 @@ namespace TextRPG.Core.UnitRendering
                     var cell = CreateCell(cellWidthPct);
                     row.Add(cell);
                     _cells.Add(cell);
-                    _cellLabels.Add(new List<Label>());
+                    _cellLabels.Add(new List<VisualElement>());
 
                     RenderCellContent(new GridPosition(x, y));
                 }
@@ -105,6 +105,43 @@ namespace TextRPG.Core.UnitRendering
             }
         }
 
+        public void PlayHitAnimation(GridPosition pos, float durationSeconds = 1.5f, string markupTemplate = "<shake a=0.1 f=5>{0}</shake>")
+        {
+            var index = pos.Y * _gridWidth + pos.X;
+            if (index < 0 || index >= _cells.Count) return;
+
+            var unitId = _grid.Get(pos);
+            if (unitId == null) return;
+            if (!_unitService.TryGetUnit(unitId.Value, out var unit)) return;
+
+            var cell = _cells[index];
+            var labels = _cellLabels[index];
+
+            // Remove existing text labels (keep health bars etc.)
+            foreach (var label in labels)
+                label.RemoveFromHierarchy();
+            labels.Clear();
+
+            float cellWidth = cell.resolvedStyle.width;
+            float cellHeight = cell.resolvedStyle.height;
+            if (float.IsNaN(cellWidth) || cellWidth <= 0) cellWidth = 60f;
+            if (float.IsNaN(cellHeight) || cellHeight <= 0) cellHeight = 60f;
+
+            var layout = UnitTextLayout.Calculate(unit.Definition.Name, cellWidth, cellHeight);
+            var animatedLabels = UnitTextLabels.AddAnimatedWithRecipeTo(layout, unit.Definition.Color, cell, markupTemplate);
+            // Insert animated labels before health bars
+            for (int i = animatedLabels.Length - 1; i >= 0; i--)
+            {
+                cell.Remove(animatedLabels[i]);
+                cell.Insert(0, animatedLabels[i]);
+            }
+
+            labels.AddRange(animatedLabels);
+
+            // Schedule revert to normal labels
+            cell.schedule.Execute(() => UpdateCell(pos)).ExecuteLater((long)(durationSeconds * 1000));
+        }
+
         public void ClearHighlights()
         {
             for (int i = 0; i < _cells.Count; i++)
@@ -131,22 +168,7 @@ namespace TextRPG.Core.UnitRendering
             if (float.IsNaN(cellHeight) || cellHeight <= 0) cellHeight = 60f;
 
             var layout = UnitTextLayout.Calculate(unit.Definition.Name, cellWidth, cellHeight);
-
-            foreach (var rowText in layout.Rows)
-            {
-                var label = new Label(rowText);
-                label.style.fontSize = layout.FontSize;
-                label.style.color = unit.Definition.Color;
-                label.style.unityTextAlign = TextAnchor.MiddleCenter;
-                label.style.whiteSpace = WhiteSpace.NoWrap;
-                label.style.unityFontStyleAndWeight = FontStyle.Bold;
-                label.style.marginTop = 0;
-                label.style.marginBottom = 0;
-                label.style.paddingTop = 0;
-                label.style.paddingBottom = 0;
-                cell.Add(label);
-                labels.Add(label);
-            }
+            labels.AddRange(UnitTextLabels.AddTo(layout, unit.Definition.Color, cell));
 
             var entityId = new EntityStats.EntityId(unit.Id.Value);
             bool excluded = _excludedHealthBarUnitIds != null && _excludedHealthBarUnitIds.Contains(unit.Id.Value);

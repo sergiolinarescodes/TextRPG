@@ -1,4 +1,6 @@
-using TextRPG.Core.CombatGrid;
+using System.Collections.Generic;
+using TextRPG.Core.CombatSlot;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
@@ -16,6 +18,8 @@ namespace TextRPG.Core.ActionExecution
         public ITurnService TurnService { get; }
         public IWeaponService WeaponService { get; }
         public StatusEffectInteractionTable InteractionTable { get; }
+        public IReadOnlyDictionary<string, EnemyDefinition> UnitRegistry { get; }
+        public ICombatSlotService SlotService { get; }
 
         public ActionHandlerContext(
             IEntityStatsService entityStats,
@@ -24,7 +28,9 @@ namespace TextRPG.Core.ActionExecution
             IStatusEffectService statusEffects = null,
             ITurnService turnService = null,
             IWeaponService weaponService = null,
-            StatusEffectInteractionTable interactionTable = null)
+            StatusEffectInteractionTable interactionTable = null,
+            IReadOnlyDictionary<string, EnemyDefinition> unitRegistry = null,
+            ICombatSlotService slotService = null)
         {
             EntityStats = entityStats;
             EventBus = eventBus;
@@ -33,6 +39,8 @@ namespace TextRPG.Core.ActionExecution
             TurnService = turnService;
             WeaponService = weaponService;
             InteractionTable = interactionTable ?? new StatusEffectInteractionTable();
+            UnitRegistry = unitRegistry;
+            SlotService = slotService;
         }
     }
 }

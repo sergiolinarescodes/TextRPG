@@ -1,16 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TextRPG.Core.CombatGrid;
+using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
-using TextRPG.Core.UnitRendering;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
-using Unidad.Core.Grid;
 using Unidad.Core.Testing;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -30,7 +28,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private IEntityStatsService _entityStats;
         private ITurnService _turnService;
         private IStatusEffectService _statusEffects;
-        private ICombatGridService _combatGrid;
+        private ICombatSlotService _slotService;
         private IEventBus _eventBus;
 
         private EntityId _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA;
@@ -90,9 +88,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _entityStats = new EntityStatsService(_eventBus);
             _turnService = new TurnService(_eventBus);
 
-            var unitService = new UnitService(_eventBus);
-            _combatGrid = new CombatGridService(_eventBus, unitService);
-            _combatGrid.Initialize(8, 8);
+            _slotService = new CombatSlotService(_eventBus);
+            _slotService.Initialize();
 
             var effectHandlerRegistry = StatusEffectSystemInstaller.CreateHandlerRegistry();
             var handlerContext = new StatusEffectHandlerContext(_entityStats, _turnService, _eventBus);
@@ -114,7 +111,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             combatContext.SetSourceEntity(_hero);
             combatContext.SetEnemies(enemies);
             combatContext.SetAllies(allies);
-            combatContext.SetGrid(_combatGrid);
+            combatContext.SetSlotService(_slotService);
             combatContext.SetEntityStats(_entityStats);
             combatContext.SetStatusEffects(_statusEffects);
 
@@ -145,12 +142,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             var allEntities = new[] { _hero, _enemyA, _enemyB, _enemyC, _enemyD, _allyA };
             _turnService.SetTurnOrder(allEntities);
 
-            _combatGrid.RegisterCombatant(_hero, new UnitDefinition(new UnitId("hero"), "HERO", 100, 12, 8, 8, Color.cyan), new GridPosition(3, 3));
-            _combatGrid.RegisterCombatant(_enemyA, new UnitDefinition(new UnitId("enemy_a"), "ENEMY_A", 80, 8, 6, 6, Color.red), new GridPosition(4, 3));
-            _combatGrid.RegisterCombatant(_enemyB, new UnitDefinition(new UnitId("enemy_b"), "ENEMY_B", 60, 6, 4, 4, Color.red), new GridPosition(3, 4));
-            _combatGrid.RegisterCombatant(_enemyC, new UnitDefinition(new UnitId("enemy_c"), "ENEMY_C", 100, 10, 8, 8, Color.red), new GridPosition(5, 3));
-            _combatGrid.RegisterCombatant(_enemyD, new UnitDefinition(new UnitId("enemy_d"), "ENEMY_D", 40, 4, 3, 3, Color.red), new GridPosition(3, 5));
-            _combatGrid.RegisterCombatant(_allyA, new UnitDefinition(new UnitId("ally_a"), "ALLY_A", 70, 7, 5, 5, Color.green), new GridPosition(2, 3));
+            _slotService.RegisterEnemy(_enemyA, 0);
+            _slotService.RegisterEnemy(_enemyB, 1);
+            _slotService.RegisterEnemy(_enemyC, 2);
         }
 
         private void RegisterTestWords() { }
@@ -210,7 +204,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             // 11. purge — Damage(3), AllBurningEnemies, Single
             resolver.RegisterWord("purge",
                 new List<WordActionMapping> { new("Damage", 3) },
-                new WordMeta("AllBurningEnemies", 0, 0, AreaShape.Single));
+                new WordMeta("AllEnemies+Burning", 0, 0, AreaShape.Single));
 
             // 12. conjure — Summon(4), Self, Single
             resolver.RegisterWord("conjure",
@@ -256,7 +250,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectAppliedEvent>(e =>
             {
                 _statusApplied.Add(e);
-                Debug.Log($"[CompositionScenario] Status: {e.Type} on {e.Target.Value} for {e.Duration} turns");
+                Debug.Log($"[CompositionScenario] Status: {e.Type} on {e.Target.Value} {(e.Duration < 0 ? "permanently" : $"for {e.Duration} turns")}");
             }));
 
             _subscriptions.Add(_eventBus.Subscribe<FireGridStatusEvent>(e =>
@@ -453,12 +447,12 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
             (_executionService as IDisposable)?.Dispose();
             (_statusEffects as IDisposable)?.Dispose();
-            (_combatGrid as IDisposable)?.Dispose();
+            (_slotService as IDisposable)?.Dispose();
             (_entityStats as IDisposable)?.Dispose();
             (_turnService as IDisposable)?.Dispose();
             _executionService = null;
             _statusEffects = null;
-            _combatGrid = null;
+            _slotService = null;
             _entityStats = null;
             _turnService = null;
             _eventBus = null;

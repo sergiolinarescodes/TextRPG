@@ -22,29 +22,12 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
-            var grid = _combatContext.CombatGrid;
-
             for (int i = 0; i < context.Targets.Count; i++)
             {
                 var target = context.Targets[i];
                 var damage = (int)(context.Value * _interactionTable.GetDamageMultiplier("Shock", target, _statusEffects));
 
                 _entityStats.ApplyDamage(target, damage);
-
-                if (grid != null)
-                {
-                    var targetPos = grid.GetPosition(target);
-                    var adjacent = grid.GetAdjacentEntities(targetPos);
-                    foreach (var secondary in adjacent)
-                    {
-                        if (secondary.Equals(context.Source))
-                            continue;
-
-                        var secDamage = (int)(context.Value * _interactionTable.GetDamageMultiplier("Shock", secondary, _statusEffects));
-
-                        _entityStats.ApplyDamage(secondary, secDamage);
-                    }
-                }
             }
         }
     }

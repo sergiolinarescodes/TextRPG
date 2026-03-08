@@ -160,7 +160,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             {
                 foreach (var effect in effects)
                 {
-                    var label = new Label($"  {effect.Type} — {effect.RemainingDuration} turns");
+                    var durationText = effect.IsPermanent ? "permanent" : $"{effect.RemainingDuration} turns";
+                    var label = new Label($"  {effect.Type} — {durationText}");
                     label.style.fontSize = 14;
                     label.style.color = new Color(0.8f, 0.6f, 0.2f);
                     label.style.marginBottom = 4;

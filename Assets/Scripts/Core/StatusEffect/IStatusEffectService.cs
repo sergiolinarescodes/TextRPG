@@ -11,5 +11,6 @@ namespace TextRPG.Core.StatusEffect
         bool HasEffect(EntityId target, StatusEffectType type);
         IReadOnlyList<StatusEffectInstance> GetEffects(EntityId target);
         int GetStackCount(EntityId target, StatusEffectType type);
+        void DecrementStack(EntityId target, StatusEffectType type);
     }
 }

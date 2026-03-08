@@ -12,11 +12,10 @@ namespace TextRPG.Core.Encounter
         {
             var entityStats = new TextRPG.Core.EntityStats.EntityStatsService(deps.EventBus);
             var turnService = new TextRPG.Core.TurnSystem.TurnService(deps.EventBus);
-            var unitService = new TextRPG.Core.UnitRendering.UnitService(deps.EventBus);
-            var combatGrid = new TextRPG.Core.CombatGrid.CombatGridService(deps.EventBus, unitService);
+            var slotService = new TextRPG.Core.CombatSlot.CombatSlotService(deps.EventBus);
             var combatContext = new TextRPG.Core.ActionExecution.CombatContext();
             var enemyResolver = new EnemyWordResolver();
-            return new EncounterService(deps.EventBus, entityStats, turnService, combatGrid, combatContext, enemyResolver);
+            return new EncounterService(deps.EventBus, entityStats, turnService, slotService, combatContext, enemyResolver);
         }
 
         public IEnumerable<ITestScenario> GetScenarios()
