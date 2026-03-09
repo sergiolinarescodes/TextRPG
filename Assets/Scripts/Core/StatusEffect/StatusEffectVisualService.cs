@@ -38,6 +38,7 @@ namespace TextRPG.Core.StatusEffect
             Subscribe<StatusEffectDamageEvent>(OnEffectDamage);
             Subscribe<StatusEffectExpiredEvent>(OnEffectExpired);
             Subscribe<DamageTakenEvent>(OnDamageTaken);
+            Subscribe<EntityDiedEvent>(OnEntityDied);
         }
 
         public void Initialize(
@@ -98,6 +99,11 @@ namespace TextRPG.Core.StatusEffect
 
             var recipe = _textAnimService.GetRecipe("damage");
             _slotVisual.PlayHitAnimation(e.EntityId, recipe?.Duration ?? 1.5f, recipe?.MarkupTemplate ?? "<shake a=0.1 f=5>{0}</shake>");
+        }
+
+        private void OnEntityDied(EntityDiedEvent e)
+        {
+            HideTooltip();
         }
 
         private void RegisterHoverCallbacks()
@@ -234,33 +240,18 @@ namespace TextRPG.Core.StatusEffect
 
                 foreach (var entry in passives)
                 {
-                    var pDef = PassiveDefinitions.Get(entry.PassiveId);
+                    var pDef = PassiveDefinitions.Generate(entry);
 
                     var row = new VisualElement();
                     row.style.flexDirection = FlexDirection.Row;
                     row.style.marginBottom = 4;
                     row.pickingMode = PickingMode.Ignore;
 
-                    var pName = new Label(pDef.DisplayName);
-                    pName.style.color = pDef.DisplayColor;
-                    pName.style.unityFontStyleAndWeight = FontStyle.Bold;
-                    pName.style.fontSize = 24;
-                    pName.style.marginRight = 16;
-                    pName.pickingMode = PickingMode.Ignore;
-                    row.Add(pName);
-
                     var pDesc = new Label(pDef.Description);
-                    pDesc.style.color = Color.white;
+                    pDesc.style.color = pDef.DisplayColor;
                     pDesc.style.fontSize = 24;
                     pDesc.pickingMode = PickingMode.Ignore;
                     row.Add(pDesc);
-
-                    var pValue = new Label($"({entry.Value})");
-                    pValue.style.color = new Color(0.6f, 0.6f, 0.6f);
-                    pValue.style.fontSize = 24;
-                    pValue.style.marginLeft = 16;
-                    pValue.pickingMode = PickingMode.Ignore;
-                    row.Add(pValue);
 
                     tooltip.Add(row);
                 }

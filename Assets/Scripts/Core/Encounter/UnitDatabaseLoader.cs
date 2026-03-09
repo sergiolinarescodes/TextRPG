@@ -48,8 +48,12 @@ namespace TextRPG.Core.Encounter
         private class UnitPassiveRow
         {
             [Column("unit_id")] public string UnitId { get; set; }
-            [Column("passive_id")] public string PassiveId { get; set; }
+            [Column("trigger_id")] public string TriggerId { get; set; }
+            [Column("trigger_param")] public string TriggerParam { get; set; }
+            [Column("effect_id")] public string EffectId { get; set; }
+            [Column("effect_param")] public string EffectParam { get; set; }
             [Column("value")] public int Value { get; set; }
+            [Column("target")] public string Target { get; set; }
         }
 
         [Table("word_meta")]
@@ -94,7 +98,7 @@ namespace TextRPG.Core.Encounter
                         list = new List<PassiveEntry>();
                         passives[row.UnitId] = list;
                     }
-                    list.Add(new PassiveEntry(row.PassiveId, row.Value));
+                    list.Add(new PassiveEntry(row.TriggerId, row.TriggerParam, row.EffectId, row.EffectParam, row.Value, row.Target ?? "Self"));
                 }
             }
             catch (SQLiteException) { /* table doesn't exist yet */ }

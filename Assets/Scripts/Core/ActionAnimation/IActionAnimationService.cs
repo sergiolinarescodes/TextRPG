@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -11,5 +12,6 @@ namespace TextRPG.Core.ActionAnimation
         bool IsAnimating { get; }
         void Initialize(Func<EntityId, Vector3> positionProvider, VisualElement projectileLayer);
         void SetEnabled(bool enabled);
+        void EnqueuePassiveAnimation(EntityId owner, string effectId, int value, IReadOnlyList<EntityId> targets, Action onArrival);
     }
 }

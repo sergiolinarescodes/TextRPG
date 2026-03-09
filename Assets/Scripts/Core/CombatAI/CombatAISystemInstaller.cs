@@ -4,6 +4,7 @@ using TextRPG.Core.CombatSlot;
 using TextRPG.Core.CombatAI.Contributors;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Passive;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.Bootstrap;
@@ -33,9 +34,11 @@ namespace TextRPG.Core.CombatAI
                 var scorers = CreateScorerRegistry(statusEffects);
 
                 var turnService = container.Resolve<ITurnService>();
+                var passiveService = container.Resolve<IPassiveService>();
 
                 return (ICombatAIService)new CombatAIService(eventBus, encounterService, entityStats,
-                    turnService, slotService, combatContext, actionExecution, scorers, enemyResolver);
+                    turnService, slotService, combatContext, actionExecution, scorers, enemyResolver,
+                    passiveService: passiveService);
             }, typeof(ICombatAIService));
         }
 

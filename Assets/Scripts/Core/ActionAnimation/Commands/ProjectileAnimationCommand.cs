@@ -23,6 +23,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
         private readonly bool _isInstant;
         private readonly IActionHandler _handler;
         private readonly IEventBus _eventBus;
+        private readonly Action _onArrival;
 
         private readonly List<ProjectileEntry> _activeProjectiles = new();
         private int _arrivedCount;
@@ -46,7 +47,8 @@ namespace TextRPG.Core.ActionAnimation.Commands
             float duration,
             bool isInstant,
             IActionHandler handler = null,
-            IEventBus eventBus = null)
+            IEventBus eventBus = null,
+            Action onArrival = null)
         {
             _actionId = actionId;
             _source = source;
@@ -59,6 +61,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
             _isInstant = isInstant;
             _handler = handler;
             _eventBus = eventBus;
+            _onArrival = onArrival;
         }
 
         public CommandStatus Execute(ICommandContext context, float deltaTime)
@@ -218,6 +221,8 @@ namespace TextRPG.Core.ActionAnimation.Commands
                 _handler.Execute(context);
                 _eventBus?.Publish(new ActionHandlerExecutedEvent(_actionId, _value, _source, _targets));
             }
+
+            _onArrival?.Invoke();
         }
     }
 }

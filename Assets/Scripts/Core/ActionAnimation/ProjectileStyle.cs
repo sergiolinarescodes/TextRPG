@@ -24,6 +24,8 @@ namespace TextRPG.Core.ActionAnimation
                 "hardening" => new Color(0.5f, 0.4f, 0.3f),
                 "concentrate" => new Color(1f, 0.9f, 0.4f),
                 "summon" => new Color(0.7f, 0.5f, 1f),
+                "mana" => new Color(0.3f, 0.5f, 1f),
+                "apply_status" => Color.yellow,
                 _ => Color.white
             };
         }

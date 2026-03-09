@@ -16,6 +16,7 @@ namespace TextRPG.Core.ActionAnimation
     {
         private readonly IAnimationResolver _animationResolver;
         private readonly IActionHandlerRegistry _handlerRegistry;
+        private readonly IEntityStatsService _entityStats;
         private readonly CommandQueue _commandQueue = new();
         private readonly ActionAnimationCommandContext _commandContext = new();
         private readonly ProjectilePool _projectilePool = new();
@@ -25,15 +26,17 @@ namespace TextRPG.Core.ActionAnimation
         private bool _initialized;
         private string _currentWord;
         private bool _deferredInProgress;
+        private bool _executionCompletedPublished;
 
-        public bool IsAnimating => !_commandQueue.IsEmpty;
+        public bool IsAnimating => !_commandQueue.IsEmpty || _deferredInProgress;
 
         public ActionAnimationService(IEventBus eventBus, IAnimationResolver animationResolver,
-            IActionHandlerRegistry handlerRegistry = null)
+            IActionHandlerRegistry handlerRegistry = null, IEntityStatsService entityStats = null)
             : base(eventBus)
         {
             _animationResolver = animationResolver;
             _handlerRegistry = handlerRegistry;
+            _entityStats = entityStats;
 
             Subscribe<ActionResolvedEvent>(OnActionResolved);
             Subscribe<ActionExecutionCompletedEvent>(OnExecutionCompleted);
@@ -60,20 +63,20 @@ namespace TextRPG.Core.ActionAnimation
         {
             if (e.IsInstant) return;
 
+            _currentWord = e.Word;
+
             if (!_enabled || !_initialized || _handlerRegistry == null)
             {
                 ExecuteFallback(e);
                 return;
             }
 
-            _currentWord = e.Word;
             _deferredInProgress = true;
+            _executionCompletedPublished = false;
 
             if (e.Actions.Count == 0)
             {
-                Publish(new ActionExecutionCompletedEvent(e.Word));
-                _deferredInProgress = false;
-                Publish(new ActionAnimationCompletedEvent(e.Word));
+                TryPublishCompletion();
                 return;
             }
 
@@ -83,10 +86,13 @@ namespace TextRPG.Core.ActionAnimation
             {
                 _handlerRegistry.TryGet(action.ActionId, out var handler);
 
+                var targets = FilterAliveTargets(action.Targets);
+                if (targets.Count == 0) continue;
+
                 var command = new Commands.ProjectileAnimationCommand(
                     action.ActionId,
                     action.Source,
-                    action.Targets,
+                    targets,
                     action.Value,
                     e.Word,
                     _positionProvider,
@@ -103,6 +109,8 @@ namespace TextRPG.Core.ActionAnimation
         {
             // Suppress OnExecutionCompleted from re-publishing AnimationCompleted
             _deferredInProgress = true;
+            _executionCompletedPublished = false;
+
             if (_handlerRegistry != null)
             {
                 foreach (var action in e.Actions)
@@ -115,9 +123,8 @@ namespace TextRPG.Core.ActionAnimation
                     }
                 }
             }
-            Publish(new ActionExecutionCompletedEvent(e.Word));
-            _deferredInProgress = false;
-            Publish(new ActionAnimationCompletedEvent(e.Word));
+
+            TryPublishCompletion();
         }
 
         private void OnExecutionCompleted(ActionExecutionCompletedEvent e)
@@ -130,9 +137,54 @@ namespace TextRPG.Core.ActionAnimation
 
         private void OnQueueEmpty()
         {
-            Publish(new ActionExecutionCompletedEvent(_currentWord));
+            TryPublishCompletion();
+        }
+
+        private void TryPublishCompletion()
+        {
+            if (!_executionCompletedPublished)
+            {
+                _executionCompletedPublished = true;
+                Publish(new ActionExecutionCompletedEvent(_currentWord));
+            }
+
+            // A passive may have inserted commands during the event above
+            if (!_commandQueue.IsEmpty)
+                return;
+
             _deferredInProgress = false;
             Publish(new ActionAnimationCompletedEvent(_currentWord));
+        }
+
+        public void EnqueuePassiveAnimation(EntityId owner, string effectId, int value,
+            IReadOnlyList<EntityId> targets, Action onArrival)
+        {
+            var aliveTargets = FilterAliveTargets(targets);
+            if (!_initialized || !_enabled || aliveTargets == null || aliveTargets.Count == 0)
+            {
+                Debug.Log($"[AnimService] EnqueuePassive FALLBACK effectId={effectId} init={_initialized} enabled={_enabled} targets={aliveTargets?.Count}");
+                onArrival?.Invoke();
+                return;
+            }
+
+            Debug.Log($"[AnimService] EnqueuePassive INSERT effectId={effectId} owner={owner} targets={aliveTargets.Count} queueCount={_commandQueue.Count}");
+            var command = new Commands.ProjectileAnimationCommand(
+                effectId, owner, aliveTargets, value, effectId,
+                _positionProvider, _projectilePool, 0.6f, false,
+                handler: null, eventBus: null, onArrival: onArrival);
+            _commandQueue.InsertFront(command);
+        }
+
+        private IReadOnlyList<EntityId> FilterAliveTargets(IReadOnlyList<EntityId> targets)
+        {
+            if (_entityStats == null || targets == null) return targets;
+            var alive = new List<EntityId>(targets.Count);
+            foreach (var t in targets)
+            {
+                if (_entityStats.HasEntity(t) && _entityStats.GetCurrentHealth(t) > 0)
+                    alive.Add(t);
+            }
+            return alive;
         }
 
         public override void Dispose()

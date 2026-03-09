@@ -12,7 +12,10 @@ namespace TextRPG.Core.CombatSlot
         private EntityId?[] _allies;
         private readonly Dictionary<EntityId, CombatSlot> _entitySlots = new();
 
-        public CombatSlotService(IEventBus eventBus) : base(eventBus) { }
+        public CombatSlotService(IEventBus eventBus) : base(eventBus)
+        {
+            Subscribe<EntityDiedEvent>(e => RemoveEntity(e.EntityId));
+        }
 
         public void Initialize(int maxEnemySlots = 3, int maxAllySlots = 2)
         {

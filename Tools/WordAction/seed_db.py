@@ -60,12 +60,48 @@ CREATE TABLE IF NOT EXISTS unit_abilities (
 );
 
 CREATE TABLE IF NOT EXISTS unit_passives (
-    unit_id    TEXT NOT NULL,
-    passive_id TEXT NOT NULL,
-    value      INTEGER NOT NULL DEFAULT 1,
-    PRIMARY KEY (unit_id, passive_id),
+    unit_id       TEXT NOT NULL,
+    trigger_id    TEXT NOT NULL,
+    trigger_param TEXT,
+    effect_id     TEXT NOT NULL,
+    effect_param  TEXT,
+    value         INTEGER NOT NULL DEFAULT 1,
+    target        TEXT NOT NULL DEFAULT 'Self',
+    seq           INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (unit_id, trigger_id, effect_id, target, seq),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id)
 );
+
+CREATE TABLE IF NOT EXISTS items (
+    item_id         TEXT PRIMARY KEY,
+    display_name    TEXT NOT NULL,
+    item_type       TEXT NOT NULL DEFAULT 'accessory',
+    durability      INTEGER NOT NULL DEFAULT 0,
+    strength        INTEGER NOT NULL DEFAULT 0,
+    magic_power     INTEGER NOT NULL DEFAULT 0,
+    phys_defense    INTEGER NOT NULL DEFAULT 0,
+    magic_defense   INTEGER NOT NULL DEFAULT 0,
+    luck            INTEGER NOT NULL DEFAULT 0,
+    max_health      INTEGER NOT NULL DEFAULT 0,
+    max_mana        INTEGER NOT NULL DEFAULT 0,
+    color_r         REAL NOT NULL DEFAULT 0.5,
+    color_g         REAL NOT NULL DEFAULT 0.5,
+    color_b         REAL NOT NULL DEFAULT 0.5
+);
+
+CREATE TABLE IF NOT EXISTS item_passives (
+    item_id       TEXT NOT NULL,
+    trigger_id    TEXT NOT NULL,
+    trigger_param TEXT,
+    effect_id     TEXT NOT NULL,
+    effect_param  TEXT,
+    value         INTEGER NOT NULL DEFAULT 1,
+    target        TEXT NOT NULL DEFAULT 'Self',
+    seq           INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (item_id, trigger_id, effect_id, target, seq),
+    FOREIGN KEY (item_id) REFERENCES items(item_id)
+);
+
 """
 
 # (word, action_name, value, target, range, area, assoc_word, seq)
@@ -179,22 +215,34 @@ SEED_ACTIONS = [
     ("fortress",   "Summon", 5, "Self", None, None, "", 0),
     ("totem",      "Summon", 3, "Self", None, None, "", 0),
     ("turret",     "Summon", 3, "Self", None, None, "", 0),
+    ("library",    "Summon", 3, "Self", None, None, "", 0),
+    ("grove",      "Summon", 3, "Self", None, None, "", 0),
+    ("sentinel",   "Summon", 4, "Self", None, None, "", 0),
+    ("pyre",       "Summon", 3, "Self", None, None, "", 0),
+    ("predator",   "Summon", 4, "Self", None, None, "", 0),
 
     # Duplicate-action words
     ("barrage",    "Damage", 2, None, None, None, "", 0),  ("barrage",    "Damage", 2, None, None, None, "", 1),
     ("soothe",     "Heal", 2, None, None, None, "", 0),   ("soothe",     "Heal", 1, None, None, None, "", 1),
 
     # Weapon words — assoc_word links weapon to ammo
-    ("gun",        "Weapon", 4, "Self", None, None, "9mm", 0),
-    ("gun",        "Weapon", 4, "Self", None, None, "buckshot", 0),
-    ("sword",      "Weapon", 5, "Self", None, None, "slash", 0),
-    ("sword",      "Weapon", 5, "Self", None, None, "stab", 0),
+    ("gun",        "Item", 4, "Self", None, None, "9mm", 0),
+    ("gun",        "Item", 4, "Self", None, None, "buckshot", 0),
+    ("sword",      "Item", 5, "Self", None, None, "slash", 0),
+    ("sword",      "Item", 5, "Self", None, None, "stab", 0),
 
     # Ammo words (only usable through weapon mode)
     ("9mm",        "Damage", 3, "RandomEnemy", 15, None, "", 0),
     ("buckshot",   "Damage", 4, "RandomEnemy", 15, "Cross", "", 0),
     ("slash",      "Damage", 3, "Melee", 1, None, "", 0),
     ("stab",       "Damage", 4, "RandomEnemy", 1, None, "", 0),
+
+    # Item words (non-weapon equipment — items with stats/passives)
+    ("crown",      "Item", 1, "Self", None, None, "", 0),
+    ("cloak",      "Item", 1, "Self", None, None, "", 0),
+    ("ring",       "Item", 1, "Self", None, None, "", 0),
+    ("amulet",     "Item", 1, "Self", None, None, "", 0),
+    ("helm",       "Item", 1, "Self", None, None, "", 0),
 ]
 
 # (word, target, cost, range, area)
@@ -282,6 +330,11 @@ SEED_META = [
     ("fortress",    "Self",         3, 0, "Single"),
     ("totem",       "Self",         2, 0, "Single"),
     ("turret",      "Self",         2, 0, "Single"),
+    ("library",     "Self",         3, 0, "Single"),
+    ("grove",       "Self",         2, 0, "Single"),
+    ("sentinel",    "Self",         3, 0, "Single"),
+    ("pyre",        "Self",         2, 0, "Single"),
+    ("predator",    "Self",         3, 0, "Single"),
     # Duplicate-action meta
     ("barrage",     "SingleEnemy",  2, 3, "Single"),
     ("soothe",      "Self",         1, 0, "Single"),
@@ -293,6 +346,12 @@ SEED_META = [
     ("buckshot",    "RandomEnemy",  0, 15, "Cross"),
     ("slash",       "Melee",        0, 1, "Single"),
     ("stab",        "RandomEnemy",  0, 1, "Single"),
+    # Item meta
+    ("crown",       "Self",         0, 0, "Single"),
+    ("cloak",       "Self",         0, 0, "Single"),
+    ("ring",        "Self",         0, 0, "Single"),
+    ("amulet",      "Self",         0, 0, "Single"),
+    ("helm",        "Self",         0, 0, "Single"),
 ]
 
 # (word, tag)
@@ -367,6 +426,16 @@ SEED_TAGS = [
     ("fortress", "DEFENSIVE"), ("fortress", "SUPPORT"),
     ("totem", "SUPPORT"), ("totem", "RESTORATION"),
     ("turret", "OFFENSIVE"), ("turret", "PHYSICAL"),
+    ("library", "SUPPORT"), ("library", "ARCANE"),
+    ("grove", "NATURE"), ("grove", "RESTORATION"),
+    ("sentinel", "DEFENSIVE"), ("sentinel", "SUPPORT"),
+    ("pyre", "OFFENSIVE"), ("pyre", "ELEMENTAL"),
+    ("predator", "OFFENSIVE"), ("predator", "SHADOW"),
+    ("crown", "ARCANE"), ("crown", "SUPPORT"),
+    ("cloak", "DEFENSIVE"), ("cloak", "SUPPORT"),
+    ("ring", "ARCANE"), ("ring", "SUPPORT"),
+    ("amulet", "ARCANE"), ("amulet", "SUPPORT"),
+    ("helm", "DEFENSIVE"), ("helm", "PHYSICAL"),
 ]
 
 # (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b)
@@ -379,6 +448,11 @@ SEED_UNITS = [
     ("fortress", "FORTRESS", "structure", 40, 0, 0, 8, 4, 0, 10, 0.4, 0.4, 0.5),
     ("totem",    "TOTEM",    "structure", 25, 0, 3, 2, 2, 0, 0,  0.6, 0.4, 0.2),
     ("turret",   "TURRET",   "structure", 20, 6, 0, 4, 2, 0, 0,  0.5, 0.5, 0.5),
+    ("library",  "LIBRARY",  "structure", 20, 0, 5, 3, 5, 0, 0,  0.6, 0.5, 0.3),
+    ("grove",    "GROVE",    "structure", 25, 0, 4, 2, 3, 0, 0,  0.2, 0.7, 0.2),
+    ("sentinel", "SENTINEL", "structure", 30, 0, 0, 7, 4, 0, 8,  0.3, 0.3, 0.5),
+    ("pyre",     "PYRE",     "structure", 15, 0, 6, 2, 2, 0, 0,  0.9, 0.3, 0.1),
+    ("predator", "PREDATOR", "enemy",     25, 7, 0, 3, 1, 2, 0,  0.5, 0.1, 0.1),
 ]
 
 # (unit_id, word)
@@ -389,15 +463,39 @@ SEED_UNIT_ABILITIES = [
     ("bat", "scratch"),
     ("golem", "smash"), ("golem", "crush"),
     ("turret", "hit"),
+    ("predator", "scratch"), ("predator", "charge"),
 ]
 
-# (unit_id, passive_id, value)
+# (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
 SEED_UNIT_PASSIVES = [
-    ("fortress", "heal_on_ally_hit", 1),
-    ("totem",    "heal_on_round_end", 2),
-    ("turret",   "damage_on_ally_hit", 2),
+    ("fortress", "on_ally_hit",    None, "heal",         None,      1, "Injured",    0),
+    ("totem",    "on_round_end",  None, "heal",         None,      2, "AllAllies",  0),
+    ("turret",   "on_ally_hit",   None, "damage",       None,      2, "Attacker",   0),
+    ("library",  "on_word_length", "6", "heal",         None,      2, "AllAllies",  0),
+    ("library",  "on_word_length", "8", "shield",       None,      1, "AllAllies",  1),
+    ("grove",    "on_word_tag",  "NATURE", "heal",      None,      2, "AllAllies",  0),
+    ("sentinel", "on_ally_hit",  None, "shield",        None,      2, "Injured",    0),
+    ("sentinel", "taunt",        None, "",              None,      0, "Self",        1),
+    ("pyre",     "on_round_start", None, "apply_status", "Burning", 2, "AllEnemies", 0),
+    ("predator", "on_kill",      None, "heal",          None,      5, "Self",        0),
 ]
 
+# (item_id, display_name, item_type, durability, strength, magic_power, phys_defense, magic_defense, luck, max_health, max_mana, color_r, color_g, color_b)
+SEED_ITEMS = [
+    ("gun",    "GUN",    "weapon",    4, 0, 0, 0, 0, 0, 0, 0,  0.5, 0.5, 0.5),
+    ("sword",  "SWORD",  "weapon",    5, 0, 0, 0, 0, 0, 0, 0,  0.7, 0.7, 0.7),
+    ("crown",  "CROWN",  "head",      0, 0, 2, 0, 0, 1, 0, 0,  1.0, 0.84, 0.0),
+    ("cloak",  "CLOAK",  "wear",      0, 0, 0, 2, 1, 0, 0, 0,  0.3, 0.2, 0.5),
+    ("ring",   "RING",   "accessory", 0, 1, 0, 0, 0, 1, 0, 0,  0.9, 0.75, 0.0),
+    ("amulet", "AMULET", "trinket",   0, 0, 1, 0, 0, 0, 0, 0,  0.4, 0.8, 0.4),
+    ("helm",   "HELM",   "head",      0, 0, 0, 3, 0, 0, 0, 0,  0.6, 0.6, 0.6),
+]
+
+# (item_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
+SEED_ITEM_PASSIVES = [
+    ("amulet", "on_word_played", None, "mana", None, 1, "Self", 0),
+    ("helm",   "on_self_hit",    None, "shield", None, 1, "Self", 0),
+]
 
 def main():
     os.makedirs(DB_DIR, exist_ok=True)
@@ -429,8 +527,19 @@ def main():
         SEED_UNIT_ABILITIES,
     )
     cur.executemany(
-        "INSERT OR REPLACE INTO unit_passives (unit_id, passive_id, value) VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO unit_passives (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         SEED_UNIT_PASSIVES,
+    )
+    cur.executemany(
+        "INSERT OR REPLACE INTO items (item_id, display_name, item_type, durability, "
+        "strength, magic_power, phys_defense, magic_defense, luck, max_health, max_mana, "
+        "color_r, color_g, color_b) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        SEED_ITEMS,
+    )
+    cur.executemany(
+        "INSERT OR REPLACE INTO item_passives (item_id, trigger_id, trigger_param, "
+        "effect_id, effect_param, value, target, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        SEED_ITEM_PASSIVES,
     )
     conn.commit()
 
@@ -441,11 +550,14 @@ def main():
     unit_count = cur.execute("SELECT COUNT(*) FROM units").fetchone()[0]
     ability_count = cur.execute("SELECT COUNT(*) FROM unit_abilities").fetchone()[0]
     passive_count = cur.execute("SELECT COUNT(*) FROM unit_passives").fetchone()[0]
+    item_count = cur.execute("SELECT COUNT(*) FROM items").fetchone()[0]
+    item_passive_count = cur.execute("SELECT COUNT(*) FROM item_passives").fetchone()[0]
     conn.close()
 
     print(f"Created {DB_PATH}")
     print(f"  {action_count} action rows, {unique_words} unique words, {meta_count} meta, {tag_count} tags")
     print(f"  {unit_count} units, {ability_count} unit abilities, {passive_count} unit passives")
+    print(f"  {item_count} items, {item_passive_count} item passives")
 
 
 if __name__ == "__main__":

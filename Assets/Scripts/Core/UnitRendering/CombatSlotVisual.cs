@@ -9,6 +9,11 @@ using EntityId = TextRPG.Core.EntityStats.EntityId;
 
 namespace TextRPG.Core.UnitRendering
 {
+    public static class SlotColors
+    {
+        public static readonly Color Placeholder = new(0.2f, 0.2f, 0.2f);
+    }
+
     internal sealed class CombatSlotVisual
     {
         private readonly IUnitService _unitService;
@@ -16,6 +21,7 @@ namespace TextRPG.Core.UnitRendering
         private readonly ICombatSlotService _slotService;
         private readonly Dictionary<EntityId, VisualElement> _slotElements = new();
         private readonly List<VisualElement> _allSlotElements = new();
+        private readonly HashSet<VisualElement> _allyCells = new();
 
         public CombatSlotVisual(IUnitService unitService, IEntityStatsService entityStats, ICombatSlotService slotService)
         {
@@ -48,6 +54,7 @@ namespace TextRPG.Core.UnitRendering
                 var cell = CreateSlotCell();
                 container.Add(cell);
                 _allSlotElements.Add(cell);
+                _allyCells.Add(cell);
 
                 var entity = _slotService.GetEntityAt(SlotType.Ally, i);
                 if (entity.HasValue)
@@ -55,7 +62,23 @@ namespace TextRPG.Core.UnitRendering
                     _slotElements[entity.Value] = cell;
                     RenderSlotContent(cell, entity.Value);
                 }
+                else
+                {
+                    RenderPlaceholder(cell, "SUMMON");
+                }
             }
+        }
+
+        private static void RenderPlaceholder(VisualElement cell, string text)
+        {
+            cell.Clear();
+            float cellWidth = cell.resolvedStyle.width;
+            float cellHeight = cell.resolvedStyle.height;
+            if (float.IsNaN(cellWidth) || cellWidth <= 0) cellWidth = 120f;
+            if (float.IsNaN(cellHeight) || cellHeight <= 0) cellHeight = 100f;
+
+            var layout = UnitTextLayout.Calculate(text, cellWidth, cellHeight);
+            UnitTextLabels.AddTo(layout, SlotColors.Placeholder, cell);
         }
 
         public void RegisterEntity(EntityId entityId, VisualElement cell)
@@ -127,6 +150,8 @@ namespace TextRPG.Core.UnitRendering
             {
                 c.Clear();
                 c.style.backgroundColor = Color.black;
+                if (_allyCells.Contains(c))
+                    RenderPlaceholder(c, "SUMMON");
             });
 
             _slotElements.Remove(entityId);

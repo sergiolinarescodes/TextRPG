@@ -113,7 +113,8 @@ namespace TextRPG.Core.WordAction
 
             var tagResolver = new WordTagResolver(wordTags);
             var resolver = new WordResolver(mappings, meta);
-            return new WordActionData(resolver, registry, tagResolver, ammoWordSet, ammoResolver);
+            var ammoWordsByItem = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+            return new WordActionData(resolver, registry, tagResolver, ammoWordSet, ammoResolver, ammoWordsByItem);
         }
     }
 }

@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.WordInput.Scenarios
 {
@@ -11,12 +13,14 @@ namespace TextRPG.Core.WordInput.Scenarios
         private readonly HashSet<EntityId> _dead = new();
         private bool _active;
         private EntityId _player;
+        private IEventBus _eventBus;
 
         public bool IsEncounterActive => _active;
         public IReadOnlyList<EntityId> EnemyEntities => _enemies;
         public EntityId PlayerEntity => _player;
 
         public void SetPlayer(EntityId player) => _player = player;
+        public void SetEventBus(IEventBus eventBus) => _eventBus = eventBus;
 
         public void Activate() => _active = true;
 
@@ -29,7 +33,16 @@ namespace TextRPG.Core.WordInput.Scenarios
             _definitions[id] = definition;
         }
 
-        public void MarkDead(EntityId id) => _dead.Add(id);
+        public void MarkDead(EntityId id)
+        {
+            _dead.Add(id);
+
+            if (_active && _enemies.All(e => _dead.Contains(e)))
+            {
+                _active = false;
+                _eventBus?.Publish(new EncounterEndedEvent("scenario", true));
+            }
+        }
 
         public bool IsEnemy(EntityId id) =>
             _definitions.ContainsKey(id) && !_dead.Contains(id);

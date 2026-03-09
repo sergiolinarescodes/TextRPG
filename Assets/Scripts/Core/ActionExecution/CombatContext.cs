@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Passive;
 using TextRPG.Core.StatusEffect;
 namespace TextRPG.Core.ActionExecution
 {
@@ -16,6 +17,7 @@ namespace TextRPG.Core.ActionExecution
         private ICombatSlotService _slotService;
         private IEntityStatsService _entityStats;
         private IStatusEffectService _statusEffects;
+        private IPassiveService _passiveService;
 
         public EntityId SourceEntity => _sourceEntity;
         public EntityId? FocusedTarget => _focusedTarget;
@@ -29,9 +31,16 @@ namespace TextRPG.Core.ActionExecution
         public void SetStatusEffects(IStatusEffectService statusEffects) => _statusEffects = statusEffects;
         public void SetFocusedTarget(EntityId target) => _focusedTarget = target;
         public void ClearFocusedTarget() => _focusedTarget = null;
+        public void SetPassiveService(IPassiveService passiveService) => _passiveService = passiveService;
 
         public IReadOnlyList<EntityId> GetTargets(TargetType targetType, int range = 0, StatusEffectType? statusFilter = null)
         {
+            if (IsSingleEnemyTarget(targetType))
+            {
+                var taunt = FindTauntTarget(_enemies);
+                if (taunt.HasValue) return new[] { taunt.Value };
+            }
+
             var enemies = _enemies;
             var allies = _allies;
             if (statusFilter.HasValue)
@@ -93,6 +102,30 @@ namespace TextRPG.Core.ActionExecution
             };
         }
 
+        // === Weighted targeting ===
+
+        private const float PlayerTargetWeight = 0.7f;
+
+        private bool IsSourceEnemy()
+        {
+            if (_slotService == null) return false;
+            var slot = _slotService.GetSlot(_sourceEntity);
+            return slot.HasValue && slot.Value.Type == SlotType.Enemy;
+        }
+
+        private EntityId[] PickWeightedTarget(IReadOnlyList<EntityId> enemies)
+        {
+            if (enemies.Count == 0) return Array.Empty<EntityId>();
+            if (enemies.Count == 1) return new[] { enemies[0] };
+            if (!IsSourceEnemy()) return new[] { enemies[0] };
+
+            // enemies[0] = player, enemies[1..n] = summons
+            if (Rng.NextDouble() < PlayerTargetWeight)
+                return new[] { enemies[0] };
+
+            return new[] { enemies[1 + Rng.Next(enemies.Count - 1)] };
+        }
+
         // === Single target with focus ===
 
         private EntityId[] PickSingleEnemy(IReadOnlyList<EntityId> enemies)
@@ -106,7 +139,7 @@ namespace TextRPG.Core.ActionExecution
                         return new[] { _focusedTarget.Value };
                 }
             }
-            return new[] { enemies[0] };
+            return PickWeightedTarget(enemies);
         }
 
         // === Slot-based positional ===
@@ -118,11 +151,8 @@ namespace TextRPG.Core.ActionExecution
                 var sourceSlot = _slotService.GetSlot(_sourceEntity);
                 if (sourceSlot.HasValue && sourceSlot.Value.Type == SlotType.Enemy)
                 {
-                    // Enemy using melee: target ally summons first (they're "in front" of the player)
-                    var ally = _slotService.FindNearestOccupiedSlot(SlotType.Ally, 0);
-                    if (ally.HasValue) return new[] { ally.Value };
-                    // No summons — fall back to enemies list (which contains the player)
-                    return enemies.Count > 0 ? new[] { enemies[0] } : Array.Empty<EntityId>();
+                    // Enemy attacking: weighted random between player and summons
+                    return PickWeightedTarget(enemies);
                 }
 
                 // Player using melee: target enemy slots positionally
@@ -277,6 +307,48 @@ namespace TextRPG.Core.ActionExecution
             for (int i = 0; i < list.Count; i++)
                 result[i] = list[i];
             return result;
+        }
+
+        // === Taunt ===
+
+        private EntityId? FindTauntTarget(IReadOnlyList<EntityId> enemies)
+        {
+            if (_passiveService == null) return null;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                var entity = enemies[i];
+                if (_entityStats == null || !_entityStats.HasEntity(entity) || _entityStats.GetCurrentHealth(entity) <= 0)
+                    continue;
+                if (_passiveService.HasTaunt(entity))
+                    return entity;
+            }
+            return null;
+        }
+
+        private static bool IsSingleEnemyTarget(TargetType targetType)
+        {
+            return targetType switch
+            {
+                TargetType.SingleEnemy => true,
+                TargetType.FrontEnemy => true,
+                TargetType.MiddleEnemy => true,
+                TargetType.BackEnemy => true,
+                TargetType.Melee => true,
+                TargetType.RandomEnemy => true,
+                TargetType.LowestHealthEnemy => true,
+                TargetType.HighestHealthEnemy => true,
+                TargetType.LowestDefenseEnemy => true,
+                TargetType.HighestDefenseEnemy => true,
+                TargetType.LowestStrengthEnemy => true,
+                TargetType.HighestStrengthEnemy => true,
+                TargetType.LowestMagicEnemy => true,
+                TargetType.HighestMagicEnemy => true,
+                TargetType.RandomLowestHealthEnemy => true,
+                TargetType.RandomHighestHealthEnemy => true,
+                TargetType.RandomEnemyWithStatus => true,
+                TargetType.RandomEnemyWithoutStatus => true,
+                _ => false
+            };
         }
     }
 }

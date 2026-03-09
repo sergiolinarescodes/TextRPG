@@ -70,6 +70,7 @@ namespace TextRPG.Core.WordAction
             var meta = new Dictionary<string, WordMeta>();
             var registry = new ActionRegistry();
             var ammoWordSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var ammoByItem = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
             using var db = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly);
 
@@ -95,11 +96,20 @@ namespace TextRPG.Core.WordAction
 
                 list.Add(new WordActionMapping(actionName, row.Value, row.Target, row.Range, actionArea, assocWord));
 
-                // Collect ammo words from Weapon action rows
-                if (string.Equals(actionName, "Weapon", StringComparison.OrdinalIgnoreCase)
+                // Collect ammo words from Item/Weapon action rows
+                if ((string.Equals(actionName, "Item", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(actionName, "Weapon", StringComparison.OrdinalIgnoreCase))
                     && !string.IsNullOrEmpty(assocWord))
                 {
-                    ammoWordSet.Add(assocWord.ToLowerInvariant());
+                    var normalizedAmmo = assocWord.ToLowerInvariant();
+                    ammoWordSet.Add(normalizedAmmo);
+
+                    if (!ammoByItem.TryGetValue(word, out var ammoList))
+                    {
+                        ammoList = new List<string>();
+                        ammoByItem[word] = ammoList;
+                    }
+                    ammoList.Add(normalizedAmmo);
                 }
             }
 
@@ -147,9 +157,14 @@ namespace TextRPG.Core.WordAction
 
             var ammoResolver = new WordResolver(ammoMappings, ammoMeta);
 
+            // Convert ammoByItem to IReadOnlyDictionary<string, IReadOnlyList<string>>
+            var ammoWordsByItem = new Dictionary<string, IReadOnlyList<string>>(ammoByItem.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, val) in ammoByItem)
+                ammoWordsByItem[key] = val;
+
             var tagResolver = new WordTagResolver(wordTags);
             var resolver = new WordResolver(mappings, meta);
-            return new WordActionData(resolver, registry, tagResolver, ammoWordSet, ammoResolver);
+            return new WordActionData(resolver, registry, tagResolver, ammoWordSet, ammoResolver, ammoWordsByItem);
         }
     }
 }

@@ -7,6 +7,7 @@ using TextRPG.Core.CombatLoop;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.CombatAI;
+using TextRPG.Core.Equipment;
 using TextRPG.Core.Passive;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
@@ -17,6 +18,7 @@ using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
 using Unidad.Core.Abstractions;
 using Unidad.Core.EventBus;
+using Unidad.Core.Inventory;
 using Unidad.Core.Testing;
 using Unidad.Core.UI.Components;
 using UnityEngine;
@@ -72,12 +74,24 @@ namespace TextRPG.Core.WordInput.Scenarios
         private ScenarioEncounterAdapter _encounterAdapter;
         private IPassiveService _passiveService;
         private ICombatLoopService _combatLoop;
+        private IEquipmentService _equipmentService;
+        private IInventoryService _inventoryService;
+        private IItemRegistry _itemRegistry;
+        private InventoryId _playerInventoryId;
+        private VisualElement _dragElement;
+        private string _dragItemWord;
+        private int _dragSourceSlot = -1;
+        private bool _dragFromEquipment;
         private UnidadProgressBar _hpBar;
         private Label _hpLabel;
         private UnidadProgressBar _manaBar;
         private Label _manaLabel;
         private VisualElement _manaCostOverlay;
         private bool _isPreviewingManaCost;
+        private ILootRewardService _lootRewardService;
+        private VisualElement _lootOverlay;
+        private VisualElement _lootTooltip;
+        private VisualElement _tooltipLayer;
 
         private static readonly Color HighlightEnemy = new(1f, 0.3f, 0.3f, 0.4f);
         private static readonly Color HighlightSelf = new(0.3f, 1f, 0.3f, 0.4f);
@@ -128,6 +142,13 @@ namespace TextRPG.Core.WordInput.Scenarios
             var weaponRegistry = WeaponSystemInstaller.BuildWeaponRegistry(wordActionData);
             _weaponService = new WeaponService(_eventBus, weaponRegistry);
 
+            // Item/Equipment registry
+            _itemRegistry = EquipmentSystemInstaller.BuildItemRegistry(wordActionData);
+
+            // Inventory service
+            _inventoryService = new InventoryService(_eventBus);
+            _playerInventoryId = new InventoryId("player");
+
             // Full action handler registry
             var actionHandlerCtx = new ActionHandlerContext(_entityStats, _eventBus, _combatContext,
                 statusEffects, _turnService, _weaponService, slotService: _slotService);
@@ -137,10 +158,23 @@ namespace TextRPG.Core.WordInput.Scenarios
             _playerId = new EntityId("player");
             _entityStats.RegisterEntity(_playerId, 100, 10, 8, 5, 4, 3);
 
+            // Create player inventory
+            _inventoryService.Create(_playerInventoryId, new InventoryDefinition(EquipmentConstants.InventorySlotCount));
+
+            // Define inventory items from item registry
+            foreach (var itemWord in _itemRegistry.Keys)
+            {
+                if (_itemRegistry.TryGet(itemWord, out var itemDef))
+                    _inventoryService.DefineItem(new Unidad.Core.Inventory.ItemDefinition(new ItemId(itemWord), itemDef.DisplayName, 1));
+            }
+
+            // Item handler registered later (after _equipmentService is created)
+
             // Load enemy definitions from DB
             var allUnits = UnitDatabaseLoader.LoadAll();
             _encounterAdapter = new ScenarioEncounterAdapter();
             _encounterAdapter.SetPlayer(_playerId);
+            _encounterAdapter.SetEventBus(_eventBus);
             var enemyResolver = new EnemyWordResolver();
 
             var enemySpawns = new[] { "goblin", "skeleton", "bat" };
@@ -180,10 +214,25 @@ namespace TextRPG.Core.WordInput.Scenarios
             _weaponExecutor = new WeaponActionExecutor(
                 _eventBus, _weaponService, _ammoResolver, handlerRegistry, _combatContext, scenarioAnimResolver);
 
+            // Action Animation service (created early so PassiveContext can reference it)
+            _animationService = new ActionAnimationService(_eventBus, scenarioAnimResolver, handlerRegistry, _entityStats);
+
             // Passive system
-            var passiveHandlerRegistry = PassiveSystemInstaller.CreateHandlerRegistry();
-            var passiveContext = new PassiveContext(_entityStats, _slotService, _eventBus, _encounterAdapter);
-            _passiveService = new PassiveService(_eventBus, passiveHandlerRegistry, passiveContext, allUnits);
+            var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
+            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
+            var targetResolver = new PassiveTargetResolver();
+            var passiveContext = new PassiveContext(_entityStats, _slotService, _eventBus, _encounterAdapter,
+                animationService: _animationService);
+            _passiveService = new PassiveService(_eventBus, triggerRegistry, effectRegistry, targetResolver, passiveContext, allUnits);
+
+            // Equipment service (needs passive service)
+            _equipmentService = new EquipmentService(_eventBus, _itemRegistry, _entityStats, _passiveService, _weaponService);
+
+            // Register Item action handler (needs _equipmentService + _itemRegistry for auto-equip)
+            handlerRegistry.Register("Item", new ItemActionHandler(actionHandlerCtx, _inventoryService, _playerInventoryId, _equipmentService, _itemRegistry));
+
+            // Loot reward service
+            _lootRewardService = new LootRewardService(_eventBus, _itemRegistry, _inventoryService, _playerInventoryId, _playerId);
 
             // Register passives for initial enemies
             foreach (var unitId in enemySpawns)
@@ -199,8 +248,6 @@ namespace TextRPG.Core.WordInput.Scenarios
             _combatAI = new CombatAIService(_eventBus, _encounterAdapter, _entityStats,
                 _turnService, _slotService, _combatContext, _actionExecution, scorers, enemyResolver, allUnits);
 
-            // Action Animation service
-            _animationService = new ActionAnimationService(_eventBus, scenarioAnimResolver, handlerRegistry);
             _statusVisualService = new StatusEffectVisualService(_eventBus);
 
             var tickRunner = SceneRoot.AddComponent<TickRunner>();
@@ -263,8 +310,7 @@ namespace TextRPG.Core.WordInput.Scenarios
                     RefreshEntityCell(evt.EntityId);
                 else
                     _slotVisual?.PlayDeathAnimation(evt.EntityId);
-                if (_allyRow != null && _slotService.GetOccupiedAllyCount() == 0)
-                    _allyRow.style.display = DisplayStyle.None;
+                // Ally slots always visible — placeholders shown by PlayDeathAnimation clearing the cell
             }));
 
             // Mana bar updates
@@ -286,7 +332,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Log passive triggers
             _subscriptions.Add(_eventBus.Subscribe<PassiveTriggeredEvent>(evt =>
             {
-                Debug.Log($"[Passive] {evt.PassiveId} from {evt.SourceEntity.Value} → " +
+                Debug.Log($"[Passive] {evt.TriggerId}+{evt.EffectId} from {evt.SourceEntity.Value} → " +
                           $"value={evt.Value} affected={evt.AffectedEntity?.Value ?? "none"}");
             }));
 
@@ -347,9 +393,12 @@ namespace TextRPG.Core.WordInput.Scenarios
                         _slotVisual.RegisterEntity(evt.EntityId, slotElements[visualIndex]);
                     }
                 }
-                if (evt.Slot.Type == SlotType.Ally && _allyRow != null)
-                    _allyRow.style.display = DisplayStyle.Flex;
+                // Ally row always visible — no display toggle needed
             }));
+
+            // Loot reward events
+            _subscriptions.Add(_eventBus.Subscribe<LootRewardOfferedEvent>(evt => ShowLootSelection(evt.Options)));
+            _subscriptions.Add(_eventBus.Subscribe<LootRewardSelectedEvent>(_ => HideLootSelection()));
 
             // --- Build UI ---
             BuildUI(vibrationAmplitude);
@@ -381,7 +430,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             middleArea.style.flexDirection = FlexDirection.Row;
             middleArea.style.flexGrow = 1;
 
-            _leftBar = new EquipmentBarVisual(5);
+            _leftBar = new EquipmentBarVisual(EquipmentConstants.InventorySlotCount);
             _leftBar.BuildColumn(middleArea);
 
             // Main text panel
@@ -393,11 +442,19 @@ namespace TextRPG.Core.WordInput.Scenarios
             _mainTextPanel.style.overflow = Overflow.Hidden;
             middleArea.Add(_mainTextPanel);
 
-            _rightBar = new EquipmentBarVisual(5);
+            _rightBar = new EquipmentBarVisual(EquipmentConstants.SlotCount);
             _rightBar.BuildColumn(middleArea);
 
-            // Set weapon slot background on bottom-right slot
-            _rightBar.SetSlotBackground(4, "WEAPON", new Color(0.2f, 0.2f, 0.2f));
+            // Set equipment slot placeholders on right bar
+            _rightBar.SetSlotBackground(0, "HEAD", SlotColors.Placeholder);
+            _rightBar.SetSlotBackground(1, "WEAR", SlotColors.Placeholder);
+            _rightBar.SetSlotBackground(2, "ACCES SORY", SlotColors.Placeholder);
+            _rightBar.SetSlotBackground(3, "TRIN KET", SlotColors.Placeholder);
+            _rightBar.SetSlotBackground(4, "WEAPON", SlotColors.Placeholder);
+
+            // Set inventory slot placeholders on left bar
+            for (int i = 0; i < EquipmentConstants.InventorySlotCount; i++)
+                _leftBar.SetSlotBackground(i, "INVEN TORY", SlotColors.Placeholder);
 
             root.Add(middleArea);
 
@@ -433,17 +490,20 @@ namespace TextRPG.Core.WordInput.Scenarios
             _codeField.RegisterCallback<KeyDownEvent>(OnKeyDown, TrickleDown.TrickleDown);
             _mainTextPanel.RegisterCallback<GeometryChangedEvent>(_ => RecalculateFontSize());
 
-            // Ally row (hidden by default, shown when allies exist)
+            // Ally row (always visible, positioned at bottom of text panel)
             _allyRow = new VisualElement();
+            _allyRow.pickingMode = PickingMode.Ignore;
+            _allyRow.style.position = Position.Absolute;
+            _allyRow.style.bottom = 10;
+            _allyRow.style.left = 0;
+            _allyRow.style.right = 0;
             _allyRow.style.flexDirection = FlexDirection.Row;
             _allyRow.style.justifyContent = Justify.Center;
             _allyRow.style.alignItems = Align.Center;
-            _allyRow.style.height = 80;
-            _allyRow.style.backgroundColor = Color.black;
+            _allyRow.style.height = 100;
             _allyRow.style.paddingTop = 4;
             _allyRow.style.paddingBottom = 4;
-            _allyRow.style.display = DisplayStyle.None;
-            root.Add(_allyRow);
+            _mainTextPanel.Add(_allyRow);
 
             _slotVisual.BuildAllyRow(_allyRow);
 
@@ -570,18 +630,18 @@ namespace TextRPG.Core.WordInput.Scenarios
             var statusTextOverlay = StatusEffectFloatingTextPool.CreateOverlay();
             root.Add(statusTextOverlay);
 
-            var tooltipLayer = new VisualElement { name = "tooltip-layer" };
-            tooltipLayer.style.position = Position.Absolute;
-            tooltipLayer.style.left = 0;
-            tooltipLayer.style.top = 0;
-            tooltipLayer.style.right = 0;
-            tooltipLayer.style.bottom = 0;
-            tooltipLayer.pickingMode = PickingMode.Ignore;
-            root.Add(tooltipLayer);
+            _tooltipLayer = new VisualElement { name = "tooltip-layer" };
+            _tooltipLayer.style.position = Position.Absolute;
+            _tooltipLayer.style.left = 0;
+            _tooltipLayer.style.top = 0;
+            _tooltipLayer.style.right = 0;
+            _tooltipLayer.style.bottom = 0;
+            _tooltipLayer.pickingMode = PickingMode.Ignore;
+            root.Add(_tooltipLayer);
 
             _statusVisualService.Initialize(positionProvider, statusTextOverlay,
                 _slotVisual.GetAllSlotElements(), _slotService, _statusEffects, _unitService,
-                _slotVisual, tooltipLayer, _passiveService);
+                _slotVisual, _tooltipLayer, _passiveService);
 
             // Weapon slot — uses bottom slot of right bar
             _weaponSlot = _rightBar.GetSlotElement(4);
@@ -597,6 +657,19 @@ namespace TextRPG.Core.WordInput.Scenarios
             _weaponDurabilityLabel.style.left = 4;
 
             _weaponSlot.RegisterCallback<ClickEvent>(_ => FireWeapon());
+
+            // --- Inventory/Equipment visual subscriptions ---
+            _subscriptions.Add(_eventBus.Subscribe<Unidad.Core.Inventory.SlotChangedEvent>(OnInventorySlotChanged));
+            _subscriptions.Add(_eventBus.Subscribe<ItemEquippedEvent>(OnItemEquipped));
+            _subscriptions.Add(_eventBus.Subscribe<ItemUnequippedEvent>(OnItemUnequipped));
+
+            // --- Drag-and-drop on inventory (left) and equipment (right) slots ---
+            RegisterSlotDragHandlers(_leftBar, EquipmentConstants.InventorySlotCount, OnInventorySlotPointerDown);
+            RegisterSlotDragHandlers(_rightBar, EquipmentConstants.SlotCount, OnEquipmentSlotPointerDown);
+
+            // Pointer move/up on root for drag tracking
+            root.RegisterCallback<PointerMoveEvent>(OnDragPointerMove);
+            root.RegisterCallback<PointerUpEvent>(OnDragPointerUp);
 
             _codeField.schedule.Execute(() => _codeField.Focus());
         }
@@ -908,6 +981,175 @@ namespace TextRPG.Core.WordInput.Scenarios
             _slotVisual?.RefreshSlot(entityId);
         }
 
+        // --- Inventory/Equipment Visual Handlers ---
+
+        private void OnInventorySlotChanged(Unidad.Core.Inventory.SlotChangedEvent evt)
+        {
+            if (evt.InventoryId != _playerInventoryId) return;
+            if (evt.NewSlot.IsEmpty)
+            {
+                _leftBar?.ClearSlotContent(evt.SlotIndex);
+            }
+            else
+            {
+                var itemWord = evt.NewSlot.ItemId.Value;
+                if (_itemRegistry.TryGet(itemWord, out var itemDef))
+                    _leftBar?.SetSlotContent(evt.SlotIndex, itemDef.DisplayName, itemDef.Color);
+                else
+                    _leftBar?.SetSlotContent(evt.SlotIndex, itemWord.ToUpperInvariant(), Color.white);
+            }
+        }
+
+        private void OnItemEquipped(ItemEquippedEvent evt)
+        {
+            if (!evt.Entity.Equals(_playerId)) return;
+            int slotIndex = (int)evt.Slot;
+            _rightBar?.SetSlotContent(slotIndex, evt.Item.DisplayName, evt.Item.Color);
+            Debug.Log($"[Equipment] Equipped {evt.Item.DisplayName} → {evt.Slot}");
+        }
+
+        private void OnItemUnequipped(ItemUnequippedEvent evt)
+        {
+            if (!evt.Entity.Equals(_playerId)) return;
+            int slotIndex = (int)evt.Slot;
+            _rightBar?.ClearSlotContent(slotIndex);
+            Debug.Log($"[Equipment] Unequipped {evt.Item.DisplayName} from {evt.Slot}");
+        }
+
+        // --- Drag-and-Drop ---
+
+        private static void RegisterSlotDragHandlers(EquipmentBarVisual bar, int count, Action<PointerDownEvent, int> handler)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                var slotIndex = i;
+                var slotElement = bar.GetSlotElement(i);
+                slotElement.pickingMode = PickingMode.Position;
+                slotElement.RegisterCallback<PointerDownEvent>(evt => handler(evt, slotIndex));
+            }
+        }
+
+        private void OnInventorySlotPointerDown(PointerDownEvent evt, int slotIndex)
+        {
+            if (_encounterAdapter?.IsEncounterActive == true) return;
+            if (_inventoryService == null) return;
+            var slot = _inventoryService.GetSlot(_playerInventoryId, slotIndex);
+            if (slot.IsEmpty) return;
+
+            _dragItemWord = slot.ItemId.Value;
+            _dragSourceSlot = slotIndex;
+            _dragFromEquipment = false;
+            StartDrag(evt.position);
+            evt.StopPropagation();
+        }
+
+        private void OnEquipmentSlotPointerDown(PointerDownEvent evt, int slotIndex)
+        {
+            if (_encounterAdapter?.IsEncounterActive == true) return;
+            if (_equipmentService == null) return;
+            var slotType = (EquipmentSlotType)slotIndex;
+            var equipped = _equipmentService.GetEquipped(_playerId, slotType);
+            if (equipped == null) return;
+
+            _dragItemWord = equipped.ItemWord;
+            _dragSourceSlot = slotIndex;
+            _dragFromEquipment = true;
+            StartDrag(evt.position);
+            evt.StopPropagation();
+        }
+
+        private void StartDrag(Vector2 position)
+        {
+            if (_dragElement != null) return;
+
+            _dragElement = new VisualElement();
+            _dragElement.style.position = Position.Absolute;
+            _dragElement.style.width = 100;
+            _dragElement.style.height = 80;
+            _dragElement.style.backgroundColor = new Color(0.2f, 0.2f, 0.3f, 0.85f);
+            _dragElement.style.borderTopWidth = 2;
+            _dragElement.style.borderBottomWidth = 2;
+            _dragElement.style.borderLeftWidth = 2;
+            _dragElement.style.borderRightWidth = 2;
+            _dragElement.style.borderTopColor = Color.yellow;
+            _dragElement.style.borderBottomColor = Color.yellow;
+            _dragElement.style.borderLeftColor = Color.yellow;
+            _dragElement.style.borderRightColor = Color.yellow;
+            _dragElement.style.justifyContent = Justify.Center;
+            _dragElement.style.alignItems = Align.Center;
+            _dragElement.pickingMode = PickingMode.Ignore;
+
+            var label = new Label(_dragItemWord.ToUpperInvariant());
+            label.style.color = Color.white;
+            label.style.fontSize = 16;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.pickingMode = PickingMode.Ignore;
+            _dragElement.Add(label);
+
+            RootVisualElement.Add(_dragElement);
+            UpdateDragPosition(position);
+        }
+
+        private void UpdateDragPosition(Vector2 position)
+        {
+            if (_dragElement == null) return;
+            _dragElement.style.left = position.x - 50;
+            _dragElement.style.top = position.y - 40;
+        }
+
+        private void OnDragPointerMove(PointerMoveEvent evt)
+        {
+            if (_dragElement == null) return;
+            UpdateDragPosition(evt.position);
+        }
+
+        private void OnDragPointerUp(PointerUpEvent evt)
+        {
+            if (_dragElement == null || _dragItemWord == null) return;
+
+            bool handled;
+            if (_dragFromEquipment)
+                handled = _equipmentService.UnequipToInventory(
+                    _playerId, (EquipmentSlotType)_dragSourceSlot, _inventoryService, _playerInventoryId);
+            else
+                handled = TryDropToEquipmentSlot(evt.position);
+
+            if (!handled)
+                Debug.Log($"[Equipment] Drag cancelled for {_dragItemWord}");
+
+            CancelDrag();
+        }
+
+        private bool TryDropToEquipmentSlot(Vector2 dropPos)
+        {
+            for (int i = 0; i < EquipmentConstants.SlotCount; i++)
+            {
+                var slotElement = _rightBar.GetSlotElement(i);
+                if (slotElement == null || !slotElement.worldBound.Contains(dropPos)) continue;
+
+                var targetSlotType = (EquipmentSlotType)i;
+                var itemSlotType = _equipmentService.GetSlotTypeForItem(_dragItemWord);
+                if (itemSlotType == null || itemSlotType.Value != targetSlotType)
+                {
+                    Debug.Log($"[Equipment] {_dragItemWord} doesn't fit in {targetSlotType} slot");
+                    return false;
+                }
+
+                return _equipmentService.EquipFromInventory(_playerId, _dragItemWord, _inventoryService, _playerInventoryId);
+            }
+            return false;
+        }
+
+        private void CancelDrag()
+        {
+            _dragElement?.RemoveFromHierarchy();
+            _dragElement = null;
+            _dragItemWord = null;
+            _dragSourceSlot = -1;
+            _dragFromEquipment = false;
+        }
+
         protected override ScenarioVerificationResult VerifyInternal(ScenarioParameterOverrides overrides)
         {
             var checks = new List<ScenarioVerificationResult.CheckResult>
@@ -924,6 +1166,190 @@ namespace TextRPG.Core.WordInput.Scenarios
                         ? null : "Main text panel background is not black")
             };
             return new ScenarioVerificationResult(checks);
+        }
+
+        private void ShowLootSelection(EquipmentItemDefinition[] options)
+        {
+            SetInputEnabled(false);
+
+            _lootOverlay = new VisualElement();
+            _lootOverlay.style.position = Position.Absolute;
+            _lootOverlay.style.left = 0;
+            _lootOverlay.style.top = 0;
+            _lootOverlay.style.right = 0;
+            _lootOverlay.style.bottom = 0;
+            _lootOverlay.style.backgroundColor = new Color(0f, 0f, 0f, 0.7f);
+            _lootOverlay.style.justifyContent = Justify.Center;
+            _lootOverlay.style.alignItems = Align.Center;
+            _lootOverlay.pickingMode = PickingMode.Position;
+
+            var title = new Label("VICTORY — Choose a Reward");
+            title.style.fontSize = 32;
+            title.style.color = Color.white;
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.marginBottom = 24;
+            title.pickingMode = PickingMode.Ignore;
+            _lootOverlay.Add(title);
+
+            var cardRow = new VisualElement();
+            cardRow.style.flexDirection = FlexDirection.Row;
+            cardRow.style.justifyContent = Justify.Center;
+            cardRow.style.alignItems = Align.FlexStart;
+            cardRow.pickingMode = PickingMode.Ignore;
+            _lootOverlay.Add(cardRow);
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                var item = options[i];
+                var cardIndex = i;
+
+                var card = new VisualElement();
+                card.style.width = 200;
+                card.style.height = 250;
+                card.style.marginLeft = 12;
+                card.style.marginRight = 12;
+                card.style.backgroundColor = new Color(0.12f, 0.12f, 0.15f);
+                card.style.borderTopWidth = 2;
+                card.style.borderBottomWidth = 2;
+                card.style.borderLeftWidth = 2;
+                card.style.borderRightWidth = 2;
+                card.style.borderTopColor = item.Color;
+                card.style.borderBottomColor = item.Color;
+                card.style.borderLeftColor = item.Color;
+                card.style.borderRightColor = item.Color;
+                card.style.borderTopLeftRadius = 8;
+                card.style.borderTopRightRadius = 8;
+                card.style.borderBottomLeftRadius = 8;
+                card.style.borderBottomRightRadius = 8;
+                card.style.paddingLeft = 12;
+                card.style.paddingRight = 12;
+                card.style.paddingTop = 12;
+                card.style.paddingBottom = 12;
+                card.style.justifyContent = Justify.FlexStart;
+                card.style.alignItems = Align.Center;
+                card.pickingMode = PickingMode.Position;
+
+                var slotLabel = new Label(item.SlotType.ToString().ToUpperInvariant());
+                slotLabel.style.fontSize = 14;
+                slotLabel.style.color = new Color(0.6f, 0.6f, 0.6f);
+                slotLabel.style.marginBottom = 8;
+                slotLabel.pickingMode = PickingMode.Ignore;
+                card.Add(slotLabel);
+
+                var nameContainer = new VisualElement();
+                nameContainer.style.width = 176;
+                nameContainer.style.height = 120;
+                nameContainer.style.justifyContent = Justify.Center;
+                nameContainer.style.alignItems = Align.Center;
+                nameContainer.style.marginBottom = 12;
+                nameContainer.pickingMode = PickingMode.Ignore;
+                var nameLayout = UnitTextLayout.Calculate(item.DisplayName, 176, 120);
+                UnitTextLabels.AddTo(nameLayout, item.Color, nameContainer);
+                card.Add(nameContainer);
+
+                var statsText = BuildStatSummary(item.Stats);
+                var statsLabel = new Label(statsText);
+                statsLabel.style.fontSize = 14;
+                statsLabel.style.color = Color.white;
+                statsLabel.style.whiteSpace = WhiteSpace.Normal;
+                statsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+                statsLabel.pickingMode = PickingMode.Ignore;
+                card.Add(statsLabel);
+
+                card.RegisterCallback<PointerEnterEvent>(_ => ShowLootTooltip(item, card));
+                card.RegisterCallback<PointerLeaveEvent>(_ => HideLootTooltip());
+                card.RegisterCallback<ClickEvent>(_ => _lootRewardService.SelectReward(cardIndex));
+
+                cardRow.Add(card);
+            }
+
+            RootVisualElement.Add(_lootOverlay);
+        }
+
+        private void HideLootSelection()
+        {
+            _lootOverlay?.RemoveFromHierarchy();
+            _lootOverlay = null;
+            HideLootTooltip();
+        }
+
+        private void ShowLootTooltip(EquipmentItemDefinition item, VisualElement card)
+        {
+            HideLootTooltip();
+
+            _lootTooltip = new VisualElement();
+            _lootTooltip.style.position = Position.Absolute;
+            _lootTooltip.style.backgroundColor = Color.black;
+            _lootTooltip.style.borderTopWidth = 1;
+            _lootTooltip.style.borderBottomWidth = 1;
+            _lootTooltip.style.borderLeftWidth = 1;
+            _lootTooltip.style.borderRightWidth = 1;
+            _lootTooltip.style.borderTopColor = Color.white;
+            _lootTooltip.style.borderBottomColor = Color.white;
+            _lootTooltip.style.borderLeftColor = Color.white;
+            _lootTooltip.style.borderRightColor = Color.white;
+            _lootTooltip.style.paddingLeft = 16;
+            _lootTooltip.style.paddingRight = 16;
+            _lootTooltip.style.paddingTop = 12;
+            _lootTooltip.style.paddingBottom = 12;
+            _lootTooltip.pickingMode = PickingMode.Ignore;
+
+            var nameLabel = new Label(item.DisplayName);
+            nameLabel.style.color = item.Color;
+            nameLabel.style.fontSize = 22;
+            nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            nameLabel.style.marginBottom = 4;
+            nameLabel.pickingMode = PickingMode.Ignore;
+            _lootTooltip.Add(nameLabel);
+
+            var slotLabel = new Label(item.SlotType.ToString());
+            slotLabel.style.color = new Color(0.6f, 0.6f, 0.6f);
+            slotLabel.style.fontSize = 16;
+            slotLabel.style.marginBottom = 8;
+            slotLabel.pickingMode = PickingMode.Ignore;
+            _lootTooltip.Add(slotLabel);
+
+            AddStatLine(item.Stats.MaxHealth, "Max Health");
+            AddStatLine(item.Stats.PhysDefense, "Physical Defense");
+            AddStatLine(item.Stats.MagicDefense, "Magic Defense");
+            AddStatLine(item.Stats.Strength, "Strength");
+            AddStatLine(item.Stats.MagicPower, "Magic Power");
+            AddStatLine(item.Stats.Luck, "Luck");
+
+            void AddStatLine(int value, string label)
+            {
+                if (value <= 0) return;
+                var line = new Label($"+{value} {label}");
+                line.style.color = new Color(0.3f, 1f, 0.3f);
+                line.style.fontSize = 16;
+                line.style.marginBottom = 2;
+                line.pickingMode = PickingMode.Ignore;
+                _lootTooltip.Add(line);
+            }
+
+            RootVisualElement.Add(_lootTooltip);
+
+            var cardBound = card.worldBound;
+            _lootTooltip.style.left = cardBound.x + cardBound.width + 12;
+            _lootTooltip.style.top = cardBound.y;
+        }
+
+        private void HideLootTooltip()
+        {
+            _lootTooltip?.RemoveFromHierarchy();
+            _lootTooltip = null;
+        }
+
+        private static string BuildStatSummary(StatBonus stats)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            if (stats.MaxHealth > 0) parts.Add($"+{stats.MaxHealth} HP");
+            if (stats.PhysDefense > 0) parts.Add($"+{stats.PhysDefense} DEF");
+            if (stats.MagicDefense > 0) parts.Add($"+{stats.MagicDefense} MDEF");
+            if (stats.Strength > 0) parts.Add($"+{stats.Strength} STR");
+            if (stats.MagicPower > 0) parts.Add($"+{stats.MagicPower} MAG");
+            if (stats.Luck > 0) parts.Add($"+{stats.Luck} LCK");
+            return string.Join(", ", parts);
         }
 
         protected override void OnCleanup()
@@ -968,6 +1394,18 @@ namespace TextRPG.Core.WordInput.Scenarios
             _ammoMatchService = null;
             _weaponSlot = null;
             _weaponDurabilityLabel = null;
+            CancelDrag();
+            (_lootRewardService as IDisposable)?.Dispose();
+            _lootRewardService = null;
+            _lootOverlay?.RemoveFromHierarchy();
+            _lootOverlay = null;
+            HideLootTooltip();
+            _tooltipLayer = null;
+            (_equipmentService as IDisposable)?.Dispose();
+            (_inventoryService as IDisposable)?.Dispose();
+            _equipmentService = null;
+            _inventoryService = null;
+            _itemRegistry = null;
             _leftBar = null;
             _rightBar = null;
             _allyRow = null;

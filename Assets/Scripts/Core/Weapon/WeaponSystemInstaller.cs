@@ -44,41 +44,31 @@ namespace TextRPG.Core.Weapon
         {
             var registry = new WeaponRegistry();
             var resolver = data.Resolver;
+            var ammoByItem = data.AmmoWordsByItem;
 
-            // Scan all words for Weapon actions and build WeaponDefinitions
-            var weaponAmmo = new Dictionary<string, (int durability, List<string> ammo)>(StringComparer.OrdinalIgnoreCase);
-
-            // We need to iterate all words — get them from the resolver
-            // WordResolver exposes all words via its mappings
-            // We check each word's actions for "Weapon" entries
-            foreach (var word in resolver.AllWords)
+            // Build WeaponDefinitions from items that have Item/Weapon actions
+            foreach (var (itemWord, ammoList) in ammoByItem)
             {
-                var actions = resolver.Resolve(word);
+                // Get durability from the first Item/Weapon action mapping
+                var actions = resolver.Resolve(itemWord);
+                int durability = 0;
                 for (int i = 0; i < actions.Count; i++)
                 {
                     var mapping = actions[i];
-                    if (!string.Equals(mapping.ActionId, "Weapon", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    if (!weaponAmmo.TryGetValue(word, out var entry))
+                    if (string.Equals(mapping.ActionId, "Weapon", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(mapping.ActionId, "Item", StringComparison.OrdinalIgnoreCase))
                     {
-                        entry = (mapping.Value, new List<string>());
-                        weaponAmmo[word] = entry;
+                        durability = mapping.Value;
+                        break;
                     }
-
-                    if (!string.IsNullOrEmpty(mapping.AssocWord))
-                        entry.ammo.Add(mapping.AssocWord.ToLowerInvariant());
                 }
-            }
 
-            foreach (var (weaponWord, (durability, ammo)) in weaponAmmo)
-            {
                 var def = new WeaponDefinition(
-                    weaponWord,
-                    weaponWord.ToUpperInvariant(),
+                    itemWord,
+                    itemWord.ToUpperInvariant(),
                     durability,
-                    ammo);
-                registry.Register(weaponWord, def);
+                    ammoList);
+                registry.Register(itemWord, def);
             }
 
             return registry;

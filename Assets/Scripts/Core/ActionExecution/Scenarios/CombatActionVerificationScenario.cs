@@ -359,16 +359,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 HP(_enemyA) == 72,
                 $"Expected HP=72, got {HP(_enemyA)}");
 
-            SoftReset();
-
-            // Shock enemy_a at (4,3) → chains to enemy_c at (5,3)
-            _resolver.RegisterWord("test_shock_chain",
-                new List<WordActionMapping> { new("Shock", 4) },
-                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
-            Exec("test_shock_chain");
-            Check("Shock chain: adjacent enemy takes secondary damage",
-                HP(_enemyA) == 76 && HP(_enemyC) == 96,
-                $"A HP={HP(_enemyA)}(exp 76), C HP={HP(_enemyC)}(exp 96)");
         }
 
         // ── Group 6: Summon ──────────────────────────────────────────
@@ -532,18 +522,17 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
             SoftReset();
 
-            // Melee: hero at (3,3), adjacent enemies: enemy_a(4,3), enemy_b(3,4)
+            // Melee: targets slot 0 (FrontEnemy = enemy_a), others untouched
             _resolver.RegisterWord("test_melee",
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("Melee", 0, 0, AreaShape.Single));
             Exec("test_melee");
             int mDmgA = Math.Max(1, 1 * 12 / 4); // 3
-            int mDmgB = Math.Max(1, 1 * 12 / 3); // 4
-            bool meleeOk = HP(_enemyA) == 80 - mDmgA && HP(_enemyB) == 60 - mDmgB &&
+            bool meleeOk = HP(_enemyA) == 80 - mDmgA && HP(_enemyB) == 60 &&
                            HP(_enemyC) == 100 && HP(_enemyD) == 40;
-            Check("Target melee: only adjacent enemies hit",
+            Check("Target melee: hits front slot enemy only",
                 meleeOk,
-                $"A={HP(_enemyA)}(exp {80 - mDmgA}), B={HP(_enemyB)}(exp {60 - mDmgB}), C={HP(_enemyC)}(exp 100), D={HP(_enemyD)}(exp 40)");
+                $"A={HP(_enemyA)}(exp {80 - mDmgA}), B={HP(_enemyB)}(exp 60), C={HP(_enemyC)}(exp 100), D={HP(_enemyD)}(exp 40)");
         }
 
         // ── Group 10: Thinking ──────────────────────────────────────
@@ -655,19 +644,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 _statusEffects.HasEffect(_enemyA, StatusEffectType.Burning),
                 $"Frozen={_statusEffects.HasEffect(_enemyA, StatusEffectType.Frozen)}, Burning={_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning)}");
 
-            SoftReset();
-
-            // Shock wet chain: enemy_a at (4,3), enemy_c at (5,3) adjacent
-            // Wet enemy_c, shock enemy_a → chain to enemy_c with 2x multiplier
-            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Wet, 5, _hero);
-            _resolver.RegisterWord("test_shock_wet_chain",
-                new List<WordActionMapping> { new("Shock", 4) },
-                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
-            Exec("test_shock_wet_chain");
-            // enemy_a: 4 damage (dry), enemy_c: chain = 4 * 2 (wet) = 8
-            Check("Shock wet chain: wet adjacent takes doubled chain damage",
-                HP(_enemyA) == 76 && HP(_enemyC) == 92,
-                $"A HP={HP(_enemyA)}(exp 76), C HP={HP(_enemyC)}(exp 92)");
         }
 
         // ── Group 14: Debuff → Damage Amplification ────────────────

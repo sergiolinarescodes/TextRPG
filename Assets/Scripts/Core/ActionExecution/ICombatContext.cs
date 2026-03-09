@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Passive;
 using TextRPG.Core.StatusEffect;
 
 namespace TextRPG.Core.ActionExecution
@@ -19,5 +20,6 @@ namespace TextRPG.Core.ActionExecution
         void SetStatusEffects(IStatusEffectService statusEffects);
         void SetFocusedTarget(EntityId target);
         void ClearFocusedTarget();
+        void SetPassiveService(IPassiveService passiveService);
     }
 }

@@ -2,7 +2,14 @@ using UnityEngine;
 
 namespace TextRPG.Core.Encounter
 {
-    public sealed record PassiveEntry(string PassiveId, int Value);
+    public sealed record PassiveEntry(
+    string TriggerId,
+    string TriggerParam,
+    string EffectId,
+    string EffectParam,
+    int Value,
+    string Target
+);
 
     public sealed record EnemyDefinition(
         string Name,

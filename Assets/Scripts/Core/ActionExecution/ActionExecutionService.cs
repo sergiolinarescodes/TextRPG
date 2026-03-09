@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
@@ -82,10 +83,18 @@ namespace TextRPG.Core.ActionExecution
         private List<ResolvedAction> ResolveActions(string word, IReadOnlyList<WordActionMapping> actions, WordMeta meta)
         {
             var resolved = new List<ResolvedAction>(actions.Count);
+            var seenActions = new HashSet<string>();
 
             for (int i = 0; i < actions.Count; i++)
             {
                 var mapping = actions[i];
+
+                // Item actions may have multiple rows (one per ammo type) — only resolve once
+                if (string.Equals(mapping.ActionId, "Item", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!seenActions.Add(mapping.ActionId)) continue;
+                }
+
                 var actionTarget = mapping.Target ?? meta.Target;
 
                 var spec = TargetTypeClassifier.Parse(actionTarget);

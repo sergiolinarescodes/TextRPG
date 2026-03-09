@@ -40,7 +40,8 @@
       "Bash(sort:*)",
       "Read(//c/Users/kelns/repos/TextRPG/**)",
       "Bash(mv TextRPG.Core.csproj.tmp TextRPG.Core.csproj)",
-      "Bash(then:*)"
+      "Bash(then:*)",
+      "Bash(sed:*)"
     ]
   }
 }

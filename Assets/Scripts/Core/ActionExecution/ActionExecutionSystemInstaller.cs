@@ -5,6 +5,7 @@ using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
+using TextRPG.Core.Passive;
 using Unidad.Core.Abstractions;
 using Unidad.Core.Bootstrap;
 using Unidad.Core.EventBus;
@@ -21,6 +22,7 @@ namespace TextRPG.Core.ActionExecution
                 var ctx = new CombatContext();
                 ctx.SetEntityStats(container.Resolve<IEntityStatsService>());
                 ctx.SetStatusEffects(container.Resolve<IStatusEffectService>());
+                ctx.SetPassiveService(container.Resolve<IPassiveService>());
                 return (ICombatContext)ctx;
             }, typeof(ICombatContext));
 

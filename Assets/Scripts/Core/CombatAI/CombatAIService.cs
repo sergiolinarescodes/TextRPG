@@ -5,6 +5,7 @@ using TextRPG.Core.ActionExecution;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Passive;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
@@ -24,6 +25,7 @@ namespace TextRPG.Core.CombatAI
         private readonly IContributorRegistry<AIDecisionContext> _scorers;
         private readonly EnemyWordResolver _enemyResolver;
         private readonly IReadOnlyDictionary<string, EnemyDefinition> _unitRegistry;
+        private readonly IPassiveService _passiveService;
 
         private readonly Dictionary<EntityId, string[]> _summonAbilities = new();
         private readonly Dictionary<EntityId, EntityId> _summonOwners = new();
@@ -32,7 +34,8 @@ namespace TextRPG.Core.CombatAI
             IEntityStatsService entityStats, ITurnService turnService, ICombatSlotService slotService,
             ICombatContext combatContext, IActionExecutionService actionExecution,
             IContributorRegistry<AIDecisionContext> scorers, EnemyWordResolver enemyResolver,
-            IReadOnlyDictionary<string, EnemyDefinition> unitRegistry = null)
+            IReadOnlyDictionary<string, EnemyDefinition> unitRegistry = null,
+            IPassiveService passiveService = null)
             : base(eventBus)
         {
             _encounterService = encounterService;
@@ -44,6 +47,7 @@ namespace TextRPG.Core.CombatAI
             _scorers = scorers;
             _enemyResolver = enemyResolver;
             _unitRegistry = unitRegistry;
+            _passiveService = passiveService;
 
             if (!_enemyResolver.HasWord("scratch"))
                 _enemyResolver.RegisterWord("scratch",
@@ -215,8 +219,11 @@ namespace TextRPG.Core.CombatAI
         {
             if (friendly)
             {
-                // Friendly summon targets enemies
+                // Friendly summon targets enemies — check taunt first
                 var enemies = _encounterService.EnemyEntities;
+                var taunt = FindTauntEntity(enemies);
+                if (!taunt.Equals(default(EntityId))) return taunt;
+
                 for (int i = 0; i < enemies.Count; i++)
                 {
                     if (_entityStats.HasEntity(enemies[i]) && _entityStats.GetCurrentHealth(enemies[i]) > 0)
@@ -225,7 +232,11 @@ namespace TextRPG.Core.CombatAI
             }
             else
             {
-                // Enemy targets player or player summons
+                // Enemy targets player or player summons — check taunt first
+                var opponents = BuildOpponents(entityId, friendly);
+                var taunt = FindTauntEntity(opponents);
+                if (!taunt.Equals(default(EntityId))) return taunt;
+
                 var player = _encounterService.PlayerEntity;
                 if (_entityStats.HasEntity(player) && _entityStats.GetCurrentHealth(player) > 0)
                     return player;
@@ -236,6 +247,20 @@ namespace TextRPG.Core.CombatAI
                         && _entityStats.GetCurrentHealth(kv.Key) > 0)
                         return kv.Key;
                 }
+            }
+            return default;
+        }
+
+        private EntityId FindTauntEntity(IReadOnlyList<EntityId> candidates)
+        {
+            if (_passiveService == null) return default;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var entity = candidates[i];
+                if (!_entityStats.HasEntity(entity) || _entityStats.GetCurrentHealth(entity) <= 0)
+                    continue;
+                if (_passiveService.HasTaunt(entity))
+                    return entity;
             }
             return default;
         }

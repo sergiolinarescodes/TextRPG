@@ -23,6 +23,7 @@ namespace TextRPG.Core.CombatLoop
         private bool _isPlayerTurn;
         private bool _gameOver;
         private bool _pendingTurnAdvance;
+        private bool _advancing;
 
         public bool IsPlayerTurn => _isPlayerTurn;
         public bool IsGameOver => _gameOver;
@@ -114,21 +115,39 @@ namespace TextRPG.Core.CombatLoop
         private void AdvanceToNextTurn()
         {
             if (_gameOver) return;
+            if (_advancing) return;
+            _advancing = true;
 
-            _turnService.EndTurn();
-            _turnService.BeginTurn();
-            var current = _turnService.CurrentEntity;
-
-            if (current.Equals(_playerId))
+            try
             {
-                _isPlayerTurn = true;
-                _pendingTurnAdvance = false;
-                Publish(new PlayerTurnStartedEvent(_turnService.CurrentTurnNumber, _turnService.CurrentRoundNumber));
-                return;
-            }
+                do
+                {
+                    _turnService.EndTurn();
+                    _pendingTurnAdvance = true;
+                    _turnService.BeginTurn();
+                    var current = _turnService.CurrentEntity;
 
-            Debug.Log($"[CombatLoop] {current.Value} turn processing");
-            _pendingTurnAdvance = true;
+                    if (current.Equals(_playerId))
+                    {
+                        _isPlayerTurn = true;
+                        _pendingTurnAdvance = false;
+                        Publish(new PlayerTurnStartedEvent(_turnService.CurrentTurnNumber, _turnService.CurrentRoundNumber));
+                        return;
+                    }
+
+                    if (_entityStats.GetCurrentHealth(current) <= 0)
+                    {
+                        _pendingTurnAdvance = false;
+                        continue;
+                    }
+
+                    Debug.Log($"[CombatLoop] {current.Value} turn processing");
+                } while (!_pendingTurnAdvance);
+            }
+            finally
+            {
+                _advancing = false;
+            }
         }
 
         private void OnAnimationCompleted()

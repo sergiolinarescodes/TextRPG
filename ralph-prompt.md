@@ -58,6 +58,29 @@ Output JSON array:
         ]
     },
     {
+        "word": "library",
+        "target": "Self",
+        "cost": 3,
+        "range": 0,
+        "area": "Single",
+        "tags": ["SUPPORT", "ARCANE"],
+        "actions": [{"action": "Summon", "value": 3}],
+        "unit": {
+            "display_name": "LIBRARY",
+            "unit_type": "structure",
+            "max_health": 20,
+            "strength": 0, "magic_power": 5,
+            "phys_defense": 3, "magic_defense": 5,
+            "luck": 0, "starting_shield": 0,
+            "color": [0.6, 0.5, 0.3],
+            "actions": [],
+            "passives": [
+                {"trigger": "on_word_length", "trigger_param": "6", "effect": "heal", "value": 2, "target": "AllAllies"},
+                {"trigger": "on_word_length", "trigger_param": "8", "effect": "shield", "value": 1, "target": "AllAllies"}
+            ]
+        }
+    },
+    {
         "word": "the",
         "target": "SingleEnemy",
         "cost": 0,
@@ -124,7 +147,180 @@ python Tools/WordAction/stats.py
 | `Reflect` | Apply Reflecting — redirects single-target abilities back to caster (Value = stacks) |
 | `Hardening` | Apply Hardening — flat damage reduction that decays each turn (Value = stacks) |
 | `Shield` | Apply shield (Value = amount) |
+| `Item` | Equippable item — goes to player inventory. Value = durability (0 = infinite). Requires an `"item"` field with type, stats, and optional passives. Weapon-type items use `assoc_word` to link ammo words. |
 | `Time` | Time manipulation (Value = intensity) |
+
+---
+
+## UNIT PASSIVES (for Summon words)
+
+Units summoned via `Summon` action can have composable passives. When classifying a summon word, include a `"unit"` field with stats, abilities, and passives. The `unit_id` is the word itself (lowercase).
+
+### Unit JSON format
+
+```json
+"unit": {
+    "display_name": "LIBRARY",
+    "unit_type": "structure",
+    "max_health": 20,
+    "strength": 0, "magic_power": 5,
+    "phys_defense": 3, "magic_defense": 5,
+    "luck": 0, "starting_shield": 0,
+    "color": [0.6, 0.5, 0.3],
+    "actions": ["scratch", "charge"],
+    "passives": [
+        {"trigger": "on_word_length", "trigger_param": "6", "effect": "heal", "value": 2, "target": "AllAllies"},
+        {"trigger": "taunt"}
+    ]
+}
+```
+
+- `unit_type`: `"enemy"` (has abilities, fights) or `"structure"` (few/no abilities, passive effects)
+- `actions`: array of word strings the unit can use in combat (e.g. `["scratch", "charge"]`). These must be words that exist in the DB with their own `word_actions` entries
+- `passives`: array of passive objects (trigger + effect + target)
+- `color`: `[r, g, b]` floats 0.0-1.0 (display color)
+- Stats: `max_health` 5-100, others 0-15, `starting_shield` 0-20
+- `taunt` passive: `{"trigger": "taunt"}` — no effect/target/value needed (marker only, forces enemy targeting)
+
+### Available triggers
+
+| Trigger | trigger_param | When it fires |
+|---------|--------------|---------------|
+| `on_ally_hit` | — | When any ally takes damage |
+| `on_self_hit` | — | When this unit takes damage |
+| `on_round_end` | — | At end of each combat round |
+| `on_round_start` | — | At start of each combat round |
+| `on_turn_start` | — | At start of each turn |
+| `on_turn_end` | — | At end of each turn |
+| `on_word_played` | — | When any word is played |
+| `on_word_length` | min length (e.g. `"6"`) | When a played word has >= N letters |
+| `on_word_tag` | tag (e.g. `"NATURE"`) | When a played word has the specified tag |
+| `on_kill` | — | When any enemy is killed |
+| `taunt` | — | Marker: forces enemies to target this unit (no effect/target needed) |
+
+### Available effects
+
+| Effect | effect_param | What it does |
+|--------|-------------|--------------|
+| `heal` | — | Heal targets by `value` HP |
+| `damage` | — | Deal `value` damage to targets |
+| `shield` | — | Grant `value` shield to targets |
+| `mana` | — | Restore `value` mana to targets |
+| `apply_status` | status name (e.g. `"Burning"`) | Apply status effect to targets for `value` duration |
+
+Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`
+
+### Available passive targets
+
+| Target | Resolves to |
+|--------|------------|
+| `Self` | The unit itself |
+| `AllAllies` | All friendly units (including player) |
+| `AllEnemies` | All enemy units |
+| `Injured` | The ally that was damaged (for hit triggers) |
+| `Attacker` | The entity that dealt damage (for hit triggers) |
+
+### Passive design archetypes
+
+| Word Theme | unit_type | Trigger | Effect | Target | Examples |
+|---|---|---|---|---|---|
+| Walls/Forts | structure | on_ally_hit | heal | Injured | fortress, bastion, rampart |
+| Healing totems | structure | on_round_end | heal | AllAllies | totem, shrine, obelisk |
+| Attack structures | structure | on_ally_hit | damage | Attacker | turret, cannon, sentry |
+| Knowledge | structure | on_word_length 6+ | heal/shield | AllAllies | library, academy, archive |
+| Nature synergy | structure | on_word_tag NATURE | heal | AllAllies | grove, garden, glade |
+| Aura emitters | structure | on_round_start | apply_status | AllEnemies | pyre, beacon, brazier |
+| Mana sources | structure | on_word_played | mana | Self | fountain, nexus, leyline |
+| Shield givers | structure | on_ally_hit | shield | Injured | sentinel, aegis, ward |
+| Taunt tanks | structure | taunt | — | — | sentinel, guardian, decoy |
+| Kill-reward | enemy | on_kill | heal | Self | predator, hunter, reaper |
+
+---
+
+## EQUIPPABLE ITEMS (for Item words)
+
+Words with the `Item` action become equippable items. When classifying an item word, include an `"item"` field with type, stats, and optional passives. The `item_id` is the word itself (lowercase).
+
+### Item JSON format
+
+```json
+{
+    "word": "crown",
+    "target": "Self",
+    "cost": 0,
+    "range": 0,
+    "area": "Single",
+    "tags": ["ARCANE", "SUPPORT"],
+    "actions": [{"action": "Item", "value": 0}],
+    "item": {
+        "display_name": "CROWN",
+        "item_type": "head",
+        "durability": 0,
+        "strength": 0, "magic_power": 2,
+        "phys_defense": 0, "magic_defense": 0,
+        "luck": 1, "max_health": 0, "max_mana": 0,
+        "color": [1.0, 0.85, 0.2],
+        "passives": []
+    }
+}
+```
+
+Weapon-type items use `assoc_word` to link ammo words:
+```json
+{
+    "word": "gun",
+    "target": "Self",
+    "cost": 0,
+    "range": 0,
+    "area": "Single",
+    "tags": ["PHYSICAL", "OFFENSIVE"],
+    "actions": [
+        {"action": "Item", "value": 5, "assoc_word": "9mm"},
+        {"action": "Item", "value": 5, "assoc_word": "buckshot"}
+    ],
+    "item": {
+        "display_name": "GUN",
+        "item_type": "weapon",
+        "durability": 5,
+        "strength": 0, "magic_power": 0,
+        "phys_defense": 0, "magic_defense": 0,
+        "luck": 0, "max_health": 0, "max_mana": 0,
+        "color": [0.5, 0.5, 0.5],
+        "passives": []
+    }
+}
+```
+
+### Item types and equipment slots
+
+| item_type | Slot | Behavior |
+|-----------|------|----------|
+| `head` | HEAD | Passive stats only |
+| `wear` | WEAR | Passive stats only |
+| `accessory` | ACCESSORY | Passive stats only |
+| `trinket` | TRINKET | Stats + optional passives |
+| `weapon` | WEAPON | Stats + ammo via `assoc_word`, durability |
+
+### Item design archetypes
+
+| Word Theme | item_type | Stats Focus | Passives | Examples |
+|---|---|---|---|---|
+| Crowns/Helms | head | magic_power, luck, phys_defense | on_self_hit: shield | crown, helm, tiara, hood |
+| Armor/Cloaks | wear | phys_defense, magic_defense | — | cloak, robe, armor, vest |
+| Rings/Bands | accessory | strength, luck | — | ring, band, bracelet, charm |
+| Amulets/Pendants | trinket | magic_power | on_word_played: mana | amulet, pendant, talisman, locket |
+| Swords/Axes | weapon | strength | — | sword, axe, spear, dagger |
+| Staves/Wands | weapon | magic_power | on_word_tag: damage | staff, wand, scepter, rod |
+| Guns/Bows | weapon | — | — | gun, bow, crossbow, cannon |
+
+### Item rules
+- Item stats: 0-5 per stat, total stat budget roughly 2-5 depending on item rarity
+- Item cost is always 0 (equipping is free — item goes to inventory first)
+- Weapon durability: 3-10 (0 = infinite, avoid infinite for weapons)
+- Non-weapon durability: 0 (equipment doesn't break)
+- Item passives use the same trigger/effect/target system as unit passives
+- Items should be ~2-3% of game words
+- Item word target is always `Self`
 
 ---
 
@@ -163,6 +359,18 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 
 ---
 
+## DESIGN AWARENESS
+
+When classifying words, consider the FULL ecosystem of word relationships:
+- **Actions**: direct combat effects (Damage, Heal, Burn, etc.)
+- **Summons**: spawning units with their own abilities and composable passives
+- **Items**: equippable gear that grants stats and/or passives (5 slots: head, wear, accessory, trinket, weapon)
+- **Tags**: categories for passive triggers and thematic grouping
+
+Each word should contribute to ONE of these roles. Don't make every word a simple damage dealer.
+
+---
+
 ## CLASSIFICATION GUIDELINES
 
 - **Word meaning drives effects**: "avalanche" → Damage + Push + Water; "whisper" → Fear; "fortress" → Heal + Shield (Self)
@@ -180,7 +388,35 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
   {"word": "barrage", "actions": [{"action": "Damage", "value": 2}, {"action": "Damage", "value": 2}]}
   ```
 - **Structure words**: Defensive/building words ("fortress", "barricade", "wall", "totem", "bunker") → `Summon` action, target `Self`, tags `DEFENSIVE`/`SUPPORT`. Offensive structure words ("turret", "cannon", "sentry") → `Summon` action, target `Self`, tags `OFFENSIVE`/`PHYSICAL`. These are units with high HP, passives, and few/no active attacks — the passive system handles their effects automatically.
+- **Item/equipment words**: Nouns that are wearable/holdable gear → `Item` action, target `Self`, cost `0`. Include `"item"` field with `item_type`, stats, and optional passives. Weapons have ammo via `assoc_word`. Examples: "crown" → head, "cloak" → wear, "ring" → accessory, "amulet" → trinket, "sword" → weapon.
 - **Balance tags**: ensure good coverage across all categories
+
+---
+
+## DIVERSITY RULES
+
+Before each batch: run `stats.py` and review action distribution.
+
+- Don't assign the same action combination to more than ~5% of game words
+- Mix targeting types — if recent batches are >60% SingleEnemy, use more AllEnemies, RandomEnemy, etc.
+- Vary tag combinations — don't always pair OFFENSIVE+PHYSICAL
+- Summon words should be ~2-3% of game words
+- **Summon unit diversity**: vary passive triggers — don't make every structure `on_ally_hit`
+- At least 20% of summons should use parameterized triggers (`on_word_length`, `on_word_tag`, `apply_status`)
+- Structures: 0-1 unit actions, 1-3 passives. Enemies: 1-2 unit actions, 0-1 passive.
+- Words can (and should) have multiple tags — e.g. "grove" → `["NATURE", "RESTORATION"]`. Tags enable `on_word_tag` passives to fire, so diverse tagging creates richer synergies.
+
+### After 5000+ words
+Run `stats.py` and check for:
+- Actions used by <1% of words → create more words using those actions
+- Tags with <3% coverage → assign those tags to appropriate words
+- Summon words all with same unit type → create more diverse unit types
+- If any stat buff/debuff has <2% usage, intentionally add words using it
+
+### Similarity prevention
+- Don't create words with identical action+value+target as existing words
+- If a word has the same meaning as an existing word (synonym), vary the action values or add different secondary effects
+- Check recent 3 batches for patterns — if you've been assigning too much Damage, shift to other effects
 
 ---
 
@@ -193,3 +429,6 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 - Cost must be 0-10
 - Range 0 = unlimited
 - Each iteration processes one batch (~150 words)
+- Summon words MUST have cost >= 1 (enforced by batch_insert.py). Summoning always costs mana.
+- Item words (equipping) have cost 0 — equipping an item is free. Use `Item` action (not `Weapon`).
+- Weapon-type items use `assoc_word` on the action to link ammo words.

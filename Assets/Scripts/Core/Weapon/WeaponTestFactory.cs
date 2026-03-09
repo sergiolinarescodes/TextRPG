@@ -85,9 +85,15 @@ namespace TextRPG.Core.Weapon
             };
             var ammoResolver = new WordResolver(ammoMappings, ammoMeta);
 
+            var ammoWordsByItem = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["gun"] = new List<string> { "9mm", "buckshot" },
+                ["sword"] = new List<string> { "slash", "stab" },
+            };
+
             var tagResolver = new WordTagResolver(new Dictionary<string, List<string>>());
             var resolver = new WordResolver(mappings, meta);
-            return new WordActionData(resolver, registry, tagResolver, ammoWordSet, ammoResolver);
+            return new WordActionData(resolver, registry, tagResolver, ammoWordSet, ammoResolver, ammoWordsByItem);
         }
 
         internal static IWeaponRegistry CreateTestWeaponRegistry(WordActionData data)
