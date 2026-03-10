@@ -117,7 +117,8 @@ namespace TextRPG.Core.Equipment
                 "weapon" => EquipmentSlotType.Weapon,
                 "head" => EquipmentSlotType.Head,
                 "wear" => EquipmentSlotType.Wear,
-                "trinket" => EquipmentSlotType.Trinket,
+                "consumable" => EquipmentSlotType.Consumable,
+                "trinket" => EquipmentSlotType.Consumable,
                 "accessory" => EquipmentSlotType.Accessory,
                 _ => EquipmentSlotType.Accessory,
             };

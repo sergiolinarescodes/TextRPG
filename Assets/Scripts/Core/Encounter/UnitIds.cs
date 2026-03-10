@@ -8,7 +8,7 @@ namespace TextRPG.Core.Encounter
         public static class Enemies
         {
             public const string BAT = "bat";
-            public static readonly EnemyDefinition BAT_DEF = new(
+            public static readonly EntityDefinition BAT_DEF = new(
                 Name: "BAT",
                 MaxHealth: 30,
                 Strength: 4,
@@ -19,7 +19,7 @@ namespace TextRPG.Core.Encounter
                 Color: new Color(0.6f, 0.3f, 0.8f),
                 Abilities: new[] { "SCRATCH" });
             public const string GOBLIN = "goblin";
-            public static readonly EnemyDefinition GOBLIN_DEF = new(
+            public static readonly EntityDefinition GOBLIN_DEF = new(
                 Name: "GOBLIN",
                 MaxHealth: 50,
                 Strength: 6,
@@ -30,7 +30,7 @@ namespace TextRPG.Core.Encounter
                 Color: new Color(0.2f, 0.8f, 0.2f),
                 Abilities: new[] { "SCRATCH", "HIT" });
             public const string ORC = "orc";
-            public static readonly EnemyDefinition ORC_DEF = new(
+            public static readonly EntityDefinition ORC_DEF = new(
                 Name: "ORC",
                 MaxHealth: 20,
                 Strength: 8,
@@ -41,7 +41,7 @@ namespace TextRPG.Core.Encounter
                 Color: new Color(0f, 1f, 0f),
                 Abilities: new[] { "SHOUT", "MACE" });
             public const string SKELETON = "skeleton";
-            public static readonly EnemyDefinition SKELETON_DEF = new(
+            public static readonly EntityDefinition SKELETON_DEF = new(
                 Name: "SKELETON",
                 MaxHealth: 50,
                 Strength: 8,

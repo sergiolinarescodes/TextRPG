@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEntityStatsService _entityStats;
 
-        public string ActionId => "Shield";
+        public string ActionId => ActionNames.Shield;
 
         public ShieldActionHandler(IActionHandlerContext ctx)
         {
@@ -15,8 +15,10 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
+            var sourcePhysDef = _entityStats.GetStat(context.Source, StatType.PhysicalDefense);
+            var shieldAmount = StatScaling.SupportScale(context.Value, sourcePhysDef);
             for (int i = 0; i < context.Targets.Count; i++)
-                _entityStats.ApplyShield(context.Targets[i], context.Value);
+                _entityStats.ApplyShield(context.Targets[i], shieldAmount);
         }
     }
 }

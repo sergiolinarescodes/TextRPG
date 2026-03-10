@@ -87,6 +87,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             RebuildAll(); RunThornsGroup();
             RebuildAll(); RunReflectGroup();
             RebuildAll(); RunHardeningGroup();
+            RebuildAll(); RunMagicDamageGroup();
 
             BuildUI();
         }
@@ -172,16 +173,23 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private int HP(EntityId id) => _entityStats.GetCurrentHealth(id);
         private int Stat(EntityId id, StatType stat) => _entityStats.GetStat(id, stat);
 
+        private static int ExpDmg(int baseVal, int str, int pdef) => StatScaling.OffensiveScale(baseVal, str, pdef);
+        private static int ExpMagicDmg(int baseVal, int magic, int mdef) => StatScaling.OffensiveScale(baseVal, magic, mdef);
+        private static int ExpHeal(int baseVal, int magic) => StatScaling.SupportScale(baseVal, magic);
+        private static int ExpShield(int baseVal, int pdef) => StatScaling.SupportScale(baseVal, pdef);
+        private static int ExpShock(int baseVal, int magic, int mdef, double mult = 1.0) => Math.Max(1, (int)(StatScaling.SupportScale(baseVal, magic) * mult) - mdef / 3);
+        private static int ExpConc(int baseVal, int magic) => StatScaling.SupportScale(baseVal, magic, StatScaling.WeakDivisor);
+
         // ── Group 1: Damage ──────────────────────────────────────────
 
         private void RunDamageGroup()
         {
-            // Damage(3) → SingleEnemy → enemy_a: Max(1, 3*12/4) = 9
+            // Damage(3) → SingleEnemy → enemy_a: ExpDmg(3, 12, 4) = Max(1, 3+4-1) = 6
             _resolver.RegisterWord("test_dmg_single",
                 new List<WordActionMapping> { new("Damage", 3) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_dmg_single");
-            int expected = Math.Max(1, 3 * 12 / Math.Max(1, 4));
+            int expected = ExpDmg(3, 12, 4);
             Check("Damage single: correct HP reduction",
                 HP(_enemyA) == 80 - expected,
                 $"Expected HP={80 - expected}, got {HP(_enemyA)}");
@@ -193,10 +201,10 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 2) },
                 new WordMeta("AreaEnemies", 0, 0, AreaShape.Single));
             Exec("test_dmg_all");
-            int dA = Math.Max(1, 2 * 12 / 4); // 6
-            int dB = Math.Max(1, 2 * 12 / 3); // 8
-            int dC = Math.Max(1, 2 * 12 / 6); // 4
-            int dD = Math.Max(1, 2 * 12 / 2); // 12
+            int dA = ExpDmg(2, 12, 4); // 5
+            int dB = ExpDmg(2, 12, 3); // 5
+            int dC = ExpDmg(2, 12, 6); // 4
+            int dD = ExpDmg(2, 12, 2); // 6
             bool allOk = HP(_enemyA) == 80 - dA && HP(_enemyB) == 60 - dB &&
                          HP(_enemyC) == 100 - dC && HP(_enemyD) == 40 - dD;
             Check("Damage all enemies: correct HP reductions",
@@ -224,15 +232,16 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
         private void RunHealGroup()
         {
-            // Pre-damage hero 20, Heal(5) → Self → HP=85
+            // Pre-damage hero 20, Heal(5) → Self → ExpHeal(5,8) = 7, HP=80+7=87
             _entityStats.ApplyDamage(_hero, 20);
             _resolver.RegisterWord("test_heal",
                 new List<WordActionMapping> { new("Heal", 5) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_heal");
+            int healAmt = ExpHeal(5, 8); // 7
             Check("Heal self: correct HP restoration",
-                HP(_hero) == 85,
-                $"Expected HP=85, got {HP(_hero)}");
+                HP(_hero) == 80 + healAmt,
+                $"Expected HP={80 + healAmt}, got {HP(_hero)}");
 
             SoftReset();
 
@@ -248,15 +257,17 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             SoftReset();
 
             // Pre-damage hero+ally 10, Heal(3) → AllAlliesAndSelf
+            // Hero magic=8: ExpHeal(3,8) = 5
             _entityStats.ApplyDamage(_hero, 10);
             _entityStats.ApplyDamage(_allyA, 10);
             _resolver.RegisterWord("test_heal_allies",
                 new List<WordActionMapping> { new("Heal", 3) },
                 new WordMeta("AllAlliesAndSelf", 0, 0, AreaShape.Single));
             Exec("test_heal_allies");
+            int allyHeal = ExpHeal(3, 8); // 5
             Check("Heal allies+self: both healed",
-                HP(_hero) == 93 && HP(_allyA) == 63,
-                $"Hero HP={HP(_hero)}(exp 93), Ally HP={HP(_allyA)}(exp 63)");
+                HP(_hero) == 90 + allyHeal && HP(_allyA) == 60 + allyHeal,
+                $"Hero HP={HP(_hero)}(exp {90 + allyHeal}), Ally HP={HP(_allyA)}(exp {60 + allyHeal})");
         }
 
         // ── Group 3: Status Effects ──────────────────────────────────
@@ -338,26 +349,28 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
         private void RunShockGroup()
         {
-            // Shock(4) → enemy_a: direct 4 damage (no defense calc)
+            // Shock(4) → enemy_a: ExpShock(4, 8, 3) = Max(1, (4+2)*1 - 1) = 5
             _resolver.RegisterWord("test_shock",
                 new List<WordActionMapping> { new("Shock", 4) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_shock");
-            Check("Shock base: correct damage (no defense calc)",
-                HP(_enemyA) == 76,
-                $"Expected HP=76, got {HP(_enemyA)}");
+            int shockBase = ExpShock(4, 8, 3);
+            Check("Shock base: correct damage",
+                HP(_enemyA) == 80 - shockBase,
+                $"Expected HP={80 - shockBase}, got {HP(_enemyA)}");
 
             SoftReset();
 
-            // Pre-wet enemy_a, Shock(4) → doubled to 8
+            // Pre-wet enemy_a, Shock(4) → doubled: ExpShock(4, 8, 3, 2.0) = Max(1, 12-1) = 11
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Wet, 5, _hero);
             _resolver.RegisterWord("test_shock_wet",
                 new List<WordActionMapping> { new("Shock", 4) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_shock_wet");
+            int shockWet = ExpShock(4, 8, 3, 2.0);
             Check("Shock wet: damage doubled when target is wet",
-                HP(_enemyA) == 72,
-                $"Expected HP=72, got {HP(_enemyA)}");
+                HP(_enemyA) == 80 - shockWet,
+                $"Expected HP={80 - shockWet}, got {HP(_enemyA)}");
 
         }
 
@@ -421,36 +434,38 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private void RunComboGroup()
         {
             // Damage(2)+Burn(3) → SingleEnemy: damage + Burning
-            // damage = Max(1, 2*12/4) = 6
+            // damage = ExpDmg(2, 12, 4) = 5
             _resolver.RegisterWord("test_combo_dmg_burn",
                 new List<WordActionMapping> { new("Damage", 2), new("Burn", 3) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_combo_dmg_burn");
-            int comboDmg = Math.Max(1, 2 * 12 / 4);
+            int comboDmg = ExpDmg(2, 12, 4);
             Check("Combo damage+burn: damage dealt and Burning applied",
                 HP(_enemyA) == 80 - comboDmg && _statusEffects.HasEffect(_enemyA, StatusEffectType.Burning),
                 $"HP={HP(_enemyA)}(exp {80 - comboDmg}), Burning={_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning)}");
 
             SoftReset();
 
-            // Water(4)+Shock(3) → SingleEnemy: wet first, shock doubled → 6
+            // Water(4)+Shock(3) → SingleEnemy: wet first, shock doubled
+            // ExpShock(3, 8, 3, 2.0) = Max(1, (int)((3+2)*2.0) - 1) = Max(1, 10-1) = 9
             _resolver.RegisterWord("test_combo_wet_shock",
                 new List<WordActionMapping> { new("Water", 4), new("Shock", 3) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_combo_wet_shock");
+            int comboShock = ExpShock(3, 8, 3, 2.0);
             Check("Combo wet+shock: shock damage doubled by wet",
-                HP(_enemyA) == 74,
-                $"Expected HP=74, got {HP(_enemyA)}");
+                HP(_enemyA) == 80 - comboShock,
+                $"Expected HP={80 - comboShock}, got {HP(_enemyA)}");
 
             SoftReset();
 
             // Damage(1)+Stun(2)+Fear(3) → SingleEnemy: damage + Stun + Fear
-            // damage = Max(1, 1*12/4) = 3
+            // damage = ExpDmg(1, 12, 4) = Max(1, 1+4-1) = 4
             _resolver.RegisterWord("test_combo_triple",
                 new List<WordActionMapping> { new("Damage", 1), new("Stun", 2), new("Fear", 3) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_combo_triple");
-            int tripleDmg = Math.Max(1, 1 * 12 / 4);
+            int tripleDmg = ExpDmg(1, 12, 4);
             bool tripleOk = HP(_enemyA) == 80 - tripleDmg &&
                             _statusEffects.HasEffect(_enemyA, StatusEffectType.Stun) &&
                             _statusEffects.HasEffect(_enemyA, StatusEffectType.Fear);
@@ -469,7 +484,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_combo_mixed");
-            int mixedDmg = Math.Max(1, 2 * 12 / 4);
+            int mixedDmg = ExpDmg(2, 12, 4);
             Check("Combo mixed targets: enemy damaged + hero buffed",
                 HP(_enemyA) == 80 - mixedDmg && Stat(_hero, StatType.Strength) == 15,
                 $"Enemy HP={HP(_enemyA)}(exp {80 - mixedDmg}), Hero str={Stat(_hero, StatType.Strength)}(exp 15)");
@@ -497,7 +512,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("LowestHealthEnemy", 0, 0, AreaShape.Single));
             Exec("test_lowest_hp");
-            int lowestDmg = Math.Max(1, 1 * 12 / 2); // 6, enemy_d pDef=2
+            int lowestDmg = ExpDmg(1, 12, 2); // enemy_d pDef=2
             bool othersOk = HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyC) == 100;
             Check("Target lowest HP: only lowest-HP enemy hit",
                 HP(_enemyD) == 40 - lowestDmg && othersOk,
@@ -512,8 +527,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("AllEnemies+Burning", 0, 0, AreaShape.Single));
             Exec("test_burning");
-            int bDmgA = Math.Max(1, 1 * 12 / 4); // 3
-            int bDmgC = Math.Max(1, 1 * 12 / 6); // 2
+            int bDmgA = ExpDmg(1, 12, 4);
+            int bDmgC = ExpDmg(1, 12, 6);
             bool burningOk = HP(_enemyA) == 80 - bDmgA && HP(_enemyC) == 100 - bDmgC &&
                              HP(_enemyB) == 60 && HP(_enemyD) == 40;
             Check("Target burning enemies: only burning enemies hit",
@@ -527,7 +542,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("Melee", 0, 0, AreaShape.Single));
             Exec("test_melee");
-            int mDmgA = Math.Max(1, 1 * 12 / 4); // 3
+            int mDmgA = ExpDmg(1, 12, 4);
             bool meleeOk = HP(_enemyA) == 80 - mDmgA && HP(_enemyB) == 60 &&
                            HP(_enemyC) == 100 && HP(_enemyD) == 40;
             Check("Target melee: hits front slot enemy only",
@@ -651,7 +666,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private void RunDebuffDamageGroup()
         {
             // DebuffPhysicalDefense(2) on enemy_a: pDef 4→2
-            // Then Damage(2): Max(1, 2*12/2) = 12 vs normal Max(1, 2*12/4) = 6
+            // Then Damage(2): ExpDmg(2, 12, 2) = Max(1, 2+4-0) = 6
             _resolver.RegisterWord("test_debuff_then_dmg_debuff",
                 new List<WordActionMapping> { new("DebuffPhysicalDefense", 2) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
@@ -664,7 +679,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 2) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_debuff_then_dmg_hit");
-            int amplifiedDmg = Math.Max(1, 2 * 12 / 2); // 12
+            int amplifiedDmg = ExpDmg(2, 12, 2);
             Check("Debuff then Damage: amplified damage dealt",
                 HP(_enemyA) == 80 - amplifiedDmg,
                 $"HP={HP(_enemyA)}(exp {80 - amplifiedDmg})");
@@ -703,10 +718,11 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1), new("Heal", 1, Target: "Self") },
                 new WordMeta("SingleEnemy", 2, 0, AreaShape.Single));
             Exec("test_mana_combo");
-            int comboDmg = Math.Max(1, 1 * 12 / 4); // 3
+            int comboDmg = ExpDmg(1, 12, 4);
+            int comboHeal = ExpHeal(1, 8);
             Check("Mana combo: cost deducted, both actions execute",
-                Mana(_hero) == 3 && HP(_enemyA) < 80 && HP(_hero) == 91,
-                $"Mana={Mana(_hero)}(exp 3), EnemyA HP={HP(_enemyA)}(exp {80 - comboDmg}), Hero HP={HP(_hero)}(exp 91)");
+                Mana(_hero) == 3 && HP(_enemyA) < 80 && HP(_hero) == 90 + comboHeal,
+                $"Mana={Mana(_hero)}(exp 3), EnemyA HP={HP(_enemyA)}(exp {80 - comboDmg}), Hero HP={HP(_hero)}(exp {90 + comboHeal})");
 
             SoftReset();
 
@@ -726,9 +742,10 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new WordMeta("Self", 3, 0, AreaShape.Single));
             _entityStats.ApplyDamage(_hero, 10);
             Exec("test_expensive_after");
+            int expAfterHeal = ExpHeal(1, 8);
             Check("Expensive word after Thinking: succeeds with mana",
-                Mana(_hero) == 2 && HP(_hero) == 91,
-                $"Mana={Mana(_hero)}(exp 2), HP={HP(_hero)}(exp 91)");
+                Mana(_hero) == 2 && HP(_hero) == 90 + expAfterHeal,
+                $"Mana={Mana(_hero)}(exp 2), HP={HP(_hero)}(exp {90 + expAfterHeal})");
         }
 
         // ── Group 17: Death Edge Cases ──────────────────────────────
@@ -749,7 +766,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
             SoftReset();
 
-            // Heal after near-death: take 95 damage (HP=5), then heal 10 → HP=15
+            // Heal after near-death: take 95 damage (HP=5), then heal 10
+            // ExpHeal(10, 8) = 12, so HP=5+12=17
             _entityStats.ApplyDamage(_hero, 95);
             Check("Near-death setup: hero at 5 HP",
                 HP(_hero) == 5,
@@ -759,9 +777,10 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Heal", 10) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_heal_near_death");
+            int nearDeathHeal = ExpHeal(10, 8);
             Check("Heal after near-death: HP correctly restored",
-                HP(_hero) == 15,
-                $"HP={HP(_hero)}(exp 15)");
+                HP(_hero) == 5 + nearDeathHeal,
+                $"HP={HP(_hero)}(exp {5 + nearDeathHeal})");
         }
 
         // ── Group 18: Poisoned DoT & Stacking ───────────────────────
@@ -973,7 +992,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
         private void RunDamageUnderModifiersGroup()
         {
-            // BuffStrength on hero then Damage: str 12→15, Damage(2) → Max(1,2*15/4)=7
+            // BuffStrength on hero then Damage: str 12→15, Damage(2) → ExpDmg(2, 15, 4)
             _resolver.RegisterWord("test_buff_then_dmg_buff",
                 new List<WordActionMapping> { new("BuffStrength", 3) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
@@ -982,16 +1001,17 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 2) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_buff_then_dmg_hit");
+            int buffDmg = ExpDmg(2, 15, 4);
             Check("Buff then Damage: increased damage",
-                HP(_enemyA) == 73,
-                $"HP={HP(_enemyA)}(exp 73)");
+                HP(_enemyA) == 80 - buffDmg,
+                $"HP={HP(_enemyA)}(exp {80 - buffDmg})");
 
             SoftReset();
 
             // Damage against Shielded-status target: pDef 4+5=9
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Shielded, 5, _hero);
-            int sStr = Stat(_hero, StatType.Strength);
-            int sDmg = Math.Max(1, 2 * sStr / 9);
+            int sPdef = Stat(_enemyA, StatType.PhysicalDefense); // 9
+            int sDmg = ExpDmg(2, 12, sPdef);
             _resolver.RegisterWord("test_dmg_vs_shielded",
                 new List<WordActionMapping> { new("Damage", 2) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
@@ -1004,8 +1024,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
             // Damage against Feared target: pDef 4-1=3
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Fear, 3, _hero);
-            int fStr = Stat(_hero, StatType.Strength);
-            int fDmg = Math.Max(1, 2 * fStr / 3);
+            int fPdef = Stat(_enemyA, StatType.PhysicalDefense); // 3
+            int fDmg = ExpDmg(2, 12, fPdef);
             _resolver.RegisterWord("test_dmg_vs_fear",
                 new List<WordActionMapping> { new("Damage", 2) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
@@ -1032,22 +1052,26 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private void RunShieldAdvancedGroup()
         {
             // Shield handler on SingleEnemy: enemy gets shield
+            // Source is hero (pDef=5), ExpShield(5, 5) = 6
             _resolver.RegisterWord("test_shield_enemy",
                 new List<WordActionMapping> { new("Shield", 5) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_shield_enemy");
-            Check("Shield on enemy: enemy_a gets 5 shield",
-                Shield(_enemyA) == 5,
-                $"Shield={Shield(_enemyA)}(exp 5)");
+            int shieldEnemy = ExpShield(5, 5);
+            Check("Shield on enemy: enemy_a gets scaled shield",
+                Shield(_enemyA) == shieldEnemy,
+                $"Shield={Shield(_enemyA)}(exp {shieldEnemy})");
 
             // Shield on AllAlliesAndSelf: hero + ally both get shield
+            // ExpShield(3, 5) = 4
             _resolver.RegisterWord("test_shield_allies",
                 new List<WordActionMapping> { new("Shield", 3) },
                 new WordMeta("AllAlliesAndSelf", 0, 0, AreaShape.Single));
             Exec("test_shield_allies");
+            int shieldAllies = ExpShield(3, 5);
             Check("Shield AllAlliesAndSelf: hero and ally both shielded",
-                Shield(_hero) == 3 && Shield(_allyA) == 3,
-                $"Hero shield={Shield(_hero)}(exp 3), Ally shield={Shield(_allyA)}(exp 3)");
+                Shield(_hero) == shieldAllies && Shield(_allyA) == shieldAllies,
+                $"Hero shield={Shield(_hero)}(exp {shieldAllies}), Ally shield={Shield(_allyA)}(exp {shieldAllies})");
 
             // Shield drain across multiple hits
             _entityStats.ApplyDamage(_hero, 100); // eat hero shield + HP to reset
@@ -1073,41 +1097,46 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private void RunHealEdgeCaseGroup()
         {
             // Heal poisoned entity: HP restored, poison still active
+            // ExpHeal(10, 8) = 12, halved by poison: Max(1, 12/2) = 6
             _entityStats.ApplyDamage(_enemyA, 20);
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 3, _hero);
             _resolver.RegisterWord("test_heal_poisoned",
                 new List<WordActionMapping> { new("Heal", 10) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_heal_poisoned");
-            // HealActionHandler halves healing on poisoned targets: Max(1, 10/2) = 5
+            int poisonedHeal = Math.Max(1, ExpHeal(10, 8) / 2);
             Check("Heal poisoned entity: HP restored (halved by poison), poison persists",
-                HP(_enemyA) == 65 && _statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned),
-                $"HP={HP(_enemyA)}(exp 65), Poisoned={_statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned)}");
+                HP(_enemyA) == 60 + poisonedHeal && _statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned),
+                $"HP={HP(_enemyA)}(exp {60 + poisonedHeal}), Poisoned={_statusEffects.HasEffect(_enemyA, StatusEffectType.Poisoned)}");
 
             SoftReset();
 
             // Heal AllAllies: only ally healed, hero unchanged
+            // ExpHeal(5, 8) = 7
             _entityStats.ApplyDamage(_hero, 20);
             _entityStats.ApplyDamage(_allyA, 20);
             _resolver.RegisterWord("test_heal_all_allies",
                 new List<WordActionMapping> { new("Heal", 5) },
                 new WordMeta("AllAllies", 0, 0, AreaShape.Single));
             Exec("test_heal_all_allies");
+            int allyHealAmt = ExpHeal(5, 8);
             Check("Heal AllAllies: only ally healed, hero excluded",
-                HP(_hero) == 80 && HP(_allyA) == 55,
-                $"Hero HP={HP(_hero)}(exp 80), Ally HP={HP(_allyA)}(exp 55)");
+                HP(_hero) == 80 && HP(_allyA) == 50 + allyHealAmt,
+                $"Hero HP={HP(_hero)}(exp 80), Ally HP={HP(_allyA)}(exp {50 + allyHealAmt})");
 
             SoftReset();
 
             // Heal SingleEnemy: heals an enemy
+            // ExpHeal(5, 8) = 7
             _entityStats.ApplyDamage(_enemyA, 20);
             _resolver.RegisterWord("test_heal_enemy",
                 new List<WordActionMapping> { new("Heal", 5) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_heal_enemy");
+            int enemyHealAmt = ExpHeal(5, 8);
             Check("Heal SingleEnemy: enemy HP restored",
-                HP(_enemyA) == 65,
-                $"HP={HP(_enemyA)}(exp 65)");
+                HP(_enemyA) == 60 + enemyHealAmt,
+                $"HP={HP(_enemyA)}(exp {60 + enemyHealAmt})");
 
             SoftReset();
 
@@ -1123,14 +1152,15 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
         private void RunTargetTypeCoverageGroup()
         {
-            // HighestHealthEnemy: enemy_c HP=100
+            // HighestHealthEnemy: enemy_c HP=100, pDef=6
             _resolver.RegisterWord("test_highest_hp",
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("HighestHealthEnemy", 0, 0, AreaShape.Single));
             Exec("test_highest_hp");
+            int highHpDmg = ExpDmg(1, 12, 6);
             Check("Target HighestHealthEnemy: enemy_c (HP=100) hit",
-                HP(_enemyC) == 98 && HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyD) == 40,
-                $"C={HP(_enemyC)}(exp 98), A={HP(_enemyA)}(80), B={HP(_enemyB)}(60), D={HP(_enemyD)}(40)");
+                HP(_enemyC) == 100 - highHpDmg && HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyD) == 40,
+                $"C={HP(_enemyC)}(exp {100 - highHpDmg}), A={HP(_enemyA)}(80), B={HP(_enemyB)}(60), D={HP(_enemyD)}(40)");
 
             SoftReset();
 
@@ -1139,9 +1169,10 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("LowestDefenseEnemy", 0, 0, AreaShape.Single));
             Exec("test_lowest_def");
+            int lowDefDmg = ExpDmg(1, 12, 2);
             Check("Target LowestDefenseEnemy: enemy_d (pDef=2) hit",
-                HP(_enemyD) == 34 && HP(_enemyA) == 80,
-                $"D={HP(_enemyD)}(exp 34), A={HP(_enemyA)}(80)");
+                HP(_enemyD) == 40 - lowDefDmg && HP(_enemyA) == 80,
+                $"D={HP(_enemyD)}(exp {40 - lowDefDmg}), A={HP(_enemyA)}(80)");
 
             SoftReset();
 
@@ -1150,20 +1181,22 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("HighestDefenseEnemy", 0, 0, AreaShape.Single));
             Exec("test_highest_def");
+            int highDefDmg = ExpDmg(1, 12, 6);
             Check("Target HighestDefenseEnemy: enemy_c (pDef=6) hit",
-                HP(_enemyC) == 98 && HP(_enemyA) == 80,
-                $"C={HP(_enemyC)}(exp 98), A={HP(_enemyA)}(80)");
+                HP(_enemyC) == 100 - highDefDmg && HP(_enemyA) == 80,
+                $"C={HP(_enemyC)}(exp {100 - highDefDmg}), A={HP(_enemyA)}(80)");
 
             SoftReset();
 
-            // HighestStrengthEnemy: enemy_c str=10
+            // HighestStrengthEnemy: enemy_c str=10, pDef=6
             _resolver.RegisterWord("test_highest_str",
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("HighestStrengthEnemy", 0, 0, AreaShape.Single));
             Exec("test_highest_str");
+            int highStrDmg = ExpDmg(1, 12, 6);
             Check("Target HighestStrengthEnemy: enemy_c (str=10) hit",
-                HP(_enemyC) == 98 && HP(_enemyA) == 80,
-                $"C={HP(_enemyC)}(exp 98), A={HP(_enemyA)}(80)");
+                HP(_enemyC) == 100 - highStrDmg && HP(_enemyA) == 80,
+                $"C={HP(_enemyC)}(exp {100 - highStrDmg}), A={HP(_enemyA)}(80)");
 
             SoftReset();
 
@@ -1194,39 +1227,44 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             SoftReset();
 
             // AllWetEnemies: wet enemy_b → only enemy_b hit
+            // ExpDmg(1, 12, 3) = Max(1, 1+4-1) = 4
             _statusEffects.ApplyEffect(_enemyB, StatusEffectType.Wet, 3, _hero);
             _resolver.RegisterWord("test_all_wet",
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("AllEnemies+Wet", 0, 0, AreaShape.Single));
             Exec("test_all_wet");
+            int wetDmg = ExpDmg(1, 12, 3);
             Check("Target AllWetEnemies: only wet enemy hit",
-                HP(_enemyB) == 56 && HP(_enemyA) == 80 && HP(_enemyC) == 100 && HP(_enemyD) == 40,
-                $"B={HP(_enemyB)}(exp 56), others unchanged");
+                HP(_enemyB) == 60 - wetDmg && HP(_enemyA) == 80 && HP(_enemyC) == 100 && HP(_enemyD) == 40,
+                $"B={HP(_enemyB)}(exp {60 - wetDmg}), others unchanged");
 
             SoftReset();
 
             // AllStunnedEnemies: stun enemy_d → only enemy_d hit
+            // ExpDmg(1, 12, 2) = 5
             _statusEffects.ApplyEffect(_enemyD, StatusEffectType.Stun, 3, _hero);
             _resolver.RegisterWord("test_all_stunned",
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("AllEnemies+Stun", 0, 0, AreaShape.Single));
             Exec("test_all_stunned");
+            int stunDmg = ExpDmg(1, 12, 2);
             Check("Target AllStunnedEnemies: only stunned enemy hit",
-                HP(_enemyD) == 34 && HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyC) == 100,
-                $"D={HP(_enemyD)}(exp 34), others unchanged");
+                HP(_enemyD) == 40 - stunDmg && HP(_enemyA) == 80 && HP(_enemyB) == 60 && HP(_enemyC) == 100,
+                $"D={HP(_enemyD)}(exp {40 - stunDmg}), others unchanged");
 
             SoftReset();
 
             // AllFearfulEnemies: fear enemy_a → only enemy_a hit
+            // Fear reduces pDef by 1: 4→3. ExpDmg(1, 12, 3) = 4
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Fear, 3, _hero);
             _resolver.RegisterWord("test_all_fear",
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("AllEnemies+Fear", 0, 0, AreaShape.Single));
             Exec("test_all_fear");
-            // Fear reduces pDef by 1: 4→3. Damage(1): Max(1, 12/3)=4
+            int fearDmg = ExpDmg(1, 12, 3); // Fear reduced pDef 4→3
             Check("Target AllFearfulEnemies: only feared enemy hit",
-                HP(_enemyA) == 76 && HP(_enemyB) == 60,
-                $"A={HP(_enemyA)}(exp 76), B={HP(_enemyB)}(60)");
+                HP(_enemyA) == 80 - fearDmg && HP(_enemyB) == 60,
+                $"A={HP(_enemyA)}(exp {80 - fearDmg}), B={HP(_enemyB)}(60)");
 
             SoftReset();
 
@@ -1283,6 +1321,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private void RunAdvancedComboGroup()
         {
             // Heal+Damage: self heal + enemy damage
+            // ExpHeal(5, 8) = 7, ExpDmg(2, 12, 4) = 5
             _entityStats.ApplyDamage(_hero, 20);
             _resolver.RegisterWord("test_combo_heal_dmg",
                 new List<WordActionMapping>
@@ -1292,13 +1331,16 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_combo_heal_dmg");
+            int comboHealAmt = ExpHeal(5, 8);
+            int comboDmgAmt = ExpDmg(2, 12, 4);
             Check("Combo Heal+Damage: hero healed, enemy damaged",
-                HP(_hero) == 85 && HP(_enemyA) == 74,
-                $"Hero HP={HP(_hero)}(exp 85), Enemy HP={HP(_enemyA)}(exp 74)");
+                HP(_hero) == 80 + comboHealAmt && HP(_enemyA) == 80 - comboDmgAmt,
+                $"Hero HP={HP(_hero)}(exp {80 + comboHealAmt}), Enemy HP={HP(_enemyA)}(exp {80 - comboDmgAmt})");
 
             SoftReset();
 
             // Shield+Damage: protect self while attacking
+            // ExpShield(5, 5) = 6, ExpDmg(2, 12, 4) = 5
             _resolver.RegisterWord("test_combo_shield_dmg",
                 new List<WordActionMapping>
                 {
@@ -1307,13 +1349,16 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_combo_shield_dmg");
+            int comboShield = ExpShield(5, 5);
+            int comboShieldDmg = ExpDmg(2, 12, 4);
             Check("Combo Shield+Damage: hero shielded, enemy damaged",
-                Shield(_hero) == 5 && HP(_enemyA) == 74,
-                $"Hero shield={Shield(_hero)}(exp 5), Enemy HP={HP(_enemyA)}(exp 74)");
+                Shield(_hero) == comboShield && HP(_enemyA) == 80 - comboShieldDmg,
+                $"Hero shield={Shield(_hero)}(exp {comboShield}), Enemy HP={HP(_enemyA)}(exp {80 - comboShieldDmg})");
 
             SoftReset();
 
             // Debuff+Damage in one word: debuff applies first, amplified damage
+            // pDef 4→2, Damage: ExpDmg(2, 12, 2) = 6
             _resolver.RegisterWord("test_combo_debuff_dmg",
                 new List<WordActionMapping>
                 {
@@ -1322,10 +1367,10 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_combo_debuff_dmg");
-            // pDef 4→2, Damage: Max(1, 2*12/2)=12
+            int comboDebuffDmg = ExpDmg(2, 12, 2);
             Check("Combo Debuff+Damage: debuff amplifies damage in same word",
-                HP(_enemyA) == 68,
-                $"HP={HP(_enemyA)}(exp 68)");
+                HP(_enemyA) == 80 - comboDebuffDmg,
+                $"HP={HP(_enemyA)}(exp {80 - comboDebuffDmg})");
 
             SoftReset();
 
@@ -1400,11 +1445,11 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 1) },
                 new WordMeta("LowestDefenseEnemy", 0, 0, AreaShape.Single));
             var negStr = Stat(_hero, StatType.Strength);
-            var negDefClamped = Math.Max(1, Stat(_enemyD, StatType.PhysicalDefense));
-            var negDmg = Math.Max(1, 1 * negStr / negDefClamped);
+            var negDef = Stat(_enemyD, StatType.PhysicalDefense); // -8
+            var negDmg = ExpDmg(1, negStr, negDef);
             var expHpNeg = HP(_enemyD) - negDmg;
             Exec("test_dmg_neg_def");
-            Check("Damage vs negative defense: Max(1,def) clamps, massive damage",
+            Check("Damage vs negative defense: increased damage from negative pDef",
                 HP(_enemyD) == expHpNeg,
                 $"HP={HP(_enemyD)}(exp {expHpNeg})");
         }
@@ -1472,24 +1517,26 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Heal", 1) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_zero_cost");
+            int zeroCostHeal = ExpHeal(1, 8);
             Check("Zero cost word: mana unchanged, action executes",
-                Mana(_hero) == manaBefore && HP(_hero) == 96,
-                $"Mana={Mana(_hero)}(exp {manaBefore}), HP={HP(_hero)}(exp 96)");
+                Mana(_hero) == manaBefore && HP(_hero) == 95 + zeroCostHeal,
+                $"Mana={Mana(_hero)}(exp {manaBefore}), HP={HP(_hero)}(exp {95 + zeroCostHeal})");
         }
 
         // ── Group 31: Concentrate ────────────────────────────────────
 
         private void RunConcentrateGroup()
         {
-            // Concentrate(3) → Self → mana restored by 3
+            // Concentrate(3) → Self → mana restored by ExpConc(3, 8) = 4
             _entityStats.TrySpendMana(_hero, 3); // 5→2
             _resolver.RegisterWord("test_concentrate",
                 new List<WordActionMapping> { new("Concentrate", 3) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_concentrate");
+            int concMana = ExpConc(3, 8); // 4
             Check("Concentrate: mana restored",
-                Mana(_hero) == 5,
-                $"Mana={Mana(_hero)}(exp 5)");
+                Mana(_hero) == 2 + concMana,
+                $"Mana={Mana(_hero)}(exp {2 + concMana})");
 
             // Concentrated status applied
             Check("Concentrate: Concentrated effect applied",
@@ -1547,16 +1594,17 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             SoftReset();
 
             // Heal halved while poisoned: Poison enemy, then heal
+            // ExpHeal(6, 8) = 8, halved: Max(1, 8/2) = 4
             _entityStats.ApplyDamage(_enemyA, 20);
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Poisoned, 5, _hero);
             _resolver.RegisterWord("test_heal_while_poisoned",
                 new List<WordActionMapping> { new("Heal", 6) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_heal_while_poisoned");
-            // Heal halved: Max(1, 6/2) = 3
+            int healWhilePoisoned = Math.Max(1, ExpHeal(6, 8) / 2);
             Check("Heal halved while poisoned: heal amount reduced",
-                HP(_enemyA) == 63,
-                $"HP={HP(_enemyA)}(exp 63)");
+                HP(_enemyA) == 60 + healWhilePoisoned,
+                $"HP={HP(_enemyA)}(exp {60 + healWhilePoisoned})");
         }
 
         // ── Group 33: Bleed ─────────────────────────────────────────
@@ -1608,23 +1656,26 @@ namespace TextRPG.Core.ActionExecution.Scenarios
 
         private void RunDuplicateActionGroup()
         {
-            // Heal(1)+Heal(1) → Self → heals twice (total 2)
+            // Heal(1)+Heal(1) → Self → heals twice
+            // ExpHeal(1, 8) = 3 each, total 6
             _entityStats.ApplyDamage(_hero, 10);
             _resolver.RegisterWord("test_double_heal",
                 new List<WordActionMapping> { new("Heal", 1), new("Heal", 1) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
             Exec("test_double_heal");
+            int doubleHeal = ExpHeal(1, 8) * 2;
             Check("Duplicate Heal: heals twice",
-                HP(_hero) == 92,
-                $"HP={HP(_hero)}(exp 92)");
+                HP(_hero) == 90 + doubleHeal,
+                $"HP={HP(_hero)}(exp {90 + doubleHeal})");
 
             SoftReset();
 
             // Damage(2)+Damage(2) → SingleEnemy → damages twice
+            // ExpDmg(2, 12, 4) = 5 each
             _resolver.RegisterWord("test_double_damage",
                 new List<WordActionMapping> { new("Damage", 2), new("Damage", 2) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
-            int singleDmg = Math.Max(1, 2 * 12 / 4); // 6
+            int singleDmg = ExpDmg(2, 12, 4);
             Exec("test_double_damage");
             Check("Duplicate Damage: damages twice",
                 HP(_enemyA) == 80 - singleDmg * 2,
@@ -1636,6 +1687,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private void RunCompositeTargetGroup()
         {
             // AllEnemies+Burning: burn enemy_a + enemy_c → only those targeted
+            // Shield(1) with hero pDef=5: ExpShield(1, 5) = 2
+            int shieldVal = ExpShield(1, 5);
             _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
             _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Burning, 3, _hero);
             _resolver.RegisterWord("test_composite_burning",
@@ -1643,8 +1696,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new WordMeta("AllEnemies+Burning", 0, 0, AreaShape.Single));
             Exec("test_composite_burning");
             Check("Composite AllEnemies+Burning: only burning enemies targeted",
-                Shield(_enemyA) == 1 && Shield(_enemyC) == 1 && Shield(_enemyB) == 0 && Shield(_enemyD) == 0,
-                $"A shield={Shield(_enemyA)}(1), C shield={Shield(_enemyC)}(1), B={Shield(_enemyB)}(0), D={Shield(_enemyD)}(0)");
+                Shield(_enemyA) == shieldVal && Shield(_enemyC) == shieldVal && Shield(_enemyB) == 0 && Shield(_enemyD) == 0,
+                $"A shield={Shield(_enemyA)}({shieldVal}), C shield={Shield(_enemyC)}({shieldVal}), B={Shield(_enemyB)}(0), D={Shield(_enemyD)}(0)");
 
             SoftReset();
             foreach (var e in new[] { _enemyA, _enemyB, _enemyC, _enemyD })
@@ -1658,8 +1711,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new WordMeta("RandomEnemy+Wet", 0, 0, AreaShape.Single));
             Exec("test_composite_wet");
             Check("Composite RandomEnemy+Wet: only wet enemy targeted",
-                Shield(_enemyB) == 1 && Shield(_enemyA) == 0 && Shield(_enemyC) == 0 && Shield(_enemyD) == 0,
-                $"B shield={Shield(_enemyB)}(1), A={Shield(_enemyA)}(0)");
+                Shield(_enemyB) == shieldVal && Shield(_enemyA) == 0 && Shield(_enemyC) == 0 && Shield(_enemyD) == 0,
+                $"B shield={Shield(_enemyB)}({shieldVal}), A={Shield(_enemyA)}(0)");
 
             SoftReset();
             foreach (var e in new[] { _enemyA, _enemyB, _enemyC, _enemyD })
@@ -1674,8 +1727,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new WordMeta("LowestHealthEnemy+Poisoned", 0, 0, AreaShape.Single));
             Exec("test_composite_poisoned_lowest");
             Check("Composite LowestHealthEnemy+Poisoned: lowest-HP poisoned enemy targeted",
-                Shield(_enemyD) == 1 && Shield(_enemyA) == 0,
-                $"D shield={Shield(_enemyD)}(1), A shield={Shield(_enemyA)}(0)");
+                Shield(_enemyD) == shieldVal && Shield(_enemyA) == 0,
+                $"D shield={Shield(_enemyD)}({shieldVal}), A shield={Shield(_enemyA)}(0)");
         }
 
         // ── Group 36: Shield on Spawn ───────────────────────────────
@@ -1780,7 +1833,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 3) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_thorns_hit");
-            int dmgDealt = Math.Max(1, 3 * 12 / 4); // 9
+            int dmgDealt = ExpDmg(3, 12, 4);
             Check("Thorns: attacker takes retaliation damage",
                 HP(_hero) == 100 - 3, // 3 stacks of thorns
                 $"HeroHP={HP(_hero)}(exp 97)");
@@ -1799,8 +1852,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 3) },
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             Exec("test_thorns_no_loop");
-            int dmg2 = Math.Max(1, 3 * 12 / 4); // 9
-            // Hero takes 1 (thorns from enemyA), enemy takes 9 (damage)
+            int dmg2 = ExpDmg(3, 12, 4);
+            // Hero takes 1 (thorns from enemyA), enemy takes damage
             // Enemy thorns fires → hero takes 1 damage (no source → no counter-thorns)
             Check("Thorns no loop: no infinite retaliation",
                 HP(_hero) == heroBefore - 1 && HP(_enemyA) == enemyBefore - dmg2,
@@ -1828,7 +1881,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
             int heroStr = Stat(_hero, StatType.Strength);
             int heroDef = Stat(_hero, StatType.PhysicalDefense);
-            int reflectedDmg = Math.Max(1, 3 * heroStr / Math.Max(1, heroDef));
+            int reflectedDmg = ExpDmg(3, heroStr, heroDef);
             Exec("test_reflect_hit");
             Check("Reflect: damage redirected to caster",
                 HP(_hero) == 100 - reflectedDmg,
@@ -1945,6 +1998,82 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             Check("Hardening reduces DoT: Burning damage reduced",
                 HP(_hero) == 99,
                 $"HP={HP(_hero)}(exp 99)");
+        }
+
+        // ── Group 41: MagicDamage ─────────────────────────────────────
+
+        private void RunMagicDamageGroup()
+        {
+            // MagicDamage(3) → SingleEnemy → enemy_a: ExpMagicDmg(3, 8, 3) = Max(1, 3+2-1) = 4
+            _resolver.RegisterWord("test_magic_dmg_single",
+                new List<WordActionMapping> { new("MagicDamage", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_magic_dmg_single");
+            int mdSingle = ExpMagicDmg(3, 8, 3); // hero magic=8, enemy_a mDef=3
+            Check("MagicDamage single: correct HP reduction",
+                HP(_enemyA) == 80 - mdSingle,
+                $"Expected HP={80 - mdSingle}, got {HP(_enemyA)}");
+
+            SoftReset();
+
+            // MagicDamage(2) → AreaEnemies (all enemies)
+            _resolver.RegisterWord("test_magic_dmg_all",
+                new List<WordActionMapping> { new("MagicDamage", 2) },
+                new WordMeta("AreaEnemies", 0, 0, AreaShape.Single));
+            Exec("test_magic_dmg_all");
+            int mdA = ExpMagicDmg(2, 8, 3); // enemy_a mDef=3
+            int mdB = ExpMagicDmg(2, 8, 2); // enemy_b mDef=2
+            int mdC = ExpMagicDmg(2, 8, 5); // enemy_c mDef=5
+            int mdD = ExpMagicDmg(2, 8, 1); // enemy_d mDef=1
+            bool mdAllOk = HP(_enemyA) == 80 - mdA && HP(_enemyB) == 60 - mdB &&
+                           HP(_enemyC) == 100 - mdC && HP(_enemyD) == 40 - mdD;
+            Check("MagicDamage all enemies: correct HP reductions",
+                mdAllOk,
+                $"A={HP(_enemyA)}(exp {80 - mdA}), B={HP(_enemyB)}(exp {60 - mdB}), C={HP(_enemyC)}(exp {100 - mdC}), D={HP(_enemyD)}(exp {40 - mdD})");
+
+            SoftReset();
+
+            // MagicDamage(99) → SingleEnemy → overkill, entity dies
+            bool mdDied = false;
+            _subscriptions.Add(_eventBus.Subscribe<EntityDiedEvent>(e =>
+            {
+                if (e.EntityId.Equals(_enemyA)) mdDied = true;
+            }));
+            _resolver.RegisterWord("test_magic_dmg_overkill",
+                new List<WordActionMapping> { new("MagicDamage", 99) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_magic_dmg_overkill");
+            Check("MagicDamage overkill: entity dies at HP=0",
+                HP(_enemyA) == 0 && mdDied,
+                $"HP={HP(_enemyA)}, died={mdDied}");
+
+            SoftReset();
+
+            // MagicDamage minimum damage: Frozen enemy_c (mDef 5+999=1004)
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Frozen, 5, _hero);
+            _resolver.RegisterWord("test_magic_dmg_frozen",
+                new List<WordActionMapping> { new("MagicDamage", 1) },
+                new WordMeta("HighestDefenseEnemy", 0, 0, AreaShape.Single));
+            Exec("test_magic_dmg_frozen");
+            Check("MagicDamage vs Frozen: floor of 1 against extreme magic defense",
+                HP(_enemyC) == 99,
+                $"HP={HP(_enemyC)}(exp 99)");
+
+            SoftReset();
+
+            // MagicDamage combo with BuffMagicPower: magic 8→12
+            _resolver.RegisterWord("test_magic_buff",
+                new List<WordActionMapping> { new("BuffMagicPower", 4) },
+                new WordMeta("Self", 0, 0, AreaShape.Single));
+            Exec("test_magic_buff");
+            _resolver.RegisterWord("test_magic_dmg_buffed",
+                new List<WordActionMapping> { new("MagicDamage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_magic_dmg_buffed");
+            int mdBuffed = ExpMagicDmg(2, 12, 3); // buffed magic=12, enemy_a mDef=3
+            Check("MagicDamage buffed: increased damage with higher magic",
+                HP(_enemyA) == 80 - mdBuffed,
+                $"HP={HP(_enemyA)}(exp {80 - mdBuffed})");
         }
 
         // ── UI ──────────────────────────────────────────────────────

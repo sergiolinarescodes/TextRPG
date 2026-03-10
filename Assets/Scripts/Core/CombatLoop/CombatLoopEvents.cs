@@ -6,5 +6,5 @@ namespace TextRPG.Core.CombatLoop
     public readonly record struct PlayerTurnEndedEvent();
     public readonly record struct GameOverEvent(EntityId PlayerId);
 
-    public enum WordSubmitResult { Accepted, InvalidWord, InsufficientMana, NotPlayerTurn, GameOver }
+    public enum WordSubmitResult { Accepted, InvalidWord, InsufficientMana, NotPlayerTurn, GameOver, ReservedWord }
 }

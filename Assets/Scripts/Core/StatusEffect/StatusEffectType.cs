@@ -19,6 +19,7 @@ namespace TextRPG.Core.StatusEffect
         Growing,
         Thorns,
         Reflecting,
-        Hardening
+        Hardening,
+        Drunk
     }
 }

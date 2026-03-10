@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Reflex.Core;
 using TextRPG.Core.ActionExecution;
+using TextRPG.Core.Equipment;
 using TextRPG.Core.WordAction;
 using Unidad.Core.Abstractions;
 using Unidad.Core.Bootstrap;
@@ -40,7 +41,7 @@ namespace TextRPG.Core.Weapon
             }, typeof(IWeaponActionExecutor));
         }
 
-        internal static IWeaponRegistry BuildWeaponRegistry(WordActionData data)
+        internal static IWeaponRegistry BuildWeaponRegistry(WordActionData data, IItemRegistry itemRegistry = null)
         {
             var registry = new WeaponRegistry();
             var resolver = data.Resolver;
@@ -49,6 +50,10 @@ namespace TextRPG.Core.Weapon
             // Build WeaponDefinitions from items that have Item/Weapon actions
             foreach (var (itemWord, ammoList) in ammoByItem)
             {
+                // Skip consumables — they have their own registry
+                if (itemRegistry != null && itemRegistry.TryGet(itemWord, out var itemDef)
+                    && itemDef.SlotType == EquipmentSlotType.Consumable)
+                    continue;
                 // Get durability from the first Item/Weapon action mapping
                 var actions = resolver.Resolve(itemWord);
                 int durability = 0;

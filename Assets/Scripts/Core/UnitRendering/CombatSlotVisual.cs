@@ -220,6 +220,19 @@ namespace TextRPG.Core.UnitRendering
             healthBar.style.backgroundColor = Color.green;
             barContainer.Add(healthBar);
 
+            int maxMana = _entityStats.GetStat(entityId, StatType.MaxMana);
+            if (maxMana > 0)
+            {
+                int currentMana = _entityStats.GetCurrentMana(entityId);
+                var manaBar = new VisualElement();
+                float manaPct = (float)currentMana / maxMana * 100f;
+                manaBar.style.width = Length.Percent(manaPct);
+                manaBar.style.height = 3;
+                manaBar.style.backgroundColor = new Color(0.3f, 0.5f, 1f);
+                barContainer.Add(manaBar);
+                barContainer.style.height = 18;
+            }
+
             cell.Add(barContainer);
         }
 

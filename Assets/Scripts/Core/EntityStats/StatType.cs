@@ -11,6 +11,8 @@ namespace TextRPG.Core.EntityStats
         Luck,
         MaxMana,
         ManaRegen,
-        DamageReduction
+        DamageReduction,
+        Dexterity,
+        Constitution
     }
 }

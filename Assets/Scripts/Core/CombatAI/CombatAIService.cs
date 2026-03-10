@@ -24,7 +24,7 @@ namespace TextRPG.Core.CombatAI
         private readonly IActionExecutionService _actionExecution;
         private readonly IContributorRegistry<AIDecisionContext> _scorers;
         private readonly EnemyWordResolver _enemyResolver;
-        private readonly IReadOnlyDictionary<string, EnemyDefinition> _unitRegistry;
+        private readonly IReadOnlyDictionary<string, EntityDefinition> _unitRegistry;
         private readonly IPassiveService _passiveService;
 
         private readonly Dictionary<EntityId, string[]> _summonAbilities = new();
@@ -34,7 +34,7 @@ namespace TextRPG.Core.CombatAI
             IEntityStatsService entityStats, ITurnService turnService, ICombatSlotService slotService,
             ICombatContext combatContext, IActionExecutionService actionExecution,
             IContributorRegistry<AIDecisionContext> scorers, EnemyWordResolver enemyResolver,
-            IReadOnlyDictionary<string, EnemyDefinition> unitRegistry = null,
+            IReadOnlyDictionary<string, EntityDefinition> unitRegistry = null,
             IPassiveService passiveService = null)
             : base(eventBus)
         {
@@ -70,7 +70,7 @@ namespace TextRPG.Core.CombatAI
             string[] abilities;
             if (_encounterService.IsEnemy(entityId))
             {
-                var def = _encounterService.GetEnemyDefinition(entityId);
+                var def = _encounterService.GetEntityDefinition(entityId);
                 abilities = def.Abilities;
             }
             else
@@ -183,12 +183,15 @@ namespace TextRPG.Core.CombatAI
             var hp = _entityStats.GetCurrentHealth(entityId);
             var maxHp = _entityStats.GetStat(entityId, StatType.MaxHealth);
 
+            var currentMana = _entityStats.GetCurrentMana(entityId);
             foreach (var ability in abilities)
             {
                 if (!_enemyResolver.HasWord(ability))
                     continue;
 
                 var meta = _enemyResolver.GetStats(ability);
+                if (meta.Cost > currentMana)
+                    continue;
                 var isMelee = meta.Target == "Melee" || meta.Target == "FrontEnemy";
 
                 var targetId = FindFirstTarget(entityId, friendly);
@@ -202,7 +205,7 @@ namespace TextRPG.Core.CombatAI
                 int distance = 1;
 
                 var ctx = new AIDecisionContext(entityId, targetId, ability,
-                    hp, maxHp, targetHp, targetMaxHp, distance, isMelee);
+                    hp, maxHp, targetHp, targetMaxHp, distance, isMelee, manaCost: meta.Cost);
 
                 var score = _scorers.EvaluateAll(ctx);
                 if (score > bestScore)

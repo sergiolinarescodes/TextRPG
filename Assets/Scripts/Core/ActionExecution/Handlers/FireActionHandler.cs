@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEventBus _eventBus;
 
-        public string ActionId => "Fire";
+        public string ActionId => ActionNames.Fire;
 
         public FireActionHandler(IActionHandlerContext ctx)
         {

@@ -19,14 +19,17 @@ namespace TextRPG.Core.EntityStats
         public void RegisterEntity(EntityId id, int maxHealth, int strength, int magicPower,
                                    int physicalDefense, int magicDefense, int luck,
                                    int maxMana = 10, int manaRegen = 2, int startingMana = 5,
-                                   int startingShield = 0)
+                                   int startingShield = 0, int dexterity = 0,
+                                   int constitution = 0)
         {
             if (_entities.ContainsKey(id))
                 throw new InvalidOperationException($"Entity '{id.Value}' is already registered.");
 
-            var entry = new EntityStatEntry(maxHealth, strength, magicPower, physicalDefense, magicDefense, luck, maxMana, manaRegen, startingMana, startingShield);
+            var hpBonus = CalculateConstitutionBonus(constitution);
+            var effectiveMaxHealth = maxHealth + hpBonus;
+            var entry = new EntityStatEntry(effectiveMaxHealth, strength, magicPower, physicalDefense, magicDefense, luck, maxMana, manaRegen, startingMana, startingShield, dexterity, constitution);
             _entities[id] = entry;
-            Publish(new EntityRegisteredEvent(id, maxHealth));
+            Publish(new EntityRegisteredEvent(id, effectiveMaxHealth));
         }
 
         public void RemoveEntity(EntityId id)
@@ -173,9 +176,12 @@ namespace TextRPG.Core.EntityStats
             return entry;
         }
 
+        private static int CalculateConstitutionBonus(int constitution)
+            => constitution > 0 ? constitution * (constitution + 1) / 2 + 2 : 0;
+
         private sealed class EntityStatEntry
         {
-            private const int StatCount = 10;
+            private static readonly int StatCount = Enum.GetValues(typeof(StatType)).Length;
             private readonly int[] _baseStats = new int[StatCount];
             private readonly ModifierStack<int>[] _modifierStacks = new ModifierStack<int>[StatCount];
 
@@ -185,7 +191,7 @@ namespace TextRPG.Core.EntityStats
 
             public EntityStatEntry(int maxHealth, int strength, int magicPower,
                                    int physicalDefense, int magicDefense, int luck,
-                                   int maxMana, int manaRegen, int startingMana, int startingShield)
+                                   int maxMana, int manaRegen, int startingMana, int startingShield, int dexterity, int constitution)
             {
                 _baseStats[(int)StatType.Health] = maxHealth;
                 _baseStats[(int)StatType.MaxHealth] = maxHealth;
@@ -196,6 +202,8 @@ namespace TextRPG.Core.EntityStats
                 _baseStats[(int)StatType.Luck] = luck;
                 _baseStats[(int)StatType.MaxMana] = maxMana;
                 _baseStats[(int)StatType.ManaRegen] = manaRegen;
+                _baseStats[(int)StatType.Dexterity] = dexterity;
+                _baseStats[(int)StatType.Constitution] = constitution;
                 CurrentHealth = maxHealth;
                 CurrentMana = startingMana;
                 CurrentShield = startingShield;

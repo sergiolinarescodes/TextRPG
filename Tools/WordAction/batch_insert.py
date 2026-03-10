@@ -42,9 +42,11 @@ VALID_ACTIONS = {
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
+    "Drunk",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",
+    "Enter", "Talk", "Steal", "Search", "Pray", "Rest", "Open", "Trade", "Recruit", "Leave",
 }
 
 # Backward compatibility alias
@@ -101,7 +103,7 @@ VALID_PASSIVE_TARGETS = {"Self", "AllAllies", "AllEnemies", "Injured", "Attacker
 
 VALID_UNIT_TYPES = {"enemy", "structure"}
 
-VALID_ITEM_TYPES = {"weapon", "trinket", "head", "wear", "accessory"}
+VALID_ITEM_TYPES = {"weapon", "consumable", "trinket", "head", "wear", "accessory"}
 
 
 def main():

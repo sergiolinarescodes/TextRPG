@@ -10,8 +10,8 @@ namespace TextRPG.Core.Encounter
         bool IsEncounterActive { get; }
         IReadOnlyList<EntityId> EnemyEntities { get; }
         bool IsEnemy(EntityId entityId);
-        EnemyDefinition GetEnemyDefinition(EntityId entityId);
-        void RegisterEnemy(EntityId entityId, EnemyDefinition definition = null);
+        EntityDefinition GetEntityDefinition(EntityId entityId);
+        void RegisterEnemy(EntityId entityId, EntityDefinition definition = null);
         EntityId PlayerEntity { get; }
     }
 }

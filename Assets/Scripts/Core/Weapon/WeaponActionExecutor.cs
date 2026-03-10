@@ -71,40 +71,12 @@ namespace TextRPG.Core.Weapon
         private List<ResolvedAction> ResolveActions(EntityId source, string word,
             IReadOnlyList<WordActionMapping> actions, WordMeta meta)
         {
-            var resolved = new List<ResolvedAction>(actions.Count);
-
-            for (int i = 0; i < actions.Count; i++)
-            {
-                var mapping = actions[i];
-                var actionTarget = mapping.Target ?? meta.Target;
-                var actionRange = mapping.Range ?? meta.Range;
-                var actionArea = mapping.Area ?? meta.Area;
-
-                var spec = TargetTypeClassifier.Parse(actionTarget);
-                var targets = _combatContext.GetTargets(spec.BaseType, actionRange, spec.StatusFilter);
-
-                if (_handlerRegistry.TryGet(mapping.ActionId, out _))
-                {
-                    resolved.Add(new ResolvedAction(
-                        mapping.ActionId, mapping.Value,
-                        source, targets, word));
-                }
-            }
-
-            return resolved;
+            return AmmoActionResolver.ResolveActions(source, word, actions, meta, _handlerRegistry, _combatContext);
         }
 
         private void ExecuteAllImmediately(List<ResolvedAction> resolved)
         {
-            foreach (var action in resolved)
-            {
-                if (_handlerRegistry.TryGet(action.ActionId, out var handler))
-                {
-                    var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word);
-                    handler.Execute(context);
-                    Publish(new ActionHandlerExecutedEvent(action.ActionId, action.Value, action.Source, action.Targets));
-                }
-            }
+            AmmoActionResolver.ExecuteAllImmediately(resolved, _handlerRegistry, EventBus);
         }
 
         private void OnAmmoSubmitted(WeaponAmmoSubmittedEvent e)

@@ -11,7 +11,7 @@ namespace TextRPG.Core.Encounter
     string Target
 );
 
-    public sealed record EnemyDefinition(
+    public sealed record EntityDefinition(
         string Name,
         int MaxHealth,
         int Strength,
@@ -23,6 +23,13 @@ namespace TextRPG.Core.Encounter
         string[] Abilities,
         int StartingShield = 0,
         string UnitType = "enemy",
-        PassiveEntry[] Passives = null
+        PassiveEntry[] Passives = null,
+        string[] Tags = null,
+        string Description = null,
+        string DeathReward = null,
+        int DeathRewardValue = 0,
+        int Tier = 1,
+        int Dexterity = 0,
+        int Constitution = 0
     );
 }

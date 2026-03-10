@@ -112,7 +112,7 @@ namespace TextRPG.Core.ActionExecution
                 {
                     resolved.Add(new ResolvedAction(
                         mapping.ActionId, mapping.Value,
-                        _combatContext.SourceEntity, targets, word));
+                        _combatContext.SourceEntity, targets, word, mapping.AssocWord));
                 }
             }
 
@@ -125,7 +125,7 @@ namespace TextRPG.Core.ActionExecution
             {
                 if (_handlerRegistry.TryGet(action.ActionId, out var handler))
                 {
-                    var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word);
+                    var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word, action.AssocWord);
                     handler.Execute(context);
                     Publish(new ActionHandlerExecutedEvent(action.ActionId, action.Value, action.Source, action.Targets));
                 }

@@ -1,3 +1,4 @@
+using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
@@ -10,5 +11,6 @@ namespace TextRPG.Core.StatusEffect.Handlers
         ITurnService TurnService { get; }
         IStatusEffectService StatusEffects { get; }
         IEventBus EventBus { get; }
+        IEncounterService EncounterService { get; }
     }
 }

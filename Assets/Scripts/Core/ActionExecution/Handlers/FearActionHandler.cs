@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IStatusEffectService _statusEffects;
 
-        public string ActionId => "Fear";
+        public string ActionId => ActionNames.Fear;
 
         public FearActionHandler(IActionHandlerContext ctx)
         {

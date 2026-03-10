@@ -5,11 +5,16 @@ using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.CombatLoop;
 using TextRPG.Core.CombatSlot;
+using TextRPG.Core.Consumable;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.CombatAI;
 using TextRPG.Core.Equipment;
+using TextRPG.Core.EventEncounter;
+using TextRPG.Core.EventEncounter.Reactions;
+using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.Passive;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Run;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
@@ -21,6 +26,8 @@ using Unidad.Core.EventBus;
 using Unidad.Core.Inventory;
 using Unidad.Core.Testing;
 using Unidad.Core.UI.Components;
+using Unidad.Core.UI.TextAnimation.ElementAnimation;
+using Unidad.Core.UI.Tooltip;
 using UnityEngine;
 using UnityEngine.UIElements;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
@@ -40,7 +47,6 @@ namespace TextRPG.Core.WordInput.Scenarios
         private IUnitService _unitService;
         private AnimatedCodeField _codeField;
         private VisualElement _mainTextPanel;
-        private VisualElement _statsBar;
         private float _fontScaleFactor;
         private VisualElement _linesContainer;
         private readonly List<IDisposable> _subscriptions = new();
@@ -82,16 +88,39 @@ namespace TextRPG.Core.WordInput.Scenarios
         private string _dragItemWord;
         private int _dragSourceSlot = -1;
         private bool _dragFromEquipment;
-        private UnidadProgressBar _hpBar;
-        private Label _hpLabel;
-        private UnidadProgressBar _manaBar;
-        private Label _manaLabel;
-        private VisualElement _manaCostOverlay;
         private bool _isPreviewingManaCost;
         private ILootRewardService _lootRewardService;
         private VisualElement _lootOverlay;
         private VisualElement _lootTooltip;
+        private int _highlightedSlotIndex = -1;
         private VisualElement _tooltipLayer;
+        private ITooltipService _frameworkTooltipService;
+        private IConsumableService _consumableService;
+        private ConsumableActionExecutor _consumableExecutor;
+        private DrunkLetterService _drunkLetterService;
+        private VisualElement _consumableSlot;
+        private Label _consumableDurabilityLabel;
+        private IVisualElementScheduledItem _drunkWobbleSchedule;
+        private EntityTooltipService _tooltipService;
+        private IWordResolver _enemyResolver;
+        private IActionRegistry _actionRegistry;
+
+        private PlayerStatsBarVisual _playerStatsBar;
+
+        // Run system fields
+        private IRunService _runService;
+        private Dictionary<string, EntityDefinition> _allUnits;
+        private Dictionary<string, EventEncounterDefinition> _allEventEncounters;
+        private IActionHandlerRegistry _handlerRegistry;
+        private ActionHandlerContext _actionHandlerCtx;
+        private ScenarioAnimationResolver _scenarioAnimResolver;
+        private IEventEncounterService _eventEncounterService;
+        private IEventEncounterLoopService _eventEncounterLoop;
+        private ReactionService _reactionService;
+        private EventEncounterContext _reactionContext;
+        private Label _nodeProgressLabel;
+        private FloatingMessagePool _messagePool;
+        private Func<EntityId, Vector3> _positionProvider;
 
         private static readonly Color HighlightEnemy = new(1f, 0.3f, 0.3f, 0.4f);
         private static readonly Color HighlightSelf = new(0.3f, 1f, 0.3f, 0.4f);
@@ -111,14 +140,18 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             // --- Services ---
             _eventBus = new EventBus();
-            _service = new WordInputService(_eventBus);
+            // DrunkLetterService created early for WordInputService injection (playerId set below)
+            var playerId = new EntityId("player");
+            _drunkLetterService = new DrunkLetterService(_eventBus, playerId);
+            _service = new WordInputService(_eventBus, _drunkLetterService);
             _unitService = new UnitService(_eventBus);
             _entityStats = new EntityStatsService(_eventBus);
             var wordActionData = WordActionDatabaseLoader.Load();
             _wordResolver = new FilteredWordResolver(wordActionData.Resolver, wordActionData.AmmoWordSet);
             _ammoResolver = wordActionData.AmmoResolver;
-            _wordMatchService = new WordMatchService(_wordResolver, wordActionData.ActionRegistry);
-            _ammoMatchService = new WordMatchService(_ammoResolver, wordActionData.ActionRegistry);
+            _actionRegistry = wordActionData.ActionRegistry;
+            _wordMatchService = new WordMatchService(_wordResolver, _actionRegistry);
+            _ammoMatchService = new WordMatchService(_ammoResolver, _actionRegistry);
 
             // CombatSlot + CombatContext
             _slotService = new CombatSlotService(_eventBus);
@@ -155,8 +188,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             var handlerRegistry = ActionHandlerRegistryFactory.CreateDefault(actionHandlerCtx);
 
             // Player entity (not in slots — first person)
-            _playerId = new EntityId("player");
-            _entityStats.RegisterEntity(_playerId, 100, 10, 8, 5, 4, 3);
+            _playerId = playerId;
+            PlayerDefaults.Register(_entityStats, _playerId);
 
             // Create player inventory
             _inventoryService.Create(_playerInventoryId, new InventoryDefinition(EquipmentConstants.InventorySlotCount));
@@ -170,52 +203,42 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             // Item handler registered later (after _equipmentService is created)
 
-            // Load enemy definitions from DB
-            var allUnits = UnitDatabaseLoader.LoadAll();
+            // Load all definitions from DB
+            _allUnits = UnitDatabaseLoader.LoadAll();
+            _allEventEncounters = LoadEventEncounters();
+
             _encounterAdapter = new ScenarioEncounterAdapter();
             _encounterAdapter.SetPlayer(_playerId);
             _encounterAdapter.SetEventBus(_eventBus);
-            var enemyResolver = new EnemyWordResolver();
-
-            var enemySpawns = new[] { "goblin", "skeleton", "bat" };
-
-            var enemyIds = new List<EntityId>();
-            for (int i = 0; i < enemySpawns.Length && i < 3; i++)
-            {
-                var unitId = enemySpawns[i];
-                if (!allUnits.TryGetValue(unitId, out var def)) continue;
-
-                var entityId = new EntityId(unitId);
-                _entityStats.RegisterEntity(entityId, def.MaxHealth, def.Strength, def.MagicPower,
-                    def.PhysicalDefense, def.MagicDefense, def.Luck);
-                _unitService.Register(new UnitId(unitId),
-                    new UnitDefinition(new UnitId(unitId), def.Name,
-                        def.MaxHealth, def.Strength, def.PhysicalDefense, def.Luck, def.Color));
-                _slotService.RegisterEnemy(entityId, i);
-                enemyIds.Add(entityId);
-                _encounterAdapter.RegisterEnemy(entityId, def);
-                UnitDatabaseLoader.RegisterUnitWords(enemyResolver, unitId);
-            }
-            _encounterAdapter.Activate();
+            var enemyWordResolver = new EnemyWordResolver();
+            _enemyResolver = enemyWordResolver;
 
             _combatContext.SetSourceEntity(_playerId);
-            _combatContext.SetEnemies(enemyIds.ToArray());
-            _combatContext.SetAllies(Array.Empty<EntityId>());
 
             _previewService = new TargetingPreviewService(_wordResolver, _combatContext);
             _ammoPreviewService = new TargetingPreviewService(_ammoResolver, _combatContext);
 
-            // Composite resolver for AI action execution
-            var compositeResolver = new CompositeWordResolver(_wordResolver, enemyResolver);
-            var scenarioAnimResolver = new ScenarioAnimationResolver();
-            _actionExecution = new ActionExecutionService(_eventBus, compositeResolver, handlerRegistry, _combatContext, _entityStats, statusEffects, scenarioAnimResolver);
+            // Shared animation resolver for entire run
+            _scenarioAnimResolver = new ScenarioAnimationResolver();
+
+            // Action execution — uses composite resolver (rebuilt per encounter)
+            var compositeResolver = new CompositeWordResolver(_wordResolver, _enemyResolver);
+            _actionExecution = new ActionExecutionService(_eventBus, compositeResolver, handlerRegistry, _combatContext, _entityStats, statusEffects, _scenarioAnimResolver);
 
             // Weapon executor
             _weaponExecutor = new WeaponActionExecutor(
-                _eventBus, _weaponService, _ammoResolver, handlerRegistry, _combatContext, scenarioAnimResolver);
+                _eventBus, _weaponService, _ammoResolver, handlerRegistry, _combatContext, _scenarioAnimResolver);
+
+            // Consumable service (must be created before executor)
+            var consumableRegistry = ConsumableSystemInstaller.BuildConsumableRegistry(_itemRegistry);
+            _consumableService = new ConsumableService(_eventBus, consumableRegistry);
+
+            // Consumable executor
+            _consumableExecutor = new ConsumableActionExecutor(
+                _eventBus, _consumableService, _ammoResolver, handlerRegistry, _combatContext, _scenarioAnimResolver);
 
             // Action Animation service (created early so PassiveContext can reference it)
-            _animationService = new ActionAnimationService(_eventBus, scenarioAnimResolver, handlerRegistry, _entityStats);
+            _animationService = new ActionAnimationService(_eventBus, _scenarioAnimResolver, handlerRegistry, _entityStats);
 
             // Passive system
             var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
@@ -223,50 +246,66 @@ namespace TextRPG.Core.WordInput.Scenarios
             var targetResolver = new PassiveTargetResolver();
             var passiveContext = new PassiveContext(_entityStats, _slotService, _eventBus, _encounterAdapter,
                 animationService: _animationService);
-            _passiveService = new PassiveService(_eventBus, triggerRegistry, effectRegistry, targetResolver, passiveContext, allUnits);
+            _passiveService = new PassiveService(_eventBus, triggerRegistry, effectRegistry, targetResolver, passiveContext, _allUnits);
 
-            // Equipment service (needs passive service)
-            _equipmentService = new EquipmentService(_eventBus, _itemRegistry, _entityStats, _passiveService, _weaponService);
+            // Reaction service — run-lifetime, enables tag reactions in both combat and events
+            var tagReactions = EventEncounterSystemInstaller.CreateTagReactionRegistry();
+            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry();
+            _reactionContext = new EventEncounterContext(_entityStats, _slotService, _eventBus, _statusEffects);
+            _reactionService = new ReactionService(_eventBus, outcomeRegistry, _reactionContext, tagReactions);
+
+            // DrunkLetterService needs StatusEffectService reference
+            _drunkLetterService.SetStatusEffects(_statusEffects);
+
+            // Equipment service (needs passive service + consumable service)
+            _equipmentService = new EquipmentService(_eventBus, _itemRegistry, _entityStats, _passiveService, _weaponService, _consumableService);
 
             // Register Item action handler (needs _equipmentService + _itemRegistry for auto-equip)
+            _actionHandlerCtx = actionHandlerCtx;
+            _handlerRegistry = handlerRegistry;
             handlerRegistry.Register("Item", new ItemActionHandler(actionHandlerCtx, _inventoryService, _playerInventoryId, _equipmentService, _itemRegistry));
 
             // Loot reward service
             _lootRewardService = new LootRewardService(_eventBus, _itemRegistry, _inventoryService, _playerInventoryId, _playerId);
-
-            // Register passives for initial enemies
-            foreach (var unitId in enemySpawns)
-            {
-                if (allUnits.TryGetValue(unitId, out var unitDef) && unitDef.Passives != null)
-                    _passiveService.RegisterPassives(new EntityId(unitId), unitDef.Passives);
-            }
-
-            // Scorer registry
-            var scorers = CombatAISystemInstaller.CreateScorerRegistry(statusEffects);
-
-            // CombatAI service
-            _combatAI = new CombatAIService(_eventBus, _encounterAdapter, _entityStats,
-                _turnService, _slotService, _combatContext, _actionExecution, scorers, enemyResolver, allUnits);
 
             _statusVisualService = new StatusEffectVisualService(_eventBus);
 
             var tickRunner = SceneRoot.AddComponent<TickRunner>();
             tickRunner.Initialize(new UnityTimeProvider(), new ITickable[] { _animationService });
 
-            // Turn order: player first, then enemies
-            var turnOrder = new List<EntityId> { _playerId };
-            turnOrder.AddRange(enemyIds);
-            _turnService.SetTurnOrder(turnOrder);
+            // Run service — manages node progression
+            _runService = new RunService(_eventBus);
 
-            // CombatLoop — orchestrates turn sequencing, word submission, game-over
-            _combatLoop = new CombatLoopService(
-                _eventBus, _turnService, _entityStats, _wordResolver, _weaponService, _playerId);
-            _combatLoop.Start();
+            // Generate and start run
+            var runDef = RunMapGenerator.Generate(10, _allUnits, _allEventEncounters);
+
+            // Subscribe to run events BEFORE starting
+            _subscriptions.Add(_eventBus.Subscribe<RunNodeStartedEvent>(OnRunNodeStarted));
+            _subscriptions.Add(_eventBus.Subscribe<RunNodeCompletedEvent>(OnRunNodeCompleted));
+            _subscriptions.Add(_eventBus.Subscribe<RunCompletedEvent>(OnRunCompleted));
+            _subscriptions.Add(_eventBus.Subscribe<EscapeAttemptedEvent>(evt =>
+                Debug.Log($"[Run] Escape attempted — {(evt.Success ? "SUCCESS" : "FAILED")}")));
+            _subscriptions.Add(_eventBus.Subscribe<InteractionMessageEvent>(evt =>
+            {
+                Debug.Log($"[EventEncounter] Message: {evt.Message}");
+                var pos = _positionProvider?.Invoke(evt.SourceEntityId) ?? Vector3.zero;
+                _messagePool?.Spawn(new Vector2(pos.x, pos.y), evt.Message, new Color(1f, 0.9f, 0.5f));
+            }));
+
+            _runService.StartRun(runDef, _playerId);
 
             // --- Subscribe to weapon events ---
             _subscriptions.Add(_eventBus.Subscribe<WeaponEquippedEvent>(OnWeaponEquipped));
             _subscriptions.Add(_eventBus.Subscribe<WeaponDurabilityChangedEvent>(OnWeaponDurabilityChanged));
             _subscriptions.Add(_eventBus.Subscribe<WeaponDestroyedEvent>(OnWeaponDestroyed));
+
+            // --- Subscribe to consumable events ---
+            _subscriptions.Add(_eventBus.Subscribe<ConsumableEquippedEvent>(OnConsumableEquipped));
+            _subscriptions.Add(_eventBus.Subscribe<ConsumableDurabilityChangedEvent>(OnConsumableDurabilityChanged));
+            _subscriptions.Add(_eventBus.Subscribe<ConsumableDestroyedEvent>(OnConsumableDestroyed));
+
+            // --- Subscribe to drunk letter changes ---
+            _subscriptions.Add(_eventBus.Subscribe<DrunkLettersChangedEvent>(_ => RefreshDrunkVisuals()));
 
             // --- Subscribe to events ---
             _subscriptions.Add(_eventBus.Subscribe<WordSubmittedEvent>(evt =>
@@ -290,39 +329,32 @@ namespace TextRPG.Core.WordInput.Scenarios
                 Debug.Log("[WordInputScenario] Word cleared");
             }));
 
-            // Re-render slot cells when HP changes + update player HP bar
+            // Re-render slot cells when HP changes
             _subscriptions.Add(_eventBus.Subscribe<DamageTakenEvent>(evt =>
             {
                 RefreshEntityCell(evt.EntityId);
-                if (evt.EntityId.Equals(_playerId))
-                    UpdatePlayerHpBar();
             }));
             _subscriptions.Add(_eventBus.Subscribe<HealedEvent>(evt =>
             {
                 RefreshEntityCell(evt.EntityId);
-                if (evt.EntityId.Equals(_playerId))
-                    UpdatePlayerHpBar();
             }));
             _subscriptions.Add(_eventBus.Subscribe<EntityDiedEvent>(evt =>
             {
-                _encounterAdapter.MarkDead(evt.EntityId);
+                if (_encounterAdapter != null)
+                    _encounterAdapter.MarkDead(evt.EntityId);
                 if (evt.EntityId.Equals(_playerId))
                     RefreshEntityCell(evt.EntityId);
                 else
                     _slotVisual?.PlayDeathAnimation(evt.EntityId);
-                // Ally slots always visible — placeholders shown by PlayDeathAnimation clearing the cell
             }));
 
-            // Mana bar updates
+            // Clear mana cost preview on mana change + refresh unit mana bars
             _subscriptions.Add(_eventBus.Subscribe<ManaChangedEvent>(evt =>
             {
-                if (evt.EntityId.Equals(_playerId))
-                {
-                    if (_isPreviewingManaCost)
-                        ClearManaCostPreview();
-                    else
-                        UpdatePlayerManaBar();
-                }
+                if (evt.EntityId.Equals(_playerId) && _isPreviewingManaCost)
+                    ClearManaCostPreview();
+                if (!evt.EntityId.Equals(_playerId))
+                    RefreshEntityCell(evt.EntityId);
             }));
             _subscriptions.Add(_eventBus.Subscribe<WordRejectedEvent>(evt =>
             {
@@ -339,7 +371,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Log enemy actions
             _subscriptions.Add(_eventBus.Subscribe<ActionHandlerExecutedEvent>(evt =>
             {
-                if (!_combatLoop.IsPlayerTurn)
+                if (_combatLoop != null && !_combatLoop.IsPlayerTurn)
                     Debug.Log($"[Turn:Enemy] {evt.ActionId}({evt.Value}) → {evt.Targets.Count} target(s)");
             }));
 
@@ -357,8 +389,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             _subscriptions.Add(_eventBus.Subscribe<GameOverEvent>(_ =>
             {
                 SetInputEnabled(false);
-                _hpLabel.text = "DEAD";
-                _hpLabel.style.color = Color.red;
+                _playerStatsBar.HpLabel.text = "DEAD";
+                _playerStatsBar.HpLabel.style.color = Color.red;
                 Debug.Log("[Turn] GAME OVER — Player died!");
             }));
 
@@ -367,7 +399,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             {
                 var word = evt.Word.ToLowerInvariant();
                 var uid = new UnitId(evt.EntityId.Value);
-                if (allUnits.TryGetValue(word, out var unitDef))
+                if (_allUnits.TryGetValue(word, out var unitDef))
                 {
                     _unitService.Register(uid,
                         new UnitDefinition(uid, unitDef.Name,
@@ -413,6 +445,17 @@ namespace TextRPG.Core.WordInput.Scenarios
             root.style.width = Length.Percent(100);
             root.style.height = Length.Percent(100);
 
+            // Node progress label
+            _nodeProgressLabel = new Label("Node 1/10 — Combat");
+            _nodeProgressLabel.style.fontSize = 18;
+            _nodeProgressLabel.style.color = new Color(0.8f, 0.8f, 0.8f);
+            _nodeProgressLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _nodeProgressLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _nodeProgressLabel.style.backgroundColor = new Color(0.1f, 0.1f, 0.12f);
+            _nodeProgressLabel.style.paddingTop = 4;
+            _nodeProgressLabel.style.paddingBottom = 4;
+            root.Add(_nodeProgressLabel);
+
             // Enemy row
             var enemyRow = new VisualElement();
             enemyRow.style.flexDirection = FlexDirection.Row;
@@ -448,13 +491,13 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Set equipment slot placeholders on right bar
             _rightBar.SetSlotBackground(0, "HEAD", SlotColors.Placeholder);
             _rightBar.SetSlotBackground(1, "WEAR", SlotColors.Placeholder);
-            _rightBar.SetSlotBackground(2, "ACCES SORY", SlotColors.Placeholder);
-            _rightBar.SetSlotBackground(3, "TRIN KET", SlotColors.Placeholder);
+            _rightBar.SetSlotBackground(2, "ACCESSORY", SlotColors.Placeholder);
+            _rightBar.SetSlotBackground(3, "USE", SlotColors.Placeholder);
             _rightBar.SetSlotBackground(4, "WEAPON", SlotColors.Placeholder);
 
             // Set inventory slot placeholders on left bar
             for (int i = 0; i < EquipmentConstants.InventorySlotCount; i++)
-                _leftBar.SetSlotBackground(i, "INVEN TORY", SlotColors.Placeholder);
+                _leftBar.SetSlotBackground(i, "INVENTORY", SlotColors.Placeholder);
 
             root.Add(middleArea);
 
@@ -507,102 +550,9 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             _slotVisual.BuildAllyRow(_allyRow);
 
-            // Stats bar
-            _statsBar = new VisualElement();
-            _statsBar.style.flexGrow = 0;
-            _statsBar.style.flexShrink = 0;
-            _statsBar.style.height = 150;
-            _statsBar.style.backgroundColor = Color.black;
-            _statsBar.style.flexDirection = FlexDirection.Column;
-            _statsBar.style.justifyContent = Justify.Center;
-            _statsBar.style.paddingLeft = 10;
-            _statsBar.style.paddingRight = 10;
-            root.Add(_statsBar);
-
-            // HP bar
-            var hpBarWrapper = new VisualElement();
-            hpBarWrapper.style.width = Length.Percent(100);
-            hpBarWrapper.style.height = 48;
-            hpBarWrapper.style.marginBottom = 8;
-            hpBarWrapper.style.justifyContent = Justify.Center;
-
-            _hpBar = new UnidadProgressBar(1f);
-            _hpBar.SetVariant(ProgressVariant.Success);
-            _hpBar.style.width = Length.Percent(100);
-            _hpBar.style.height = 16;
-            hpBarWrapper.Add(_hpBar);
-
-            int playerHp = _entityStats.GetCurrentHealth(_playerId);
-            int playerMaxHp = _entityStats.GetStat(_playerId, StatType.MaxHealth);
-            _hpLabel = new Label($"{playerHp}/{playerMaxHp}");
-            _hpLabel.style.position = Position.Absolute;
-            _hpLabel.style.top = 0;
-            _hpLabel.style.left = 0;
-            _hpLabel.style.right = 0;
-            _hpLabel.style.bottom = 0;
-            _hpLabel.style.fontSize = 36;
-            _hpLabel.style.color = Color.white;
-            _hpLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            _hpLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            hpBarWrapper.Add(_hpLabel);
-
-            _statsBar.Add(hpBarWrapper);
-
-            // Mana bar
-            var manaBarWrapper = new VisualElement();
-            manaBarWrapper.style.width = Length.Percent(100);
-            manaBarWrapper.style.height = 48;
-            manaBarWrapper.style.marginBottom = 8;
-            manaBarWrapper.style.justifyContent = Justify.Center;
-
-            _manaBar = new UnidadProgressBar(0.5f);
-            _manaBar.SetVariant(ProgressVariant.Info);
-            _manaBar.style.width = Length.Percent(100);
-            _manaBar.style.height = 16;
-            manaBarWrapper.Add(_manaBar);
-
-            _manaCostOverlay = new VisualElement();
-            _manaCostOverlay.style.position = Position.Absolute;
-            _manaCostOverlay.style.top = 0;
-            _manaCostOverlay.style.bottom = 0;
-            _manaCostOverlay.style.display = DisplayStyle.None;
-            _manaCostOverlay.pickingMode = PickingMode.Ignore;
-            _manaBar.Add(_manaCostOverlay);
-
-            int playerMana = _entityStats.GetCurrentMana(_playerId);
-            int playerMaxMana = _entityStats.GetStat(_playerId, StatType.MaxMana);
-            _manaLabel = new Label($"{playerMana}/{playerMaxMana}");
-            _manaLabel.style.position = Position.Absolute;
-            _manaLabel.style.top = 0;
-            _manaLabel.style.left = 0;
-            _manaLabel.style.right = 0;
-            _manaLabel.style.bottom = 0;
-            _manaLabel.style.fontSize = 36;
-            _manaLabel.style.color = Color.white;
-            _manaLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            _manaLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            manaBarWrapper.Add(_manaLabel);
-
-            _statsBar.Add(manaBarWrapper);
-
-            // Stats row
-            var statsRow = new VisualElement();
-            statsRow.style.flexDirection = FlexDirection.Row;
-            statsRow.style.alignItems = Align.Center;
-            _statsBar.Add(statsRow);
-
-            var statsLabel = new Label("STR: 10  DEX: 8  INT: 12");
-            statsLabel.style.color = Color.white;
-            statsLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            statsLabel.style.fontSize = 38;
-            statsLabel.style.marginRight = 20;
-            statsRow.Add(statsLabel);
-
-            var statusLabel = new Label("Status: Normal");
-            statusLabel.style.color = Color.white;
-            statusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            statusLabel.style.fontSize = 38;
-            statsRow.Add(statusLabel);
+            // Stats bar (HP, Mana, Stats, Status Effects)
+            _playerStatsBar = new PlayerStatsBarVisual(_eventBus, _entityStats, _statusEffects, _playerId);
+            root.Add(_playerStatsBar.Build());
 
             // Projectile overlay
             var projectileOverlay = ProjectilePool.CreateOverlay();
@@ -613,7 +563,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             {
                 if (entityId.Equals(_playerId))
                 {
-                    var hpCenter = _hpBar.worldBound.center;
+                    var hpCenter = _playerStatsBar.HpBar.worldBound.center;
                     return new Vector3(hpCenter.x, hpCenter.y, 0f);
                 }
                 var element = _slotVisual.GetSlotElement(entityId);
@@ -624,11 +574,18 @@ namespace TextRPG.Core.WordInput.Scenarios
                 }
                 return Vector3.zero;
             };
+            _positionProvider = positionProvider;
             _animationService.Initialize(positionProvider, projectileOverlay);
 
             // Status effect visual overlays
             var statusTextOverlay = StatusEffectFloatingTextPool.CreateOverlay();
             root.Add(statusTextOverlay);
+
+            // Floating message overlay (generic arc+bounce messages)
+            var messageOverlay = FloatingMessagePool.CreateOverlay();
+            root.Add(messageOverlay);
+            _messagePool = new FloatingMessagePool();
+            _messagePool.Initialize(messageOverlay);
 
             _tooltipLayer = new VisualElement { name = "tooltip-layer" };
             _tooltipLayer.style.position = Position.Absolute;
@@ -639,9 +596,24 @@ namespace TextRPG.Core.WordInput.Scenarios
             _tooltipLayer.pickingMode = PickingMode.Ignore;
             root.Add(_tooltipLayer);
 
-            _statusVisualService.Initialize(positionProvider, statusTextOverlay,
-                _slotVisual.GetAllSlotElements(), _slotService, _statusEffects, _unitService,
-                _slotVisual, _tooltipLayer, _passiveService);
+            _statusVisualService.Initialize(positionProvider, statusTextOverlay, _slotVisual);
+
+            // Framework tooltip service
+            var elementAnimator = new ElementAnimator();
+            _frameworkTooltipService = new TooltipService(_eventBus, elementAnimator);
+            _frameworkTooltipService.SetTooltipLayer(_tooltipLayer);
+
+            // Entity tooltip service — handles hover tooltips for combat, equipment, and inventory slots
+            _tooltipService = new EntityTooltipService(_eventBus);
+            _tooltipService.Initialize(
+                _slotVisual.GetAllSlotElements(),
+                _rightBar.GetAllSlotElements(),
+                _leftBar.GetAllSlotElements(),
+                _frameworkTooltipService,
+                _slotService, _statusEffects, _unitService, _passiveService,
+                _encounterAdapter, _actionRegistry, _handlerRegistry, _enemyResolver,
+                _ammoResolver, _weaponService, _consumableService, _equipmentService,
+                _itemRegistry, _entityStats, _inventoryService, _playerInventoryId, _playerId);
 
             // Weapon slot — uses bottom slot of right bar
             _weaponSlot = _rightBar.GetSlotElement(4);
@@ -657,6 +629,21 @@ namespace TextRPG.Core.WordInput.Scenarios
             _weaponDurabilityLabel.style.left = 4;
 
             _weaponSlot.RegisterCallback<ClickEvent>(_ => FireWeapon());
+
+            // Consumable slot — uses slot 3 of right bar
+            _consumableSlot = _rightBar.GetSlotElement(3);
+            _consumableSlot.pickingMode = PickingMode.Position;
+
+            _consumableDurabilityLabel = new Label();
+            _consumableDurabilityLabel.style.color = new Color(1f, 0.85f, 0.2f);
+            _consumableDurabilityLabel.style.fontSize = 20;
+            _consumableDurabilityLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _consumableDurabilityLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+            _consumableDurabilityLabel.style.position = Position.Absolute;
+            _consumableDurabilityLabel.style.bottom = 2;
+            _consumableDurabilityLabel.style.left = 4;
+
+            _consumableSlot.RegisterCallback<ClickEvent>(_ => UseConsumable());
 
             // --- Inventory/Equipment visual subscriptions ---
             _subscriptions.Add(_eventBus.Subscribe<Unidad.Core.Inventory.SlotChangedEvent>(OnInventorySlotChanged));
@@ -675,12 +662,14 @@ namespace TextRPG.Core.WordInput.Scenarios
         }
 
         private bool IsAmmoWord(string word) =>
-            _weaponService != null && _weaponService.HasWeapon(_playerId)
-            && _weaponService.IsAmmoForEquipped(_playerId, word);
+            (_weaponService != null && _weaponService.HasWeapon(_playerId)
+            && _weaponService.IsAmmoForEquipped(_playerId, word))
+            || (_consumableService != null && _consumableService.HasConsumable(_playerId)
+            && _consumableService.IsAmmoForEquipped(_playerId, word));
 
         private void FireWeapon()
         {
-            if (!_combatLoop.FireWeapon()) return;
+            if (_combatLoop == null || !_combatLoop.FireWeapon()) return;
 
             _service.Clear();
             _codeField.value = "";
@@ -697,12 +686,23 @@ namespace TextRPG.Core.WordInput.Scenarios
             foreach (var c in newText)
                 _service.AppendCharacter(c);
 
+            // Use remapped text for display and matching (differs from newText when drunk)
+            var displayText = _service.CurrentWord;
+
             RecalculateFontSize();
 
-            bool isAmmo = IsAmmoWord(newText);
+            // Update label text to show remapped characters immediately
+            if (_drunkLetterService != null && _drunkLetterService.IsActive)
+            {
+                var labels = _codeField.CharLabels;
+                for (int i = 0; i < labels.Count && i < displayText.Length; i++)
+                    labels[i].text = displayText[i].ToString();
+            }
+
+            bool isAmmo = IsAmmoWord(displayText);
             var matchService = isAmmo ? _ammoMatchService : _wordMatchService;
             var wasMatched = matchService.IsMatched;
-            var colors = matchService.CheckMatch(newText);
+            var colors = matchService.CheckMatch(displayText);
             if (colors.Count > 0)
             {
                 var labels = _codeField.CharLabels;
@@ -717,11 +717,11 @@ namespace TextRPG.Core.WordInput.Scenarios
                     _codeField.PlayHighlightAnimation(indices);
                 }
 
-                var currentWord = newText.ToLowerInvariant();
+                var currentWord = displayText.ToLowerInvariant();
                 if (currentWord != _lastMatchedWord)
                 {
                     _lastMatchedWord = currentWord;
-                    ShowTargetingPreview(newText);
+                    ShowTargetingPreview(displayText);
                     if (!isAmmo)
                         ShowManaCostPreview(currentWord);
                     else
@@ -737,6 +737,26 @@ namespace TextRPG.Core.WordInput.Scenarios
                 _lastMatchedWord = "";
                 ClearTargetingPreview();
                 ClearManaCostPreview();
+            }
+
+            // Apply drunk visual override — color letters that were remapped
+            if (_drunkLetterService != null && _drunkLetterService.IsActive)
+            {
+                var drunkLabels = _codeField.CharLabels;
+                for (int i = 0; i < drunkLabels.Count && i < newText.Length; i++)
+                {
+                    var original = char.ToLowerInvariant(newText[i]);
+                    if (_drunkLetterService.IsLetterDrunk(original))
+                    {
+                        drunkLabels[i].style.color = new Color(1f, 0.85f, 0.2f);
+                        drunkLabels[i].AddToClassList("drunk-letter");
+                    }
+                    else
+                    {
+                        drunkLabels[i].RemoveFromClassList("drunk-letter");
+                    }
+                }
+                UpdateDrunkWobble();
             }
         }
 
@@ -774,13 +794,31 @@ namespace TextRPG.Core.WordInput.Scenarios
 
         private void SubmitCurrentWord(string word = null)
         {
-            word ??= _codeField?.value?.Trim() ?? "";
+            // Use remapped word (after drunk letter scramble) so submit matches preview
+            word ??= _service.CurrentWord?.Trim() ?? "";
             if (word.Length == 0) return;
 
-            var result = _combatLoop.SubmitWord(word);
+            WordSubmitResult result;
+            if (_combatLoop != null)
+                result = _combatLoop.SubmitWord(word);
+            else if (_eventEncounterLoop != null)
+                result = _eventEncounterLoop.SubmitWord(word);
+            else
+                return;
+
             if (result == WordSubmitResult.InsufficientMana)
             {
                 PlayManaRejection();
+                _codeField?.schedule.Execute(() => _codeField?.Focus());
+                return;
+            }
+            if (result == WordSubmitResult.ReservedWord)
+            {
+                _service.Clear();
+                _codeField.value = "";
+                RecalculateFontSize();
+                ClearTargetingPreview();
+                ClearManaCostPreview();
                 _codeField?.schedule.Execute(() => _codeField?.Focus());
                 return;
             }
@@ -796,7 +834,7 @@ namespace TextRPG.Core.WordInput.Scenarios
 
         private void OnKeyDown(KeyDownEvent evt)
         {
-            if (!_combatLoop.IsPlayerTurn) return;
+            if (_combatLoop != null && !_combatLoop.IsPlayerTurn) return;
             if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
             {
                 SubmitCurrentWord();
@@ -865,27 +903,9 @@ namespace TextRPG.Core.WordInput.Scenarios
             }
         }
 
-        private void UpdatePlayerHpBar()
-        {
-            if (_hpBar == null || _hpLabel == null) return;
-            int hp = _entityStats.GetCurrentHealth(_playerId);
-            int maxHp = _entityStats.GetStat(_playerId, StatType.MaxHealth);
-            _hpBar.Value = (float)hp / maxHp;
-            _hpLabel.text = $"{hp}/{maxHp}";
-        }
-
-        private void UpdatePlayerManaBar()
-        {
-            if (_manaBar == null || _manaLabel == null) return;
-            int mana = _entityStats.GetCurrentMana(_playerId);
-            int maxMana = _entityStats.GetStat(_playerId, StatType.MaxMana);
-            _manaBar.Value = maxMana > 0 ? (float)mana / maxMana : 0f;
-            _manaLabel.text = $"{mana}/{maxMana}";
-        }
-
         private void ShowManaCostPreview(string word)
         {
-            if (_manaBar == null || _manaLabel == null || _manaCostOverlay == null) return;
+            if (_playerStatsBar.ManaBar == null || _playerStatsBar.ManaLabel == null || _playerStatsBar.ManaCostOverlay == null) return;
 
             var meta = _wordResolver.GetStats(word);
             int cost = meta.Cost;
@@ -904,32 +924,32 @@ namespace TextRPG.Core.WordInput.Scenarios
             int previewMana = currentMana - cost;
             float previewRatio = (float)previewMana / maxMana;
 
-            _manaBar.Value = Mathf.Clamp01(previewRatio);
+            _playerStatsBar.ManaBar.Value = Mathf.Clamp01(previewRatio);
 
             float overlayLeft = Mathf.Max(0f, previewRatio);
             float overlayWidth = currentRatio - overlayLeft;
-            _manaCostOverlay.style.left = Length.Percent(overlayLeft * 100f);
-            _manaCostOverlay.style.width = Length.Percent(overlayWidth * 100f);
-            _manaCostOverlay.style.display = DisplayStyle.Flex;
+            _playerStatsBar.ManaCostOverlay.style.left = Length.Percent(overlayLeft * 100f);
+            _playerStatsBar.ManaCostOverlay.style.width = Length.Percent(overlayWidth * 100f);
+            _playerStatsBar.ManaCostOverlay.style.display = DisplayStyle.Flex;
 
             bool canAfford = previewMana >= 0;
-            _manaCostOverlay.style.backgroundColor = canAfford
+            _playerStatsBar.ManaCostOverlay.style.backgroundColor = canAfford
                 ? new Color(1f, 0.6f, 0f, 0.5f)
                 : new Color(1f, 0f, 0f, 0.5f);
 
-            _manaLabel.text = $"{previewMana}/{maxMana} (-{cost})";
-            _manaLabel.style.color = canAfford ? Color.white : Color.red;
+            _playerStatsBar.ManaLabel.text = $"{previewMana}/{maxMana} (-{cost})";
+            _playerStatsBar.ManaLabel.style.color = canAfford ? Color.white : Color.red;
         }
 
         private void ClearManaCostPreview()
         {
             if (!_isPreviewingManaCost) return;
             _isPreviewingManaCost = false;
-            if (_manaCostOverlay != null)
-                _manaCostOverlay.style.display = DisplayStyle.None;
-            UpdatePlayerManaBar();
-            if (_manaLabel != null)
-                _manaLabel.style.color = Color.white;
+            if (_playerStatsBar.ManaCostOverlay != null)
+                _playerStatsBar.ManaCostOverlay.style.display = DisplayStyle.None;
+            _playerStatsBar.UpdateManaBar();
+            if (_playerStatsBar.ManaLabel != null)
+                _playerStatsBar.ManaLabel.style.color = Color.white;
         }
 
         private void PlayManaRejection()
@@ -940,8 +960,8 @@ namespace TextRPG.Core.WordInput.Scenarios
                 indices.Add(i);
             _codeField.PlayRejectionAnimation(indices);
 
-            _manaBar.SetVariant(ProgressVariant.Danger);
-            _manaBar.schedule.Execute(() => _manaBar?.SetVariant(ProgressVariant.Info)).ExecuteLater(500);
+            _playerStatsBar.ManaBar.SetVariant(ProgressVariant.Danger);
+            _playerStatsBar.ManaBar.schedule.Execute(() => _playerStatsBar.ManaBar?.SetVariant(ProgressVariant.Info)).ExecuteLater(500);
 
             Debug.Log("[WordInputScenario] Insufficient mana — word rejected");
         }
@@ -974,6 +994,107 @@ namespace TextRPG.Core.WordInput.Scenarios
         {
             _rightBar?.SetSlotContent(4, name, Color.white);
             _weaponSlot?.Add(_weaponDurabilityLabel);
+        }
+
+        private void UseConsumable()
+        {
+            if (_combatLoop == null || !_combatLoop.UseConsumable()) return;
+
+            _service.Clear();
+            _codeField.value = "";
+            ClearTargetingPreview();
+            ClearManaCostPreview();
+            _codeField?.schedule.Execute(() => _codeField?.Focus());
+        }
+
+        private void OnConsumableEquipped(ConsumableEquippedEvent evt)
+        {
+            if (!evt.Entity.Equals(_playerId)) return;
+            Debug.Log($"[WordInputScenario] Consumable equipped: {evt.Consumable.DisplayName} (dur={evt.Consumable.Durability})");
+            _rightBar?.SetSlotContent(3, evt.Consumable.DisplayName, new Color(1f, 0.85f, 0.2f));
+            _consumableDurabilityLabel.text = evt.Consumable.Durability.ToString();
+            _consumableSlot?.Add(_consumableDurabilityLabel);
+        }
+
+        private void OnConsumableDurabilityChanged(ConsumableDurabilityChangedEvent evt)
+        {
+            if (!evt.Entity.Equals(_playerId)) return;
+            Debug.Log($"[WordInputScenario] Consumable durability: {evt.CurrentDurability}/{evt.MaxDurability}");
+            _consumableDurabilityLabel.text = evt.CurrentDurability.ToString();
+        }
+
+        private void OnConsumableDestroyed(ConsumableDestroyedEvent evt)
+        {
+            if (!evt.Entity.Equals(_playerId)) return;
+            Debug.Log($"[WordInputScenario] Consumable destroyed: {evt.Word}");
+            _rightBar?.ClearSlotContent(3);
+            if (_consumableDurabilityLabel?.parent != null)
+                _consumableDurabilityLabel.RemoveFromHierarchy();
+        }
+
+        private void RefreshDrunkVisuals()
+        {
+            if (_codeField == null) return;
+            var labels = _codeField.CharLabels;
+            if (labels.Count == 0) return;
+
+            // _codeField.value has original typed chars; remap and update labels
+            var originalText = _codeField.value ?? "";
+            for (int i = 0; i < labels.Count && i < originalText.Length; i++)
+            {
+                var original = char.ToLowerInvariant(originalText[i]);
+                if (_drunkLetterService != null && _drunkLetterService.IsLetterDrunk(original))
+                {
+                    var remapped = _drunkLetterService.RemapInput(original);
+                    labels[i].text = remapped.ToString();
+                    labels[i].style.color = new Color(1f, 0.85f, 0.2f);
+                    labels[i].AddToClassList("drunk-letter");
+                }
+                else
+                {
+                    labels[i].text = original.ToString();
+                    labels[i].RemoveFromClassList("drunk-letter");
+                }
+            }
+
+            UpdateDrunkWobble();
+        }
+
+        private void UpdateDrunkWobble()
+        {
+            if (_drunkLetterService == null || !_drunkLetterService.IsActive)
+            {
+                _drunkWobbleSchedule?.Pause();
+                _drunkWobbleSchedule = null;
+                // Reset transforms on all labels
+                if (_codeField != null)
+                {
+                    var labels = _codeField.CharLabels;
+                    for (int i = 0; i < labels.Count; i++)
+                    {
+                        labels[i].style.translate = new Translate(0, 0);
+                        labels[i].RemoveFromClassList("drunk-letter");
+                    }
+                }
+                return;
+            }
+
+            if (_drunkWobbleSchedule != null) return;
+
+            _drunkWobbleSchedule = _codeField.schedule.Execute(() =>
+            {
+                if (_codeField == null || _drunkLetterService == null) return;
+                var labels = _codeField.CharLabels;
+                var text = _codeField.value ?? "";
+                float time = Time.time;
+                for (int i = 0; i < labels.Count && i < text.Length; i++)
+                {
+                    if (!labels[i].ClassListContains("drunk-letter")) continue;
+                    float offsetX = Mathf.Sin(time * 8 + i) * 3f;
+                    float offsetY = Mathf.Cos(time * 6 + i * 0.5f) * 2f;
+                    labels[i].style.translate = new Translate(offsetX, offsetY);
+                }
+            }).Every(16);
         }
 
         private void RefreshEntityCell(EntityId entityId)
@@ -1031,7 +1152,7 @@ namespace TextRPG.Core.WordInput.Scenarios
 
         private void OnInventorySlotPointerDown(PointerDownEvent evt, int slotIndex)
         {
-            if (_encounterAdapter?.IsEncounterActive == true) return;
+            if (_encounterAdapter?.IsEncounterActive == true || _eventEncounterService?.IsEncounterActive == true) return;
             if (_inventoryService == null) return;
             var slot = _inventoryService.GetSlot(_playerInventoryId, slotIndex);
             if (slot.IsEmpty) return;
@@ -1045,7 +1166,7 @@ namespace TextRPG.Core.WordInput.Scenarios
 
         private void OnEquipmentSlotPointerDown(PointerDownEvent evt, int slotIndex)
         {
-            if (_encounterAdapter?.IsEncounterActive == true) return;
+            if (_encounterAdapter?.IsEncounterActive == true || _eventEncounterService?.IsEncounterActive == true) return;
             if (_equipmentService == null) return;
             var slotType = (EquipmentSlotType)slotIndex;
             var equipped = _equipmentService.GetEquipped(_playerId, slotType);
@@ -1158,8 +1279,8 @@ namespace TextRPG.Core.WordInput.Scenarios
                     SceneRoot != null ? null : "No scene root"),
                 new("AnimatedCodeField exists", _codeField != null,
                     _codeField != null ? null : "Code field is null"),
-                new("Stats bar exists", _statsBar != null,
-                    _statsBar != null ? null : "Stats bar is null"),
+                new("Stats bar exists", _playerStatsBar?.Root != null,
+                    _playerStatsBar?.Root != null ? null : "Stats bar is null"),
                 new("Main text panel has black background",
                     _mainTextPanel != null && _mainTextPanel.resolvedStyle.backgroundColor == Color.black,
                     _mainTextPanel != null && _mainTextPanel.resolvedStyle.backgroundColor == Color.black
@@ -1178,12 +1299,11 @@ namespace TextRPG.Core.WordInput.Scenarios
             _lootOverlay.style.top = 0;
             _lootOverlay.style.right = 0;
             _lootOverlay.style.bottom = 0;
-            _lootOverlay.style.backgroundColor = new Color(0f, 0f, 0f, 0.7f);
             _lootOverlay.style.justifyContent = Justify.Center;
             _lootOverlay.style.alignItems = Align.Center;
             _lootOverlay.pickingMode = PickingMode.Position;
 
-            var title = new Label("VICTORY — Choose a Reward");
+            var title = new Label("Choose a reward");
             title.style.fontSize = 32;
             title.style.color = Color.white;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -1202,62 +1322,26 @@ namespace TextRPG.Core.WordInput.Scenarios
             {
                 var item = options[i];
                 var cardIndex = i;
+                var slotIndex = (int)item.SlotType;
 
                 var card = new VisualElement();
-                card.style.width = 200;
-                card.style.height = 250;
                 card.style.marginLeft = 12;
                 card.style.marginRight = 12;
-                card.style.backgroundColor = new Color(0.12f, 0.12f, 0.15f);
-                card.style.borderTopWidth = 2;
-                card.style.borderBottomWidth = 2;
-                card.style.borderLeftWidth = 2;
-                card.style.borderRightWidth = 2;
-                card.style.borderTopColor = item.Color;
-                card.style.borderBottomColor = item.Color;
-                card.style.borderLeftColor = item.Color;
-                card.style.borderRightColor = item.Color;
-                card.style.borderTopLeftRadius = 8;
-                card.style.borderTopRightRadius = 8;
-                card.style.borderBottomLeftRadius = 8;
-                card.style.borderBottomRightRadius = 8;
-                card.style.paddingLeft = 12;
-                card.style.paddingRight = 12;
-                card.style.paddingTop = 12;
-                card.style.paddingBottom = 12;
-                card.style.justifyContent = Justify.FlexStart;
                 card.style.alignItems = Align.Center;
                 card.pickingMode = PickingMode.Position;
 
-                var slotLabel = new Label(item.SlotType.ToString().ToUpperInvariant());
-                slotLabel.style.fontSize = 14;
-                slotLabel.style.color = new Color(0.6f, 0.6f, 0.6f);
-                slotLabel.style.marginBottom = 8;
-                slotLabel.pickingMode = PickingMode.Ignore;
-                card.Add(slotLabel);
+                card.Add(TooltipContentBuilder.CreateMiniWordBox(item.DisplayName, item.Color, 120, 100));
 
-                var nameContainer = new VisualElement();
-                nameContainer.style.width = 176;
-                nameContainer.style.height = 120;
-                nameContainer.style.justifyContent = Justify.Center;
-                nameContainer.style.alignItems = Align.Center;
-                nameContainer.style.marginBottom = 12;
-                nameContainer.pickingMode = PickingMode.Ignore;
-                var nameLayout = UnitTextLayout.Calculate(item.DisplayName, 176, 120);
-                UnitTextLabels.AddTo(nameLayout, item.Color, nameContainer);
-                card.Add(nameContainer);
-
-                var statsText = BuildStatSummary(item.Stats);
-                var statsLabel = new Label(statsText);
-                statsLabel.style.fontSize = 14;
-                statsLabel.style.color = Color.white;
-                statsLabel.style.whiteSpace = WhiteSpace.Normal;
-                statsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-                statsLabel.pickingMode = PickingMode.Ignore;
-                card.Add(statsLabel);
-
-                card.RegisterCallback<PointerEnterEvent>(_ => ShowLootTooltip(item, card));
-                card.RegisterCallback<PointerLeaveEvent>(_ => HideLootTooltip());
+                card.RegisterCallback<PointerEnterEvent>(_ =>
+                {
+                    ShowLootTooltip(item, card);
+                    HighlightEquipmentSlot(slotIndex);
+                });
+                card.RegisterCallback<PointerLeaveEvent>(_ =>
+                {
+                    HideLootTooltip();
+                    ClearEquipmentSlotHighlight();
+                });
                 card.RegisterCallback<ClickEvent>(_ => _lootRewardService.SelectReward(cardIndex));
 
                 cardRow.Add(card);
@@ -1271,6 +1355,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             _lootOverlay?.RemoveFromHierarchy();
             _lootOverlay = null;
             HideLootTooltip();
+            ClearEquipmentSlotHighlight();
         }
 
         private void ShowLootTooltip(EquipmentItemDefinition item, VisualElement card)
@@ -1294,38 +1379,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             _lootTooltip.style.paddingBottom = 12;
             _lootTooltip.pickingMode = PickingMode.Ignore;
 
-            var nameLabel = new Label(item.DisplayName);
-            nameLabel.style.color = item.Color;
-            nameLabel.style.fontSize = 22;
-            nameLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            nameLabel.style.marginBottom = 4;
-            nameLabel.pickingMode = PickingMode.Ignore;
-            _lootTooltip.Add(nameLabel);
-
-            var slotLabel = new Label(item.SlotType.ToString());
-            slotLabel.style.color = new Color(0.6f, 0.6f, 0.6f);
-            slotLabel.style.fontSize = 16;
-            slotLabel.style.marginBottom = 8;
-            slotLabel.pickingMode = PickingMode.Ignore;
-            _lootTooltip.Add(slotLabel);
-
-            AddStatLine(item.Stats.MaxHealth, "Max Health");
-            AddStatLine(item.Stats.PhysDefense, "Physical Defense");
-            AddStatLine(item.Stats.MagicDefense, "Magic Defense");
-            AddStatLine(item.Stats.Strength, "Strength");
-            AddStatLine(item.Stats.MagicPower, "Magic Power");
-            AddStatLine(item.Stats.Luck, "Luck");
-
-            void AddStatLine(int value, string label)
-            {
-                if (value <= 0) return;
-                var line = new Label($"+{value} {label}");
-                line.style.color = new Color(0.3f, 1f, 0.3f);
-                line.style.fontSize = 16;
-                line.style.marginBottom = 2;
-                line.pickingMode = PickingMode.Ignore;
-                _lootTooltip.Add(line);
-            }
+            _lootTooltip.Add(TooltipContentBuilder.BuildHeader(item.DisplayName, item.Color, item.SlotType.ToString()));
+            _lootTooltip.Add(TooltipContentBuilder.BuildArmorContent(item));
 
             RootVisualElement.Add(_lootTooltip);
 
@@ -1340,16 +1395,263 @@ namespace TextRPG.Core.WordInput.Scenarios
             _lootTooltip = null;
         }
 
-        private static string BuildStatSummary(StatBonus stats)
+        private void HighlightEquipmentSlot(int slotIndex)
         {
-            var parts = new System.Collections.Generic.List<string>();
-            if (stats.MaxHealth > 0) parts.Add($"+{stats.MaxHealth} HP");
-            if (stats.PhysDefense > 0) parts.Add($"+{stats.PhysDefense} DEF");
-            if (stats.MagicDefense > 0) parts.Add($"+{stats.MagicDefense} MDEF");
-            if (stats.Strength > 0) parts.Add($"+{stats.Strength} STR");
-            if (stats.MagicPower > 0) parts.Add($"+{stats.MagicPower} MAG");
-            if (stats.Luck > 0) parts.Add($"+{stats.Luck} LCK");
-            return string.Join(", ", parts);
+            ClearEquipmentSlotHighlight();
+            _highlightedSlotIndex = slotIndex;
+            var slot = _rightBar.GetSlotElement(slotIndex);
+            var green = new Color(0.3f, 1f, 0.3f);
+            slot.style.borderTopColor = green;
+            slot.style.borderBottomColor = green;
+            slot.style.borderLeftColor = green;
+            slot.style.borderRightColor = green;
+        }
+
+        private void ClearEquipmentSlotHighlight()
+        {
+            if (_highlightedSlotIndex < 0) return;
+            var slot = _rightBar.GetSlotElement(_highlightedSlotIndex);
+            slot.style.borderTopColor = Color.white;
+            slot.style.borderBottomColor = Color.white;
+            slot.style.borderLeftColor = Color.white;
+            slot.style.borderRightColor = Color.white;
+            _highlightedSlotIndex = -1;
+        }
+
+        // --- Run system methods ---
+
+        private void OnRunNodeStarted(RunNodeStartedEvent evt)
+        {
+            var node = _runService.CurrentRun.Nodes[evt.NodeIndex];
+            if (node.CombatEncounter != null)
+                StartCombatNode(node.CombatEncounter);
+            else if (node.EventEncounter != null)
+                StartEventNode(node.EventEncounter);
+            UpdateNodeProgressLabel(evt.NodeIndex, evt.NodeType);
+            Debug.Log($"[Run] Node {evt.NodeIndex + 1}/{_runService.CurrentRun.Nodes.Length} started: {evt.NodeType} — {evt.EncounterId}");
+        }
+
+        private void OnRunNodeCompleted(RunNodeCompletedEvent evt)
+        {
+            CleanupCurrentNode();
+            Debug.Log($"[Run] Node {evt.NodeIndex + 1} completed (victory={evt.Victory})");
+        }
+
+        private void OnRunCompleted(RunCompletedEvent evt)
+        {
+            Debug.Log($"[Run] Run {(evt.Victory ? "VICTORY" : "DEFEAT")}!");
+            if (evt.Victory)
+                ShowRunCompleteOverlay();
+        }
+
+        private void StartCombatNode(EncounterDefinition encounter)
+        {
+            // Clear and repopulate enemy word resolver (shared with CompositeWordResolver)
+            (_enemyResolver as EnemyWordResolver)?.Clear();
+
+            _encounterAdapter = new ScenarioEncounterAdapter();
+            _encounterAdapter.SetPlayer(_playerId);
+            _encounterAdapter.SetEventBus(_eventBus);
+
+            var enemyIds = new List<EntityId>();
+            for (int i = 0; i < encounter.Enemies.Length && i < 3; i++)
+            {
+                var def = encounter.Enemies[i];
+                var unitId = $"{def.Name.ToLowerInvariant()}_{i}";
+                var entityId = new EntityId(unitId);
+
+                _entityStats.RegisterEntity(entityId, def.MaxHealth, def.Strength, def.MagicPower,
+                    def.PhysicalDefense, def.MagicDefense, def.Luck);
+                _unitService.Register(new UnitId(unitId),
+                    new UnitDefinition(new UnitId(unitId), def.Name,
+                        def.MaxHealth, def.Strength, def.PhysicalDefense, def.Luck, def.Color));
+                _slotService.RegisterEnemy(entityId, i);
+                enemyIds.Add(entityId);
+                _encounterAdapter.RegisterEnemy(entityId, def);
+
+                // Find matching unit key for word registration
+                var matchKey = _allUnits.FirstOrDefault(kvp =>
+                    kvp.Value.Name == def.Name).Key;
+                if (matchKey != null)
+                    UnitDatabaseLoader.RegisterUnitWords((_enemyResolver as EnemyWordResolver), matchKey);
+            }
+            _encounterAdapter.Activate();
+
+            _combatContext.SetEnemies(enemyIds.ToArray());
+            _combatContext.SetAllies(Array.Empty<EntityId>());
+
+            // Scorer registry
+            var scorers = CombatAISystemInstaller.CreateScorerRegistry(_statusEffects);
+
+            // CombatAI service
+            _combatAI = new CombatAIService(_eventBus, _encounterAdapter, _entityStats,
+                _turnService, _slotService, _combatContext, _actionExecution, scorers,
+                (_enemyResolver as EnemyWordResolver), _allUnits);
+
+            // Turn order: player first, then enemies
+            var turnOrder = new List<EntityId> { _playerId };
+            turnOrder.AddRange(enemyIds);
+            _turnService.SetTurnOrder(turnOrder);
+
+            // CombatLoop with RunService as reserved word handler
+            _combatLoop = new CombatLoopService(
+                _eventBus, _turnService, _entityStats, _wordResolver, _weaponService, _playerId,
+                _consumableService, (IReservedWordHandler)_runService);
+            _combatLoop.Start();
+
+            // Register passives and tags for enemies
+            for (int i = 0; i < encounter.Enemies.Length && i < 3; i++)
+            {
+                var def = encounter.Enemies[i];
+                var unitId = $"{def.Name.ToLowerInvariant()}_{i}";
+                var eid = new EntityId(unitId);
+                if (def.Passives != null)
+                    _passiveService.RegisterPassives(eid, def.Passives);
+                if (def.Tags != null && def.Tags.Length > 0)
+                    _reactionService.RegisterReactions(eid, null, def.Tags);
+            }
+
+            // Update slot visual
+            // Slot visual refreshes via SlotEntityRegisteredEvent/RemovedEvent subscriptions
+            SetInputEnabled(true);
+        }
+
+        private void StartEventNode(EventEncounterDefinition encounter)
+        {
+            // Use run-lifetime reaction service for event encounters
+            _eventEncounterService = new EventEncounterService(
+                _eventBus, _entityStats, _slotService, _combatContext, _reactionService);
+            _reactionContext.EncounterService = _eventEncounterService;
+            _tooltipService?.SetEventEncounterService(_eventEncounterService);
+
+            // Register interactable UnitDefinitions for rendering
+            for (int i = 0; i < encounter.Interactables.Length; i++)
+            {
+                var def = encounter.Interactables[i];
+                var entityId = new EntityId($"interactable_{def.Name.ToLowerInvariant()}_{i}");
+                var uid = new UnitId(entityId.Value);
+                _unitService.Register(uid,
+                    new UnitDefinition(uid, def.Name, def.MaxHealth, 0, 0, 0, def.Color));
+            }
+
+            // Start encounter
+            _eventEncounterService.StartEncounter(encounter, _playerId);
+
+            // Register interactable passives
+            for (int i = 0; i < encounter.Interactables.Length; i++)
+            {
+                var def = encounter.Interactables[i];
+                if (def.Passives != null && def.Passives.Length > 0)
+                {
+                    var entityId = _eventEncounterService.InteractableEntities[i];
+                    _passiveService.RegisterPassives(entityId, def.Passives);
+                }
+            }
+
+            // Event encounter loop with RunService as reserved word handler
+            _eventEncounterLoop = new EventEncounterLoopService(
+                _eventBus, _entityStats, _wordResolver, _eventEncounterService, _playerId,
+                (IReservedWordHandler)_runService);
+            _eventEncounterLoop.Start();
+
+            // Update slot visual
+            // Slot visual refreshes via SlotEntityRegisteredEvent/RemovedEvent subscriptions
+            SetInputEnabled(true);
+        }
+
+        private void CleanupCurrentNode()
+        {
+            // Dispose per-encounter combat services
+            (_combatLoop as IDisposable)?.Dispose();
+            _combatLoop = null;
+            (_combatAI as IDisposable)?.Dispose();
+            _combatAI = null;
+
+            // Dispose per-encounter event services
+            (_eventEncounterLoop as IDisposable)?.Dispose();
+            _eventEncounterLoop = null;
+            if (_eventEncounterService?.IsEncounterActive == true)
+                _eventEncounterService.EndEncounter();
+            (_eventEncounterService as IDisposable)?.Dispose();
+            _eventEncounterService = null;
+
+            // Clear reactions (tags registered during combat or event encounters)
+            _reactionService?.ClearReactions();
+
+            // Clear encounter adapter
+            if (_encounterAdapter != null)
+            {
+                _encounterAdapter.EndEncounter();
+                _encounterAdapter = null;
+            }
+
+            // Clear enemy entities from slots
+            _slotService.Initialize();
+
+            // Clear enemy resolver (reuse same instance — tooltip service holds a reference)
+            (_enemyResolver as EnemyWordResolver)?.Clear();
+
+            // Reset combat context enemies
+            _combatContext.SetEnemies(Array.Empty<EntityId>());
+            _combatContext.SetAllies(Array.Empty<EntityId>());
+
+            // Update slot visual
+            // Slot visual refreshes via SlotEntityRegisteredEvent/RemovedEvent subscriptions
+        }
+
+        private void UpdateNodeProgressLabel(int nodeIndex, RunNodeType nodeType)
+        {
+            if (_nodeProgressLabel == null) return;
+            var total = _runService.CurrentRun.Nodes.Length;
+            _nodeProgressLabel.text = $"Node {nodeIndex + 1}/{total} — {nodeType}";
+        }
+
+        private void ShowRunCompleteOverlay()
+        {
+            SetInputEnabled(false);
+
+            var overlay = new VisualElement();
+            overlay.style.position = Position.Absolute;
+            overlay.style.left = 0;
+            overlay.style.top = 0;
+            overlay.style.right = 0;
+            overlay.style.bottom = 0;
+            overlay.style.backgroundColor = new Color(0f, 0f, 0f, 0.8f);
+            overlay.style.justifyContent = Justify.Center;
+            overlay.style.alignItems = Align.Center;
+            overlay.pickingMode = PickingMode.Position;
+
+            var title = new Label("RUN COMPLETE");
+            title.style.fontSize = 48;
+            title.style.color = new Color(1f, 0.85f, 0.2f);
+            title.style.unityFontStyleAndWeight = FontStyle.Bold;
+            title.style.unityTextAlign = TextAnchor.MiddleCenter;
+            title.pickingMode = PickingMode.Ignore;
+            overlay.Add(title);
+
+            var subtitle = new Label("All encounters cleared!");
+            subtitle.style.fontSize = 24;
+            subtitle.style.color = Color.white;
+            subtitle.style.marginTop = 16;
+            subtitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            subtitle.pickingMode = PickingMode.Ignore;
+            overlay.Add(subtitle);
+
+            RootVisualElement.Add(overlay);
+        }
+
+        private static Dictionary<string, EventEncounterDefinition> LoadEventEncounters()
+        {
+            var registry = new EventEncounterProviderRegistry();
+            EventEncounterDatabaseLoader.LoadIntoRegistry(registry);
+
+            var result = new Dictionary<string, EventEncounterDefinition>();
+            foreach (var key in registry.Keys)
+            {
+                if (registry.TryGet(key, out var provider))
+                    result[key] = provider.CreateDefinition();
+            }
+            return result;
         }
 
         protected override void OnCleanup()
@@ -1357,6 +1659,13 @@ namespace TextRPG.Core.WordInput.Scenarios
             foreach (var sub in _subscriptions) sub.Dispose();
             _subscriptions.Clear();
 
+            _tooltipService?.Dispose();
+            _tooltipService = null;
+            (_frameworkTooltipService as IDisposable)?.Dispose();
+            _frameworkTooltipService = null;
+            _messagePool?.Dispose();
+            _messagePool = null;
+            _positionProvider = null;
             _statusVisualService?.Dispose();
             _statusVisualService = null;
             _statusEffects = null;
@@ -1364,12 +1673,21 @@ namespace TextRPG.Core.WordInput.Scenarios
             (_passiveService as IDisposable)?.Dispose();
             (_combatLoop as IDisposable)?.Dispose();
             (_combatAI as IDisposable)?.Dispose();
+            (_eventEncounterLoop as IDisposable)?.Dispose();
+            (_eventEncounterService as IDisposable)?.Dispose();
+            (_runService as IDisposable)?.Dispose();
+            (_reactionService as IDisposable)?.Dispose();
             (_turnService as IDisposable)?.Dispose();
             _eventBus?.ClearAllSubscriptions();
             _animationService = null;
             _passiveService = null;
+            _reactionService = null;
+            _reactionContext = null;
             _combatLoop = null;
             _combatAI = null;
+            _eventEncounterLoop = null;
+            _eventEncounterService = null;
+            _runService = null;
             _turnService = null;
             _encounterAdapter = null;
             _eventBus = null;
@@ -1378,7 +1696,6 @@ namespace TextRPG.Core.WordInput.Scenarios
             _codeField = null;
             _linesContainer = null;
             _mainTextPanel = null;
-            _statsBar = null;
             _slotVisual = null;
             _wordMatchService = null;
             _wordResolver = null;
@@ -1394,6 +1711,16 @@ namespace TextRPG.Core.WordInput.Scenarios
             _ammoMatchService = null;
             _weaponSlot = null;
             _weaponDurabilityLabel = null;
+            _drunkWobbleSchedule?.Pause();
+            _drunkWobbleSchedule = null;
+            (_drunkLetterService as IDisposable)?.Dispose();
+            _drunkLetterService = null;
+            (_consumableService as IDisposable)?.Dispose();
+            (_consumableExecutor as IDisposable)?.Dispose();
+            _consumableService = null;
+            _consumableExecutor = null;
+            _consumableSlot = null;
+            _consumableDurabilityLabel = null;
             CancelDrag();
             (_lootRewardService as IDisposable)?.Dispose();
             _lootRewardService = null;
@@ -1401,6 +1728,14 @@ namespace TextRPG.Core.WordInput.Scenarios
             _lootOverlay = null;
             HideLootTooltip();
             _tooltipLayer = null;
+            _enemyResolver = null;
+            _actionRegistry = null;
+            _handlerRegistry = null;
+            _actionHandlerCtx = null;
+            _scenarioAnimResolver = null;
+            _allUnits = null;
+            _allEventEncounters = null;
+            _nodeProgressLabel = null;
             (_equipmentService as IDisposable)?.Dispose();
             (_inventoryService as IDisposable)?.Dispose();
             _equipmentService = null;
@@ -1409,11 +1744,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             _leftBar = null;
             _rightBar = null;
             _allyRow = null;
-            _hpBar = null;
-            _hpLabel = null;
-            _manaBar = null;
-            _manaLabel = null;
-            _manaCostOverlay = null;
+            _playerStatsBar?.Dispose();
+            _playerStatsBar = null;
         }
 
         private sealed class ScenarioAnimationResolver : IAnimationResolver

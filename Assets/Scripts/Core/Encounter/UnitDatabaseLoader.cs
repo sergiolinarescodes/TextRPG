@@ -8,31 +8,6 @@ namespace TextRPG.Core.Encounter
 {
     internal static class UnitDatabaseLoader
     {
-        [Table("units")]
-        private class UnitRow
-        {
-            [Column("unit_id")] public string UnitId { get; set; }
-            [Column("display_name")] public string DisplayName { get; set; }
-            [Column("unit_type")] public string UnitType { get; set; }
-            [Column("max_health")] public int MaxHealth { get; set; }
-            [Column("strength")] public int Strength { get; set; }
-            [Column("magic_power")] public int MagicPower { get; set; }
-            [Column("phys_defense")] public int PhysDefense { get; set; }
-            [Column("magic_defense")] public int MagicDefense { get; set; }
-            [Column("luck")] public int Luck { get; set; }
-            [Column("starting_shield")] public int StartingShield { get; set; }
-            [Column("color_r")] public float ColorR { get; set; }
-            [Column("color_g")] public float ColorG { get; set; }
-            [Column("color_b")] public float ColorB { get; set; }
-        }
-
-        [Table("unit_abilities")]
-        private class UnitAbilityRow
-        {
-            [Column("unit_id")] public string UnitId { get; set; }
-            [Column("word")] public string Word { get; set; }
-        }
-
         [Table("word_actions")]
         private class WordActionRow
         {
@@ -56,6 +31,13 @@ namespace TextRPG.Core.Encounter
             [Column("target")] public string Target { get; set; }
         }
 
+        [Table("unit_tags")]
+        private class UnitTagRow
+        {
+            [Column("unit_id")] public string UnitId { get; set; }
+            [Column("tag")] public string Tag { get; set; }
+        }
+
         [Table("word_meta")]
         private class WordMetaRow
         {
@@ -66,14 +48,14 @@ namespace TextRPG.Core.Encounter
             [Column("area")] public string Area { get; set; }
         }
 
-        public static Dictionary<string, EnemyDefinition> LoadAll(string dbPath = null)
+        public static Dictionary<string, EntityDefinition> LoadAll(string dbPath = null)
         {
             dbPath ??= Path.Combine(Application.streamingAssetsPath, "wordactions.db");
-            var result = new Dictionary<string, EnemyDefinition>();
+            var result = new Dictionary<string, EntityDefinition>();
 
             using var db = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly);
-            var units = db.Table<UnitRow>().ToList();
-            var abilityRows = db.Table<UnitAbilityRow>().ToList();
+            var units = db.Table<DatabaseModels.UnitRow>().ToList();
+            var abilityRows = db.Table<DatabaseModels.UnitAbilityRow>().ToList();
 
             var abilities = new Dictionary<string, List<string>>();
             foreach (var row in abilityRows)
@@ -103,6 +85,23 @@ namespace TextRPG.Core.Encounter
             }
             catch (SQLiteException) { /* table doesn't exist yet */ }
 
+            // Load tags (table may not exist in older DBs)
+            var tags = new Dictionary<string, List<string>>();
+            try
+            {
+                var tagRows = db.Table<UnitTagRow>().ToList();
+                foreach (var row in tagRows)
+                {
+                    if (!tags.TryGetValue(row.UnitId, out var list))
+                    {
+                        list = new List<string>();
+                        tags[row.UnitId] = list;
+                    }
+                    list.Add(row.Tag);
+                }
+            }
+            catch (SQLiteException) { /* table doesn't exist yet */ }
+
             foreach (var unit in units)
             {
                 var abilityArray = abilities.TryGetValue(unit.UnitId, out var words)
@@ -113,11 +112,16 @@ namespace TextRPG.Core.Encounter
                     ? pList.ToArray()
                     : null;
 
-                result[unit.UnitId] = new EnemyDefinition(
+                var tagArray = tags.TryGetValue(unit.UnitId, out var tList)
+                    ? tList.ToArray()
+                    : null;
+
+                result[unit.UnitId] = new EntityDefinition(
                     unit.DisplayName, unit.MaxHealth, unit.Strength, unit.MagicPower,
                     unit.PhysDefense, unit.MagicDefense, unit.Luck,
                     new Color(unit.ColorR, unit.ColorG, unit.ColorB), abilityArray,
-                    unit.StartingShield, unit.UnitType, passiveArray);
+                    unit.StartingShield, unit.UnitType, passiveArray, tagArray,
+                    Tier: unit.Tier, Dexterity: unit.Dexterity, Constitution: unit.Constitution);
             }
 
             return result;
@@ -130,7 +134,7 @@ namespace TextRPG.Core.Encounter
             dbPath ??= Path.Combine(Application.streamingAssetsPath, "wordactions.db");
 
             using var db = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly);
-            var abilityRows = db.Query<UnitAbilityRow>(
+            var abilityRows = db.Query<DatabaseModels.UnitAbilityRow>(
                 "SELECT * FROM unit_abilities WHERE unit_id = ?", unitId);
 
             foreach (var ability in abilityRows)

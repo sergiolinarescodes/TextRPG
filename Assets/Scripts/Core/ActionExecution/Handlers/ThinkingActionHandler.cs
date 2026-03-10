@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEntityStatsService _entityStats;
 
-        public string ActionId => "Thinking";
+        public string ActionId => ActionNames.Thinking;
 
         public ThinkingActionHandler(IActionHandlerContext ctx)
         {

@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IStatusEffectService _statusEffects;
 
-        public string ActionId => "Water";
+        public string ActionId => ActionNames.Water;
 
         public WetActionHandler(IActionHandlerContext ctx)
         {

@@ -16,7 +16,7 @@ namespace TextRPG.Core.ActionExecution
 
     public readonly record struct ResolvedAction(
         string ActionId, int Value, EntityId Source,
-        IReadOnlyList<EntityId> Targets, string Word);
+        IReadOnlyList<EntityId> Targets, string Word, string AssocWord = "");
 
     public readonly record struct ActionResolvedEvent(
         string Word, IReadOnlyList<ResolvedAction> Actions,

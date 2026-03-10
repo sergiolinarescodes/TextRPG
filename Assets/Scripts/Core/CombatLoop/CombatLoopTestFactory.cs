@@ -28,6 +28,7 @@ namespace TextRPG.Core.CombatLoop
         public IEnumerable<ITestScenario> GetScenarios()
         {
             yield return new Scenarios.CombatLoopScenario();
+            yield return new Scenarios.CombatEncounterLiveScenario();
         }
     }
 }

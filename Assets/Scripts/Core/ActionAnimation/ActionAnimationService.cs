@@ -40,6 +40,7 @@ namespace TextRPG.Core.ActionAnimation
 
             Subscribe<ActionResolvedEvent>(OnActionResolved);
             Subscribe<ActionExecutionCompletedEvent>(OnExecutionCompleted);
+            Subscribe<EntityDiedEvent>(OnEntityDied);
 
             _commandQueue.OnQueueEmpty += OnQueueEmpty;
         }
@@ -100,9 +101,14 @@ namespace TextRPG.Core.ActionAnimation
                     0.9f,
                     false,
                     handler,
-                    EventBus);
+                    EventBus,
+                    assocWord: action.AssocWord);
                 _commandQueue.Enqueue(command);
             }
+
+            // All targets were dead — no commands enqueued, complete immediately
+            if (_commandQueue.IsEmpty)
+                TryPublishCompletion();
         }
 
         private void ExecuteFallback(ActionResolvedEvent e)
@@ -117,13 +123,22 @@ namespace TextRPG.Core.ActionAnimation
                 {
                     if (_handlerRegistry.TryGet(action.ActionId, out var handler))
                     {
-                        var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word);
+                        var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word, action.AssocWord);
                         handler.Execute(context);
                         Publish(new ActionHandlerExecutedEvent(action.ActionId, action.Value, action.Source, action.Targets));
                     }
                 }
             }
 
+            TryPublishCompletion();
+        }
+
+        private void OnEntityDied(EntityDiedEvent e)
+        {
+            if (!_deferredInProgress) return;
+
+            // Entity died mid-animation — cancel remaining commands and complete
+            _commandQueue.Clear();
             TryPublishCompletion();
         }
 

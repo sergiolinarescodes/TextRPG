@@ -17,6 +17,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
         private readonly IReadOnlyList<EntityId> _targets;
         private readonly int _value;
         private readonly string _word;
+        private readonly string _assocWord;
         private readonly Func<EntityId, Vector3> _positionProvider;
         private readonly ProjectilePool _pool;
         private readonly float _duration;
@@ -48,13 +49,15 @@ namespace TextRPG.Core.ActionAnimation.Commands
             bool isInstant,
             IActionHandler handler = null,
             IEventBus eventBus = null,
-            Action onArrival = null)
+            Action onArrival = null,
+            string assocWord = "")
         {
             _actionId = actionId;
             _source = source;
             _targets = targets;
             _value = value;
             _word = word;
+            _assocWord = assocWord;
             _positionProvider = positionProvider;
             _pool = pool;
             _duration = duration;
@@ -217,7 +220,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
 
             if (_handler != null)
             {
-                var context = new ActionContext(_source, _targets, _value, _word);
+                var context = new ActionContext(_source, _targets, _value, _word, _assocWord);
                 _handler.Execute(context);
                 _eventBus?.Publish(new ActionHandlerExecutedEvent(_actionId, _value, _source, _targets));
             }

@@ -8,7 +8,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
         private readonly IEntityStatsService _entityStats;
         private readonly IStatusEffectService _statusEffects;
 
-        public string ActionId => "Concentrate";
+        public string ActionId => ActionNames.Concentrate;
 
         public ConcentrateActionHandler(IActionHandlerContext ctx)
         {
@@ -18,7 +18,9 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
-            _entityStats.ApplyMana(context.Source, context.Value);
+            var sourceMagic = _entityStats.GetStat(context.Source, StatType.MagicPower);
+            var manaGain = StatScaling.SupportScale(context.Value, sourceMagic, StatScaling.WeakDivisor);
+            _entityStats.ApplyMana(context.Source, manaGain);
             _statusEffects.ApplyEffect(context.Source, StatusEffectType.Concentrated, 2, context.Source);
         }
     }

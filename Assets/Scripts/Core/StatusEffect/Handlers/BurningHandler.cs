@@ -1,3 +1,4 @@
+using System;
 using TextRPG.Core.EntityStats;
 
 namespace TextRPG.Core.StatusEffect.Handlers
@@ -16,6 +17,15 @@ namespace TextRPG.Core.StatusEffect.Handlers
             if (definition.DamagePerTick.HasValue)
             {
                 var damage = definition.DamagePerTick.Value * instance.StackCount;
+
+                var encounterSvc = ctx.EncounterService;
+                if (encounterSvc != null)
+                {
+                    var entityDef = encounterSvc.GetEntityDefinition(target);
+                    if (entityDef?.Tags != null && Array.IndexOf(entityDef.Tags, "flammable") >= 0)
+                        damage *= 2;
+                }
+
                 ctx.EntityStats.ApplyDamage(target, damage, instance.Source);
                 ctx.EventBus.Publish(new StatusEffectDamageEvent(target, StatusEffectType.Burning, damage));
             }

@@ -41,7 +41,10 @@
       "Read(//c/Users/kelns/repos/TextRPG/**)",
       "Bash(mv TextRPG.Core.csproj.tmp TextRPG.Core.csproj)",
       "Bash(then:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pip install:*)",
+      "Bash(pip run:*)"
     ]
   }
 }

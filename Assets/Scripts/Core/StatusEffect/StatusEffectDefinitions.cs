@@ -107,6 +107,11 @@ namespace TextRPG.Core.StatusEffect
                 StatusEffectType.Hardening, "Hardening", StackPolicy.StackIntensity,
                 DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
                 DisplayColor: new Color(0.5f, 0.4f, 0.3f), Description: "Reducing incoming damage"),
+
+            [StatusEffectType.Drunk] = new StatusEffectDefinition(
+                StatusEffectType.Drunk, "Drunk", StackPolicy.StackIntensity,
+                DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
+                DisplayColor: new Color(1f, 0.85f, 0.2f), Description: "Scrambles keyboard letters"),
         };
 
         public static StatusEffectDefinition Get(StatusEffectType type) => All[type];

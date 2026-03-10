@@ -6,7 +6,7 @@ namespace TextRPG.Core.Weapon
     {
         private readonly IWeaponService _weaponService;
 
-        public string ActionId => "Weapon";
+        public string ActionId => ActionNames.Weapon;
 
         public WeaponActionHandler(IActionHandlerContext ctx)
         {

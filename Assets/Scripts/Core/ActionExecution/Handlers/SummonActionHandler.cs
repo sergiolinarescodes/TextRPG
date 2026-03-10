@@ -14,10 +14,10 @@ namespace TextRPG.Core.ActionExecution.Handlers
         private readonly ICombatContext _combatContext;
         private readonly IEntityStatsService _entityStats;
         private readonly IEventBus _eventBus;
-        private readonly IReadOnlyDictionary<string, EnemyDefinition> _unitRegistry;
+        private readonly IReadOnlyDictionary<string, EntityDefinition> _unitRegistry;
         private int _summonCounter;
 
-        public string ActionId => "Summon";
+        public string ActionId => ActionNames.Summon;
 
         public SummonActionHandler(IActionHandlerContext ctx)
         {
@@ -44,13 +44,13 @@ namespace TextRPG.Core.ActionExecution.Handlers
             var entityId = new EntityId(id);
 
             var unitType = "enemy";
-            if (_unitRegistry != null &&
-                _unitRegistry.TryGetValue(context.Word.ToLowerInvariant(), out var unitDef))
+            var summonKey = !string.IsNullOrEmpty(context.AssocWord)
+                ? context.AssocWord.ToLowerInvariant()
+                : context.Word.ToLowerInvariant();
+
+            if (_unitRegistry != null && _unitRegistry.TryGetValue(summonKey, out var unitDef))
             {
-                _entityStats.RegisterEntity(entityId, maxHealth: unitDef.MaxHealth,
-                    strength: unitDef.Strength, magicPower: unitDef.MagicPower,
-                    physicalDefense: unitDef.PhysicalDefense, magicDefense: unitDef.MagicDefense,
-                    luck: unitDef.Luck, startingShield: unitDef.StartingShield);
+                EntityRegistrationHelper.RegisterFromDefinition(_entityStats, entityId, unitDef);
                 unitType = unitDef.UnitType;
             }
             else
@@ -64,7 +64,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
             // Publish summon event before slot registration so subscribers
             // can register unit visuals before SlotEntityRegisteredEvent triggers rendering
-            _eventBus.Publish(new UnitSummonedEvent(entityId, context.Source, slot, unitType, context.Word));
+            _eventBus.Publish(new UnitSummonedEvent(entityId, context.Source, slot, unitType, summonKey));
 
             if (isEnemySummon)
                 slotService.RegisterEnemy(entityId, emptySlot.Value);

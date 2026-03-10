@@ -9,7 +9,7 @@ namespace TextRPG.Core.WordInput.Scenarios
     internal sealed class ScenarioEncounterAdapter : IEncounterService
     {
         private readonly List<EntityId> _enemies = new();
-        private readonly Dictionary<EntityId, EnemyDefinition> _definitions = new();
+        private readonly Dictionary<EntityId, EntityDefinition> _definitions = new();
         private readonly HashSet<EntityId> _dead = new();
         private bool _active;
         private EntityId _player;
@@ -24,10 +24,10 @@ namespace TextRPG.Core.WordInput.Scenarios
 
         public void Activate() => _active = true;
 
-        public void RegisterEnemy(EntityId id, EnemyDefinition definition = null)
+        public void RegisterEnemy(EntityId id, EntityDefinition definition = null)
         {
             if (_definitions.ContainsKey(id)) return;
-            definition ??= new EnemyDefinition("SUMMON", 10, 1, 0, 0, 0, 0,
+            definition ??= new EntityDefinition("SUMMON", 10, 1, 0, 0, 0, 0,
                 UnityEngine.Color.red, new[] { "scratch" });
             _enemies.Add(id);
             _definitions[id] = definition;
@@ -47,7 +47,7 @@ namespace TextRPG.Core.WordInput.Scenarios
         public bool IsEnemy(EntityId id) =>
             _definitions.ContainsKey(id) && !_dead.Contains(id);
 
-        public EnemyDefinition GetEnemyDefinition(EntityId id) =>
+        public EntityDefinition GetEntityDefinition(EntityId id) =>
             _definitions.TryGetValue(id, out var def)
                 ? def
                 : throw new KeyNotFoundException($"'{id.Value}' is not an enemy.");

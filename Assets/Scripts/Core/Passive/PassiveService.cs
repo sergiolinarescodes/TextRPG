@@ -14,7 +14,7 @@ namespace TextRPG.Core.Passive
         private readonly IReadOnlyDictionary<string, IPassiveEffect> _effectRegistry;
         private readonly PassiveTargetResolver _targetResolver;
         private readonly IPassiveContext _context;
-        private readonly IReadOnlyDictionary<string, EnemyDefinition> _unitRegistry;
+        private readonly IReadOnlyDictionary<string, EntityDefinition> _unitRegistry;
         private readonly Dictionary<EntityId, List<ActivePassive>> _activePassives = new();
         private readonly Dictionary<EntityId, List<PassiveEntry>> _passiveEntryCache = new();
         private bool _isProcessing;
@@ -28,7 +28,7 @@ namespace TextRPG.Core.Passive
             IReadOnlyDictionary<string, IPassiveEffect> effectRegistry,
             PassiveTargetResolver targetResolver,
             IPassiveContext context,
-            IReadOnlyDictionary<string, EnemyDefinition> unitRegistry = null)
+            IReadOnlyDictionary<string, EntityDefinition> unitRegistry = null)
             : base(eventBus)
         {
             _triggerRegistry = triggerRegistry;

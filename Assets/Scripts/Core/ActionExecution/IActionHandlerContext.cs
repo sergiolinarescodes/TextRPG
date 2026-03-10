@@ -18,7 +18,7 @@ namespace TextRPG.Core.ActionExecution
         ITurnService TurnService { get; }
         IWeaponService WeaponService { get; }
         StatusEffectInteractionTable InteractionTable { get; }
-        IReadOnlyDictionary<string, EnemyDefinition> UnitRegistry { get; }
+        IReadOnlyDictionary<string, EntityDefinition> UnitRegistry { get; }
         ICombatSlotService SlotService { get; }
     }
 }

@@ -1,4 +1,5 @@
 using Reflex.Core;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
@@ -19,6 +20,11 @@ namespace TextRPG.Core.StatusEffect
                 var turnService = container.Resolve<ITurnService>();
                 var handlerRegistry = CreateHandlerRegistry();
                 var handlerContext = new StatusEffectHandlerContext(entityStats, turnService, eventBus);
+
+                IEncounterService encounterService = null;
+                try { encounterService = container.Resolve<IEncounterService>(); } catch { /* optional */ }
+                handlerContext.EncounterService = encounterService;
+
                 var service = new StatusEffectService(eventBus, entityStats, turnService, handlerRegistry, handlerContext);
                 handlerContext.StatusEffects = service;
                 return (IStatusEffectService)service;
@@ -48,6 +54,7 @@ namespace TextRPG.Core.StatusEffect
             registry.Register(StatusEffectType.Thorns, new ThornsHandler());
             registry.Register(StatusEffectType.Reflecting, new ReflectingHandler());
             registry.Register(StatusEffectType.Hardening, new HardeningHandler());
+            registry.Register(StatusEffectType.Drunk, new DrunkHandler());
             return registry;
         }
     }

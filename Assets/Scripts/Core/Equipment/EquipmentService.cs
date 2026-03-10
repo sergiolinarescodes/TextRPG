@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using TextRPG.Core.ActionExecution.Handlers;
+using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Passive;
 using TextRPG.Core.Weapon;
@@ -15,6 +16,7 @@ namespace TextRPG.Core.Equipment
         private readonly IEntityStatsService _entityStats;
         private readonly IPassiveService _passiveService;
         private readonly IWeaponService _weaponService;
+        private readonly IConsumableService _consumableService;
         private readonly Dictionary<EntityId, Dictionary<EquipmentSlotType, EquipmentEntry>> _equipped = new();
         private int _nextModifierId;
 
@@ -23,14 +25,18 @@ namespace TextRPG.Core.Equipment
             IItemRegistry itemRegistry,
             IEntityStatsService entityStats,
             IPassiveService passiveService,
-            IWeaponService weaponService) : base(eventBus)
+            IWeaponService weaponService,
+            IConsumableService consumableService = null) : base(eventBus)
         {
             _itemRegistry = itemRegistry;
             _entityStats = entityStats;
             _passiveService = passiveService;
             _weaponService = weaponService;
+            _consumableService = consumableService;
 
             Subscribe<EntityDiedEvent>(evt => _equipped.Remove(evt.EntityId));
+            Subscribe<WeaponDestroyedEvent>(evt => Unequip(evt.Entity, EquipmentSlotType.Weapon));
+            Subscribe<ConsumableDestroyedEvent>(evt => Unequip(evt.Entity, EquipmentSlotType.Consumable));
         }
 
         public bool Equip(EntityId entity, string itemWord)
@@ -49,6 +55,9 @@ namespace TextRPG.Core.Equipment
 
             if (slot == EquipmentSlotType.Weapon)
                 _weaponService?.EquipWeapon(entity, itemWord);
+
+            if (slot == EquipmentSlotType.Consumable)
+                _consumableService?.EquipConsumable(entity, itemWord);
 
             Publish(new ItemEquippedEvent(entity, itemDef, slot));
             return true;

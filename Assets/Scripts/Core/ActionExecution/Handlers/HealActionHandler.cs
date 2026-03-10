@@ -9,7 +9,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
         private readonly IEntityStatsService _entityStats;
         private readonly IStatusEffectService _statusEffects;
 
-        public string ActionId => "Heal";
+        public string ActionId => ActionNames.Heal;
 
         public HealActionHandler(IActionHandlerContext ctx)
         {
@@ -19,9 +19,10 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
+            var sourceMagic = _entityStats.GetStat(context.Source, StatType.MagicPower);
             for (int i = 0; i < context.Targets.Count; i++)
             {
-                var healAmount = context.Value;
+                var healAmount = StatScaling.SupportScale(context.Value, sourceMagic);
                 if (_statusEffects != null && _statusEffects.HasEffect(context.Targets[i], StatusEffectType.Poisoned))
                     healAmount = Math.Max(1, healAmount / 2);
                 _entityStats.ApplyHeal(context.Targets[i], healAmount);

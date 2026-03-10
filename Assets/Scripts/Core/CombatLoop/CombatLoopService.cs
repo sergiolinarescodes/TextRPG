@@ -1,6 +1,8 @@
 using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
+using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Run;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
@@ -18,6 +20,8 @@ namespace TextRPG.Core.CombatLoop
         private readonly IEntityStatsService _entityStats;
         private readonly IWordResolver _wordResolver;
         private readonly IWeaponService _weaponService;
+        private readonly IConsumableService _consumableService;
+        private readonly IReservedWordHandler _reservedWordHandler;
         private readonly EntityId _playerId;
 
         private bool _isPlayerTurn;
@@ -34,12 +38,16 @@ namespace TextRPG.Core.CombatLoop
             IEntityStatsService entityStats,
             IWordResolver wordResolver,
             IWeaponService weaponService,
-            EntityId playerId) : base(eventBus)
+            EntityId playerId,
+            IConsumableService consumableService = null,
+            IReservedWordHandler reservedWordHandler = null) : base(eventBus)
         {
             _turnService = turnService;
             _entityStats = entityStats;
             _wordResolver = wordResolver;
             _weaponService = weaponService;
+            _consumableService = consumableService;
+            _reservedWordHandler = reservedWordHandler;
             _playerId = playerId;
 
             Subscribe<ActionAnimationCompletedEvent>(_ => OnAnimationCompleted());
@@ -57,14 +65,21 @@ namespace TextRPG.Core.CombatLoop
 
         public WordSubmitResult SubmitWord(string word)
         {
-            if (_gameOver) return WordSubmitResult.GameOver;
-            if (!_isPlayerTurn) return WordSubmitResult.NotPlayerTurn;
-
             word = word?.Trim()?.ToLowerInvariant() ?? "";
             if (word.Length == 0) return WordSubmitResult.InvalidWord;
 
-            bool isAmmo = _weaponService != null && _weaponService.HasWeapon(_playerId)
+            if (_reservedWordHandler?.TryHandleReservedWord(word) == true)
+                return WordSubmitResult.ReservedWord;
+
+            if (_gameOver) return WordSubmitResult.GameOver;
+            if (!_isPlayerTurn) return WordSubmitResult.NotPlayerTurn;
+
+            bool isWeaponAmmo = _weaponService != null && _weaponService.HasWeapon(_playerId)
                           && _weaponService.IsAmmoForEquipped(_playerId, word);
+            bool isConsumableAmmo = !isWeaponAmmo && _consumableService != null
+                          && _consumableService.HasConsumable(_playerId)
+                          && _consumableService.IsAmmoForEquipped(_playerId, word);
+            bool isAmmo = isWeaponAmmo || isConsumableAmmo;
             bool validAction = isAmmo || _wordResolver.HasWord(word);
             if (!validAction) return WordSubmitResult.InvalidWord;
 
@@ -78,12 +93,17 @@ namespace TextRPG.Core.CombatLoop
                 }
             }
 
-            if (isAmmo)
+            // Advance turns BEFORE publishing the action event so that _pendingTurnAdvance
+            // is set before any synchronous animation completion can fire.
+            AdvanceTurns();
+
+            if (isWeaponAmmo)
                 Publish(new WeaponAmmoSubmittedEvent(_playerId, word));
+            else if (isConsumableAmmo)
+                Publish(new ConsumableAmmoSubmittedEvent(_playerId, word));
             else
                 Publish(new WordSubmittedEvent(word));
 
-            AdvanceTurns();
             return WordSubmitResult.Accepted;
         }
 
@@ -98,8 +118,24 @@ namespace TextRPG.Core.CombatLoop
             var ammo = ammoWords[Random.Range(0, ammoWords.Count)];
             Debug.Log($"[CombatLoop] Fire weapon: {ammo}");
 
-            Publish(new WeaponAmmoSubmittedEvent(_playerId, ammo));
             AdvanceTurns();
+            Publish(new WeaponAmmoSubmittedEvent(_playerId, ammo));
+            return true;
+        }
+
+        public bool UseConsumable()
+        {
+            if (!_isPlayerTurn || _gameOver) return false;
+            if (_consumableService == null || !_consumableService.HasConsumable(_playerId)) return false;
+
+            var ammoWords = _consumableService.GetAmmoWords(_playerId);
+            if (ammoWords.Count == 0) return false;
+
+            var ammo = ammoWords[Random.Range(0, ammoWords.Count)];
+            Debug.Log($"[CombatLoop] Use consumable: {ammo}");
+
+            AdvanceTurns();
+            Publish(new ConsumableAmmoSubmittedEvent(_playerId, ammo));
             return true;
         }
 

@@ -1,4 +1,3 @@
-using System;
 using TextRPG.Core.EntityStats;
 
 namespace TextRPG.Core.ActionExecution.Handlers
@@ -7,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEntityStatsService _entityStats;
 
-        public string ActionId => "Damage";
+        public string ActionId => ActionNames.Damage;
 
         public DamageActionHandler(IActionHandlerContext ctx)
         {
@@ -22,7 +21,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
             {
                 var target = context.Targets[i];
                 var targetDefense = _entityStats.GetStat(target, StatType.PhysicalDefense);
-                var damage = Math.Max(1, context.Value * sourceStrength / Math.Max(1, targetDefense));
+                var damage = StatScaling.OffensiveScale(context.Value, sourceStrength, targetDefense);
                 _entityStats.ApplyDamage(target, damage, context.Source);
             }
         }

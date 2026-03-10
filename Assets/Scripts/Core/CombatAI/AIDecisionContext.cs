@@ -14,10 +14,11 @@ namespace TextRPG.Core.CombatAI
         public int Distance { get; }
         public bool IsMelee { get; }
         public int Range { get; }
+        public int ManaCost { get; }
 
         public AIDecisionContext(EntityId entityId, EntityId targetId, string abilityWord,
             int entityHealth, int entityMaxHealth, int targetHealth, int targetMaxHealth,
-            int distance, bool isMelee, int range = 1)
+            int distance, bool isMelee, int range = 1, int manaCost = 0)
         {
             EntityId = entityId;
             TargetId = targetId;
@@ -29,6 +30,7 @@ namespace TextRPG.Core.CombatAI
             Distance = distance;
             IsMelee = isMelee;
             Range = range;
+            ManaCost = manaCost;
         }
     }
 }

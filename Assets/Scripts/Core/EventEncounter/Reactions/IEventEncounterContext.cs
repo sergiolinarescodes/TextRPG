@@ -1,0 +1,16 @@
+using TextRPG.Core.CombatSlot;
+using TextRPG.Core.EntityStats;
+using TextRPG.Core.StatusEffect;
+using Unidad.Core.EventBus;
+
+namespace TextRPG.Core.EventEncounter.Reactions
+{
+    public interface IEventEncounterContext
+    {
+        IEntityStatsService EntityStats { get; }
+        ICombatSlotService SlotService { get; }
+        IEventBus EventBus { get; }
+        IStatusEffectService StatusEffects { get; }
+        IEventEncounterService EncounterService { get; }
+    }
+}

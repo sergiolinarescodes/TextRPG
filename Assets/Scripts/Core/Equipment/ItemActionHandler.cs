@@ -1,28 +1,29 @@
 using TextRPG.Core.ActionExecution;
 using Unidad.Core.EventBus;
 using Unidad.Core.Inventory;
+using Unidad.Core.Systems;
 
 namespace TextRPG.Core.Equipment
 {
-    internal sealed class ItemActionHandler : IActionHandler
+    internal sealed class ItemActionHandler : SystemServiceBase, IActionHandler
     {
-        private readonly IEventBus _eventBus;
         private readonly IInventoryService _inventoryService;
         private readonly InventoryId _playerInventoryId;
         private readonly IEquipmentService _equipmentService;
         private readonly IItemRegistry _itemRegistry;
         private string _lastAcquiredWord;
 
-        public string ActionId => "Item";
+        public string ActionId => ActionNames.Item;
 
         public ItemActionHandler(IActionHandlerContext ctx, IInventoryService inventoryService, InventoryId playerInventoryId,
-            IEquipmentService equipmentService = null, IItemRegistry itemRegistry = null)
+            IEquipmentService equipmentService = null, IItemRegistry itemRegistry = null) : base(ctx.EventBus)
         {
-            _eventBus = ctx.EventBus;
             _inventoryService = inventoryService;
             _playerInventoryId = playerInventoryId;
             _equipmentService = equipmentService;
             _itemRegistry = itemRegistry;
+
+            Subscribe<ActionExecutionCompletedEvent>(_ => _lastAcquiredWord = null);
         }
 
         public void Execute(ActionContext context)
@@ -35,13 +36,13 @@ namespace TextRPG.Core.Equipment
 
             var itemId = new ItemId(itemWord);
 
-            // Auto-equip weapon-type items directly
+            // Auto-equip weapon and consumable-type items directly
             if (_equipmentService != null && _itemRegistry != null
                 && _itemRegistry.TryGet(itemWord, out var itemDef)
-                && itemDef.SlotType == EquipmentSlotType.Weapon)
+                && (itemDef.SlotType == EquipmentSlotType.Weapon || itemDef.SlotType == EquipmentSlotType.Consumable))
             {
                 _equipmentService.Equip(context.Source, itemWord);
-                _eventBus.Publish(new ItemAcquiredEvent(context.Source, itemWord));
+                Publish(new ItemAcquiredEvent(context.Source, itemWord));
                 return;
             }
 
@@ -52,7 +53,7 @@ namespace TextRPG.Core.Equipment
                     UnityEngine.Debug.Log($"[Equipment] Inventory full, could not add {itemWord}");
             }
 
-            _eventBus.Publish(new ItemAcquiredEvent(context.Source, itemWord));
+            Publish(new ItemAcquiredEvent(context.Source, itemWord));
         }
     }
 }

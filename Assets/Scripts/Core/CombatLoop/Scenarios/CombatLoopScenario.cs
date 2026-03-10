@@ -59,7 +59,7 @@ namespace TextRPG.Core.CombatLoop.Scenarios
             var weaponService = new WeaponService(_eventBus, weaponRegistry);
 
             _playerId = new EntityId("player");
-            _entityStats.RegisterEntity(_playerId, 100, 10, 8, 5, 4, 3);
+            PlayerDefaults.Register(_entityStats, _playerId);
 
             var enemy1 = new EntityId("goblin");
             var enemy2 = new EntityId("skeleton");

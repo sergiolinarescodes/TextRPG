@@ -1,3 +1,4 @@
+using System;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 
@@ -10,7 +11,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
         private readonly ICombatContext _combatContext;
         private readonly StatusEffectInteractionTable _interactionTable;
 
-        public string ActionId => "Shock";
+        public string ActionId => ActionNames.Shock;
 
         public ShockActionHandler(IActionHandlerContext ctx)
         {
@@ -22,10 +23,14 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
+            var sourceMagic = _entityStats.GetStat(context.Source, StatType.MagicPower);
+
             for (int i = 0; i < context.Targets.Count; i++)
             {
                 var target = context.Targets[i];
-                var damage = (int)(context.Value * _interactionTable.GetDamageMultiplier("Shock", target, _statusEffects));
+                var targetMDef = _entityStats.GetStat(target, StatType.MagicDefense);
+                var multiplier = _interactionTable.GetDamageMultiplier(ActionNames.Shock, target, _statusEffects);
+                var damage = Math.Max(1, (int)(StatScaling.SupportScale(context.Value, sourceMagic) * multiplier) - targetMDef / 3);
 
                 _entityStats.ApplyDamage(target, damage);
             }

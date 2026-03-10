@@ -19,6 +19,7 @@
 - All events MUST be `struct` (value types) — enforced by `where T : struct` constraint
 - Use `IEventBus.Publish<T>()` / `IEventBus.Subscribe<T>()` for all inter-system communication
 - Never use Unity's `SendMessage` or `BroadcastMessage`
+- **NEVER** subscribe to an event with a stub/log-only handler. If you subscribe, the handler MUST perform real logic. If the feature isn't ready, don't subscribe — leave a `// TODO:` comment instead. Silent stub handlers appear functional but are bugs.
 
 ### Systems
 - Every system MUST implement `ISystemInstaller` which forces `CreateTestFactory()`

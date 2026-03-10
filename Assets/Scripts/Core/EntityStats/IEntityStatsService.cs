@@ -7,7 +7,8 @@ namespace TextRPG.Core.EntityStats
         void RegisterEntity(EntityId id, int maxHealth, int strength, int magicPower,
                             int physicalDefense, int magicDefense, int luck,
                             int maxMana = 10, int manaRegen = 2, int startingMana = 5,
-                            int startingShield = 0);
+                            int startingShield = 0, int dexterity = 0,
+                            int constitution = 0);
         void RemoveEntity(EntityId id);
         bool HasEntity(EntityId id);
 

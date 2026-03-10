@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IStatusEffectService _statusEffects;
 
-        public string ActionId => "Stun";
+        public string ActionId => ActionNames.Stun;
 
         public StunActionHandler(IActionHandlerContext ctx)
         {

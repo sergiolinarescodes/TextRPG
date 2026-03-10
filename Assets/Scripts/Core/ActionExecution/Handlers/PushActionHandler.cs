@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEventBus _eventBus;
 
-        public string ActionId => "Push";
+        public string ActionId => ActionNames.Push;
 
         public PushActionHandler(IActionHandlerContext ctx)
         {

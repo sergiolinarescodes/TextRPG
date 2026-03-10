@@ -1,5 +1,6 @@
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.EventEncounter;
 using Unidad.Core.EventBus;
 using Unidad.Core.Inventory;
 using Unidad.Core.Systems;
@@ -31,11 +32,18 @@ namespace TextRPG.Core.Equipment
             _playerId = playerId;
 
             Subscribe<EncounterEndedEvent>(OnEncounterEnded);
+            Subscribe<RewardGrantedEvent>(OnRewardGranted);
         }
 
         private void OnEncounterEnded(EncounterEndedEvent evt)
         {
             if (evt.Victory)
+                GenerateAndOffer();
+        }
+
+        private void OnRewardGranted(RewardGrantedEvent evt)
+        {
+            if (evt.RewardType == "random" && !IsAwaitingSelection)
                 GenerateAndOffer();
         }
 

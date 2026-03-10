@@ -18,7 +18,7 @@ namespace TextRPG.Core.ActionExecution
         public ITurnService TurnService { get; }
         public IWeaponService WeaponService { get; }
         public StatusEffectInteractionTable InteractionTable { get; }
-        public IReadOnlyDictionary<string, EnemyDefinition> UnitRegistry { get; }
+        public IReadOnlyDictionary<string, EntityDefinition> UnitRegistry { get; }
         public ICombatSlotService SlotService { get; }
 
         public ActionHandlerContext(
@@ -29,7 +29,7 @@ namespace TextRPG.Core.ActionExecution
             ITurnService turnService = null,
             IWeaponService weaponService = null,
             StatusEffectInteractionTable interactionTable = null,
-            IReadOnlyDictionary<string, EnemyDefinition> unitRegistry = null,
+            IReadOnlyDictionary<string, EntityDefinition> unitRegistry = null,
             ICombatSlotService slotService = null)
         {
             EntityStats = entityStats;

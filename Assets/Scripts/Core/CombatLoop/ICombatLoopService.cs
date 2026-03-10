@@ -7,5 +7,6 @@ namespace TextRPG.Core.CombatLoop
         void Start();
         WordSubmitResult SubmitWord(string word);
         bool FireWeapon();
+        bool UseConsumable();
     }
 }

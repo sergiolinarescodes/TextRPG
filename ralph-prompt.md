@@ -146,9 +146,39 @@ python Tools/WordAction/stats.py
 | `Thorns` | Apply Thorns — retaliates damage back to attackers (Value = duration) |
 | `Reflect` | Apply Reflecting — redirects single-target abilities back to caster (Value = stacks) |
 | `Hardening` | Apply Hardening — flat damage reduction that decays each turn (Value = stacks) |
+| `Drunk` | Apply Drunk status — scrambles keyboard letters. Value = stacks (5 letters per stack). Applied to SELF. Stacks decrement each turn. |
 | `Shield` | Apply shield (Value = amount) |
-| `Item` | Equippable item — goes to player inventory. Value = durability (0 = infinite). Requires an `"item"` field with type, stats, and optional passives. Weapon-type items use `assoc_word` to link ammo words. |
+| `Item` | Equippable item — goes to player inventory. Value = durability (0 = infinite). Requires an `"item"` field with type, stats, and optional passives. Weapon-type items use `assoc_word` to link ammo words. Consumable-type items auto-equip and have durability = uses. |
+| `Melt` | Melts or softens materials through intense heat — differs from Burn (combustion of flammable materials). Melt works on metal, ice, wax. In combat, debuffs physical defense (Value = amount). |
 | `Time` | Time manipulation (Value = intensity) |
+
+### INTERACTION ACTIONS
+
+These actions are used for **event encounters** (non-combat: inns, shrines, chests, NPCs). They do NOT deal damage or apply status effects. The game's reaction system handles outcomes (heal, reward, transition, etc.) based on what the player targets. Value is always 1 for interaction actions. Target is usually `SingleEnemy` (the interactable entity).
+
+| ActionId | Usage | Example words |
+|----------|-------|---------------|
+| `Enter` | Enter/go to a place | enter, go, visit, arrive, venture |
+| `Talk` | Speak to an NPC | talk, speak, greet, converse, chat |
+| `Steal` | Attempt to steal from target | steal, swipe, pilfer, pickpocket, filch |
+| `Search` | Search/examine something | search, examine, inspect, investigate, scrutinize |
+| `Pray` | Pray at a shrine or altar | pray, worship, beseech, kneel, invoke |
+| `Rest` | Rest or sleep (target Self) | rest, sleep, nap, snooze, doze |
+| `Open` | Open a container/door | open, unlock, unseal, unbar, crack |
+| `Trade` | Trade with a merchant | trade, barter, haggle, deal, exchange |
+| `Recruit` | Recruit/hire an ally | recruit, hire, enlist, summon, rally |
+| `Leave` | Leave/exit current area | leave, exit, depart, withdraw, flee |
+
+**When to classify as interaction action:**
+- Words whose primary meaning is a social/exploration action (not combat)
+- Words that imply interacting with objects or people non-violently
+- Synonyms of the above action types
+- **Do NOT give interaction actions to combat words** — "attack", "slash", "fireball" remain combat actions
+
+**Interaction action format:**
+```json
+{"action": "Enter", "value": 1}
+```
 
 ---
 
@@ -291,14 +321,57 @@ Weapon-type items use `assoc_word` to link ammo words:
 }
 ```
 
+**Consumable example** (beer with healing + drunk ammo):
+
+Word "beer" — item_type consumable, durability 3 (3 uses), ammo word "sip":
+```json
+{
+    "word": "beer",
+    "target": "Self",
+    "cost": 0,
+    "range": 0,
+    "area": "Single",
+    "tags": ["SUPPORT", "HEALING"],
+    "actions": [
+        {"action": "Item", "value": 3, "assoc_word": "sip"}
+    ],
+    "item": {
+        "display_name": "BEER",
+        "item_type": "consumable",
+        "durability": 3,
+        "strength": 0, "magic_power": 0,
+        "phys_defense": 0, "magic_defense": 0,
+        "luck": 0, "max_health": 0, "max_mana": 0,
+        "color": [1.0, 0.85, 0.2],
+        "passives": []
+    }
+}
+```
+
+Word "sip" (ammo for beer) — heals 10 HP and applies 2 stacks of Drunk:
+```json
+{
+    "word": "sip",
+    "target": "Self",
+    "cost": 0,
+    "range": 0,
+    "area": "Single",
+    "tags": ["SUPPORT"],
+    "actions": [
+        {"action": "Heal", "value": 10},
+        {"action": "Drunk", "value": 2}
+    ]
+}
+```
+
 ### Item types and equipment slots
 
 | item_type | Slot | Behavior |
 |-----------|------|----------|
 | `head` | HEAD | Passive stats only |
 | `wear` | WEAR | Passive stats only |
-| `accessory` | ACCESSORY | Passive stats only |
-| `trinket` | TRINKET | Stats + optional passives |
+| `accessory` | ACCESSORY | Stats + optional passives |
+| `consumable` | CONSUMABLE | Auto-equips. Durability = uses. Ammo via `assoc_word` triggers any action (Heal, Drunk, etc.). Destroyed when uses run out. |
 | `weapon` | WEAPON | Stats + ammo via `assoc_word`, durability |
 
 ### Item design archetypes
@@ -308,7 +381,9 @@ Weapon-type items use `assoc_word` to link ammo words:
 | Crowns/Helms | head | magic_power, luck, phys_defense | on_self_hit: shield | crown, helm, tiara, hood |
 | Armor/Cloaks | wear | phys_defense, magic_defense | — | cloak, robe, armor, vest |
 | Rings/Bands | accessory | strength, luck | — | ring, band, bracelet, charm |
-| Amulets/Pendants | trinket | magic_power | on_word_played: mana | amulet, pendant, talisman, locket |
+| Amulets/Pendants | accessory | magic_power | on_word_played: mana | amulet, pendant, talisman, locket |
+| Potions/Drinks | consumable | — | — | beer, potion, elixir, wine, ale, mead |
+| Food/Herbs | consumable | — | — | bread, apple, mushroom, herb, berry |
 | Swords/Axes | weapon | strength | — | sword, axe, spear, dagger |
 | Staves/Wands | weapon | magic_power | on_word_tag: damage | staff, wand, scepter, rod |
 | Guns/Bows | weapon | — | — | gun, bow, crossbow, cannon |
@@ -364,7 +439,7 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 When classifying words, consider the FULL ecosystem of word relationships:
 - **Actions**: direct combat effects (Damage, Heal, Burn, etc.)
 - **Summons**: spawning units with their own abilities and composable passives
-- **Items**: equippable gear that grants stats and/or passives (5 slots: head, wear, accessory, trinket, weapon)
+- **Items**: equippable gear that grants stats and/or passives (5 slots: head, wear, accessory, consumable, weapon)
 - **Tags**: categories for passive triggers and thematic grouping
 
 Each word should contribute to ONE of these roles. Don't make every word a simple damage dealer.
@@ -388,7 +463,7 @@ Each word should contribute to ONE of these roles. Don't make every word a simpl
   {"word": "barrage", "actions": [{"action": "Damage", "value": 2}, {"action": "Damage", "value": 2}]}
   ```
 - **Structure words**: Defensive/building words ("fortress", "barricade", "wall", "totem", "bunker") → `Summon` action, target `Self`, tags `DEFENSIVE`/`SUPPORT`. Offensive structure words ("turret", "cannon", "sentry") → `Summon` action, target `Self`, tags `OFFENSIVE`/`PHYSICAL`. These are units with high HP, passives, and few/no active attacks — the passive system handles their effects automatically.
-- **Item/equipment words**: Nouns that are wearable/holdable gear → `Item` action, target `Self`, cost `0`. Include `"item"` field with `item_type`, stats, and optional passives. Weapons have ammo via `assoc_word`. Examples: "crown" → head, "cloak" → wear, "ring" → accessory, "amulet" → trinket, "sword" → weapon.
+- **Item/equipment words**: Nouns that are wearable/holdable gear → `Item` action, target `Self`, cost `0`. Include `"item"` field with `item_type`, stats, and optional passives. Weapons have ammo via `assoc_word`. Consumables have ammo via `assoc_word` (ammo words trigger Heal, Drunk, buffs, etc.) and durability = number of uses. Examples: "crown" → head, "cloak" → wear, "ring" → accessory, "beer" → consumable (ammo: "sip" with Heal+Drunk actions), "sword" → weapon.
 - **Balance tags**: ensure good coverage across all categories
 
 ---

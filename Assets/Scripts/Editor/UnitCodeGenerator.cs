@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using SQLite;
+using TextRPG.Core.Encounter;
 using UnityEditor;
 using UnityEngine;
 
@@ -13,31 +14,6 @@ namespace TextRPG.Editor
     {
         private const string OutputPath = "Assets/Scripts/Core/Encounter/UnitIds.cs";
         private const string Namespace = "TextRPG.Core.Encounter";
-
-        [Table("units")]
-        private class UnitRow
-        {
-            [Column("unit_id")] public string UnitId { get; set; }
-            [Column("display_name")] public string DisplayName { get; set; }
-            [Column("unit_type")] public string UnitType { get; set; }
-            [Column("max_health")] public int MaxHealth { get; set; }
-            [Column("strength")] public int Strength { get; set; }
-            [Column("magic_power")] public int MagicPower { get; set; }
-            [Column("phys_defense")] public int PhysDefense { get; set; }
-            [Column("magic_defense")] public int MagicDefense { get; set; }
-            [Column("luck")] public int Luck { get; set; }
-            [Column("starting_shield")] public int StartingShield { get; set; }
-            [Column("color_r")] public float ColorR { get; set; }
-            [Column("color_g")] public float ColorG { get; set; }
-            [Column("color_b")] public float ColorB { get; set; }
-        }
-
-        [Table("unit_abilities")]
-        private class UnitAbilityRow
-        {
-            [Column("unit_id")] public string UnitId { get; set; }
-            [Column("word")] public string Word { get; set; }
-        }
 
         [MenuItem("Tools/TextRPG/Generate Unit IDs")]
         public static void Generate()
@@ -49,14 +25,14 @@ namespace TextRPG.Editor
                 return;
             }
 
-            List<UnitRow> units;
+            List<DatabaseModels.UnitRow> units;
             Dictionary<string, List<string>> abilities;
             using (var db = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly))
             {
                 try
                 {
-                    units = db.Table<UnitRow>().ToList();
-                    var abilityRows = db.Table<UnitAbilityRow>().ToList();
+                    units = db.Table<DatabaseModels.UnitRow>().ToList();
+                    var abilityRows = db.Table<DatabaseModels.UnitAbilityRow>().ToList();
                     abilities = new Dictionary<string, List<string>>();
                     foreach (var row in abilityRows)
                     {
@@ -111,7 +87,7 @@ namespace TextRPG.Editor
                         : "";
 
                     sb.AppendLine($"            public const string {constName} = \"{unit.UnitId}\";");
-                    sb.AppendLine($"            public static readonly EnemyDefinition {constName}_DEF = new(");
+                    sb.AppendLine($"            public static readonly EntityDefinition {constName}_DEF = new(");
                     sb.AppendLine($"                Name: \"{unit.DisplayName}\",");
                     sb.AppendLine($"                MaxHealth: {unit.MaxHealth},");
                     sb.AppendLine($"                Strength: {unit.Strength},");
@@ -121,7 +97,10 @@ namespace TextRPG.Editor
                     sb.AppendLine($"                Luck: {unit.Luck},");
                     sb.AppendLine($"                Color: new Color({unit.ColorR}f, {unit.ColorG}f, {unit.ColorB}f),");
                     sb.AppendLine($"                Abilities: new[] {{ {abilityList} }},");
-                    sb.AppendLine($"                StartingShield: {unit.StartingShield});");
+                    sb.AppendLine($"                StartingShield: {unit.StartingShield},");
+                    sb.AppendLine($"                Tier: {unit.Tier},");
+                    sb.AppendLine($"                Dexterity: {unit.Dexterity},");
+                    sb.AppendLine($"                Constitution: {unit.Constitution});");
                 }
 
                 sb.AppendLine("        }");

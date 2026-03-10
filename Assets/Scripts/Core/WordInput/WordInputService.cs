@@ -1,4 +1,5 @@
 using System.Text;
+using TextRPG.Core.StatusEffect;
 using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.WordInput
@@ -6,19 +7,22 @@ namespace TextRPG.Core.WordInput
     internal sealed class WordInputService : IWordInputService
     {
         private readonly IEventBus _eventBus;
+        private readonly IDrunkLetterService _drunkLetterService;
         private readonly StringBuilder _buffer = new();
 
         public string CurrentWord => _buffer.ToString();
 
-        public WordInputService(IEventBus eventBus)
+        public WordInputService(IEventBus eventBus, IDrunkLetterService drunkLetterService = null)
         {
             _eventBus = eventBus;
+            _drunkLetterService = drunkLetterService;
         }
 
         public void AppendCharacter(char c)
         {
-            _buffer.Append(c);
-            _eventBus.Publish(new WordCharacterAddedEvent(c, CurrentWord));
+            var remapped = _drunkLetterService?.RemapInput(c) ?? c;
+            _buffer.Append(remapped);
+            _eventBus.Publish(new WordCharacterAddedEvent(remapped, CurrentWord));
         }
 
         public void RemoveLastCharacter()

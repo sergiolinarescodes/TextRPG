@@ -1,6 +1,6 @@
 namespace TextRPG.Core.Equipment
 {
-    public enum EquipmentSlotType { Head = 0, Wear = 1, Accessory = 2, Trinket = 3, Weapon = 4 }
+    public enum EquipmentSlotType { Head = 0, Wear = 1, Accessory = 2, Consumable = 3, Weapon = 4 }
 
     public static class EquipmentConstants
     {

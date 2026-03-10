@@ -22,7 +22,7 @@ namespace TextRPG.Core.Encounter
         private readonly EnemyWordResolver _enemyWordResolver;
 
         private readonly List<EntityId> _enemyEntities = new();
-        private readonly Dictionary<EntityId, EnemyDefinition> _enemyDefinitions = new();
+        private readonly Dictionary<EntityId, EntityDefinition> _enemyDefinitions = new();
         private string _activeEncounterId;
         private EntityId _player;
 
@@ -61,9 +61,7 @@ namespace TextRPG.Core.Encounter
                 var enemyDef = encounter.Enemies[i];
                 var entityId = new EntityId($"enemy_{enemyDef.Name.ToLowerInvariant()}_{i}");
 
-                _entityStats.RegisterEntity(entityId, enemyDef.MaxHealth, enemyDef.Strength, enemyDef.MagicPower,
-                    enemyDef.PhysicalDefense, enemyDef.MagicDefense, enemyDef.Luck,
-                    startingShield: enemyDef.StartingShield);
+                EntityRegistrationHelper.RegisterFromDefinition(_entityStats, entityId, enemyDef);
 
                 _slotService.RegisterEnemy(entityId, i);
 
@@ -107,19 +105,19 @@ namespace TextRPG.Core.Encounter
             Publish(new EncounterEndedEvent(id, victory));
         }
 
-        public void RegisterEnemy(EntityId entityId, EnemyDefinition definition = null)
+        public void RegisterEnemy(EntityId entityId, EntityDefinition definition = null)
         {
             if (_enemyDefinitions.ContainsKey(entityId))
                 return;
 
-            definition ??= new EnemyDefinition("SUMMON", 10, 1, 0, 0, 0, 0, Color.red, new[] { "scratch" });
+            definition ??= new EntityDefinition("SUMMON", 10, 1, 0, 0, 0, 0, Color.red, new[] { "scratch" });
             _enemyEntities.Add(entityId);
             _enemyDefinitions[entityId] = definition;
         }
 
         public bool IsEnemy(EntityId entityId) => _enemyDefinitions.ContainsKey(entityId);
 
-        public EnemyDefinition GetEnemyDefinition(EntityId entityId)
+        public EntityDefinition GetEntityDefinition(EntityId entityId)
         {
             if (!_enemyDefinitions.TryGetValue(entityId, out var def))
                 throw new KeyNotFoundException($"Entity '{entityId.Value}' is not an enemy.");

@@ -50,6 +50,7 @@ namespace TextRPG.Core.CombatAI
             registry.Register(new HealthScoreContributor());
             registry.Register(new DistanceScoreContributor());
             registry.Register(new StatusEffectScoreContributor(statusEffects));
+            registry.Register(new AbilityPreferenceContributor());
             return registry;
         }
     }

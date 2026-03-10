@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS units (
     magic_defense   INTEGER NOT NULL DEFAULT 0,
     luck            INTEGER NOT NULL DEFAULT 0,
     starting_shield INTEGER NOT NULL DEFAULT 0,
+    tier            INTEGER NOT NULL DEFAULT 1,
+    dexterity       INTEGER NOT NULL DEFAULT 0,
+    constitution    INTEGER NOT NULL DEFAULT 0,
     color_r         REAL NOT NULL DEFAULT 0.5,
     color_g         REAL NOT NULL DEFAULT 0.5,
     color_b         REAL NOT NULL DEFAULT 0.5
@@ -71,6 +74,14 @@ CREATE TABLE IF NOT EXISTS unit_passives (
     PRIMARY KEY (unit_id, trigger_id, effect_id, target, seq),
     FOREIGN KEY (unit_id) REFERENCES units(unit_id)
 );
+
+CREATE TABLE IF NOT EXISTS unit_tags (
+    unit_id TEXT NOT NULL,
+    tag     TEXT NOT NULL,
+    PRIMARY KEY (unit_id, tag),
+    FOREIGN KEY (unit_id) REFERENCES units(unit_id)
+);
+CREATE INDEX IF NOT EXISTS idx_unit_tags ON unit_tags(unit_id);
 
 CREATE TABLE IF NOT EXISTS items (
     item_id         TEXT PRIMARY KEY,
@@ -102,6 +113,38 @@ CREATE TABLE IF NOT EXISTS item_passives (
     FOREIGN KEY (item_id) REFERENCES items(item_id)
 );
 
+
+CREATE TABLE IF NOT EXISTS event_encounters (
+    encounter_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS interactables (
+    interactable_id TEXT NOT NULL,
+    encounter_id    TEXT NOT NULL,
+    display_name    TEXT NOT NULL,
+    max_health      INTEGER NOT NULL DEFAULT 5,
+    color_r         REAL NOT NULL DEFAULT 0.5,
+    color_g         REAL NOT NULL DEFAULT 0.5,
+    color_b         REAL NOT NULL DEFAULT 0.5,
+    description     TEXT,
+    slot_index      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (encounter_id, interactable_id),
+    FOREIGN KEY (encounter_id) REFERENCES event_encounters(encounter_id)
+);
+
+CREATE TABLE IF NOT EXISTS interactable_reactions (
+    encounter_id    TEXT NOT NULL,
+    interactable_id TEXT NOT NULL,
+    action_id       TEXT NOT NULL,
+    outcome_id      TEXT NOT NULL,
+    outcome_param   TEXT,
+    value           INTEGER NOT NULL DEFAULT 0,
+    chance          REAL NOT NULL DEFAULT 1.0,
+    seq             INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (encounter_id, interactable_id, action_id, outcome_id, seq),
+    FOREIGN KEY (encounter_id, interactable_id) REFERENCES interactables(encounter_id, interactable_id)
+);
 """
 
 # (word, action_name, value, target, range, area, assoc_word, seq)
@@ -175,7 +218,12 @@ SEED_ACTIONS = [
     # Enemy ability words
     ("shout",      "Fear", 2, None, None, None, "", 0),
     ("mace",       "Damage", 2, None, None, None, "", 0),
-    ("raise",      "Summon", 3, None, None, None, "", 0),
+    ("raise",      "Summon", 1, None, None, None, "bones", 0),
+    ("screech",    "Fear", 1, None, None, None, "", 0),
+    ("slam",       "Damage", 2, None, None, None, "", 0),
+    ("pounce",     "Damage", 4, None, None, None, "", 0),
+    ("hex",        "Curse", 2, None, None, None, "", 0),  ("hex", "MagicDamage", 1, None, None, None, "", 1),
+    ("drain",      "MagicDamage", 2, "SingleEnemy", None, None, "", 0),  ("drain", "Heal", 2, "Self", None, None, "", 1),
 
     # Concentrate words
     ("focus",      "Concentrate", 2, None, None, None, "", 0),
@@ -232,10 +280,10 @@ SEED_ACTIONS = [
     ("sword",      "Item", 5, "Self", None, None, "stab", 0),
 
     # Ammo words (only usable through weapon mode)
-    ("9mm",        "Damage", 3, "RandomEnemy", 15, None, "", 0),
-    ("buckshot",   "Damage", 4, "RandomEnemy", 15, "Cross", "", 0),
-    ("slash",      "Damage", 3, "Melee", 1, None, "", 0),
-    ("stab",       "Damage", 4, "RandomEnemy", 1, None, "", 0),
+    ("9mm",        "WeaponDamage", 3, "RandomEnemy", 15, None, "", 0),
+    ("buckshot",   "WeaponDamage", 4, "RandomEnemy", 15, "Cross", "", 0),
+    ("slash",      "WeaponDamage", 3, "Melee", 1, None, "", 0),
+    ("stab",       "WeaponDamage", 4, "RandomEnemy", 1, None, "", 0),
 
     # Item words (non-weapon equipment — items with stats/passives)
     ("crown",      "Item", 1, "Self", None, None, "", 0),
@@ -243,6 +291,48 @@ SEED_ACTIONS = [
     ("ring",       "Item", 1, "Self", None, None, "", 0),
     ("amulet",     "Item", 1, "Self", None, None, "", 0),
     ("helm",       "Item", 1, "Self", None, None, "", 0),
+
+    # Consumable words — assoc_word links consumable to ammo
+    ("beer",       "Item", 3, "Self", None, None, "sip", 0),
+
+    # Consumable ammo words (only usable through consumable mode)
+    ("sip",        "Heal", 10, "Self", None, None, "", 0),
+    ("sip",        "Drunk", 2, "Self", None, None, "", 1),
+
+    # Melt words
+    ("laser",      "Damage", 3, None, None, None, "", 0),  ("laser",      "Melt", 2, None, None, None, "", 0),   ("laser",      "Burn", 1, None, None, None, "", 0),
+    ("forge",      "Melt", 3, None, None, None, "", 0),    ("forge",      "Fire", 2, None, None, None, "", 0),
+    ("furnace",    "Melt", 4, None, None, None, "", 0),    ("furnace",    "Fire", 3, None, None, None, "", 0),
+    ("smelt",      "Melt", 3, None, None, None, "", 0),    ("smelt",      "Fire", 1, None, None, None, "", 0),
+    ("thaw",       "Melt", 2, None, None, None, "", 0),    ("thaw",       "Heal", 1, None, None, None, "", 0),
+
+    # Interaction words
+    ("enter",      "Enter", 1, "SingleEnemy", None, None, "", 0),
+    ("go",         "Enter", 1, "SingleEnemy", None, None, "", 0),
+    ("visit",      "Enter", 1, "SingleEnemy", None, None, "", 0),
+    ("talk",       "Talk", 1, "SingleEnemy", None, None, "", 0),
+    ("speak",      "Talk", 1, "SingleEnemy", None, None, "", 0),
+    ("greet",      "Talk", 1, "SingleEnemy", None, None, "", 0),
+    ("steal",      "Steal", 1, "SingleEnemy", None, None, "", 0),
+    ("swipe",      "Steal", 1, "SingleEnemy", None, None, "", 0),
+    ("pilfer",     "Steal", 1, "SingleEnemy", None, None, "", 0),
+    ("search",     "Search", 1, "SingleEnemy", None, None, "", 0),
+    ("examine",    "Search", 1, "SingleEnemy", None, None, "", 0),
+    ("inspect",    "Search", 1, "SingleEnemy", None, None, "", 0),
+    ("pray",       "Pray", 1, "SingleEnemy", None, None, "", 0),
+    ("worship",    "Pray", 1, "SingleEnemy", None, None, "", 0),
+    ("rest",       "Rest", 1, "Self", None, None, "", 0),
+    ("sleep",      "Rest", 1, "Self", None, None, "", 0),
+    ("nap",        "Rest", 1, "Self", None, None, "", 0),
+    ("open",       "Open", 1, "SingleEnemy", None, None, "", 0),
+    ("unlock",     "Open", 1, "SingleEnemy", None, None, "", 0),
+    ("trade",      "Trade", 1, "SingleEnemy", None, None, "", 0),
+    ("barter",     "Trade", 1, "SingleEnemy", None, None, "", 0),
+    ("recruit",    "Recruit", 1, "SingleEnemy", None, None, "", 0),
+    ("hire",       "Recruit", 1, "SingleEnemy", None, None, "", 0),
+    ("leave",      "Leave", 1, "SingleEnemy", None, None, "", 0),
+    ("exit",       "Leave", 1, "SingleEnemy", None, None, "", 0),
+    ("depart",     "Leave", 1, "SingleEnemy", None, None, "", 0),
 ]
 
 # (word, target, cost, range, area)
@@ -296,9 +386,15 @@ SEED_META = [
     ("retreat",     "Self",         2, 0, "Single"),
     ("rush",        "SingleEnemy",  2, 0, "Single"),
     # Enemy ability meta
-    ("shout",       "AreaEnemies",  0, 0, "Single"),
+    ("shout",       "AreaEnemies",  2, 0, "Single"),
     ("mace",        "Melee",        0, 1, "Single"),
-    ("raise",       "Self",         2, 0, "Single"),
+    ("raise",       "Self",         1, 0, "Single"),
+    # New enemy ability meta
+    ("screech",     "AllEnemies",   1, 0, "Single"),
+    ("slam",        "SingleEnemy",  0, 0, "Single"),
+    ("pounce",      "SingleEnemy",  2, 0, "Single"),
+    ("hex",         "SingleEnemy",  0, 0, "Single"),
+    ("drain",       "SingleEnemy",  3, 0, "Single"),
     # Concentrate meta
     ("focus",       "Self",         0, 0, "Single"),
     ("meditate",    "Self",         1, 0, "Single"),
@@ -352,6 +448,42 @@ SEED_META = [
     ("ring",        "Self",         0, 0, "Single"),
     ("amulet",      "Self",         0, 0, "Single"),
     ("helm",        "Self",         0, 0, "Single"),
+    # Consumable meta
+    ("beer",        "Self",         0, 0, "Single"),
+    ("sip",         "Self",         0, 0, "Single"),
+    # Melt meta
+    ("laser",       "SingleEnemy",  2, 3, "Single"),
+    ("forge",       "SingleEnemy",  1, 2, "Single"),
+    ("furnace",     "SingleEnemy",  2, 2, "Single"),
+    ("smelt",       "SingleEnemy",  1, 2, "Single"),
+    ("thaw",        "SingleEnemy",  0, 3, "Single"),
+    # Interaction meta
+    ("enter",       "SingleEnemy",  0, 0, "Single"),
+    ("go",          "SingleEnemy",  0, 0, "Single"),
+    ("visit",       "SingleEnemy",  0, 0, "Single"),
+    ("talk",        "SingleEnemy",  0, 0, "Single"),
+    ("speak",       "SingleEnemy",  0, 0, "Single"),
+    ("greet",       "SingleEnemy",  0, 0, "Single"),
+    ("steal",       "SingleEnemy",  0, 0, "Single"),
+    ("swipe",       "SingleEnemy",  0, 0, "Single"),
+    ("pilfer",      "SingleEnemy",  0, 0, "Single"),
+    ("search",      "SingleEnemy",  0, 0, "Single"),
+    ("examine",     "SingleEnemy",  0, 0, "Single"),
+    ("inspect",     "SingleEnemy",  0, 0, "Single"),
+    ("pray",        "SingleEnemy",  0, 0, "Single"),
+    ("worship",     "SingleEnemy",  0, 0, "Single"),
+    ("rest",        "Self",         0, 0, "Single"),
+    ("sleep",       "Self",         0, 0, "Single"),
+    ("nap",         "Self",         0, 0, "Single"),
+    ("open",        "SingleEnemy",  0, 0, "Single"),
+    ("unlock",      "SingleEnemy",  0, 0, "Single"),
+    ("trade",       "SingleEnemy",  0, 0, "Single"),
+    ("barter",      "SingleEnemy",  0, 0, "Single"),
+    ("recruit",     "SingleEnemy",  0, 0, "Single"),
+    ("hire",        "SingleEnemy",  0, 0, "Single"),
+    ("leave",       "SingleEnemy",  0, 0, "Single"),
+    ("exit",        "SingleEnemy",  0, 0, "Single"),
+    ("depart",      "SingleEnemy",  0, 0, "Single"),
 ]
 
 # (word, tag)
@@ -406,6 +538,11 @@ SEED_TAGS = [
     ("rush", "PHYSICAL"), ("rush", "OFFENSIVE"),
     ("shout", "OFFENSIVE"), ("mace", "PHYSICAL"), ("mace", "OFFENSIVE"),
     ("raise", "SHADOW"),
+    ("screech", "OFFENSIVE"), ("screech", "SHADOW"),
+    ("slam", "PHYSICAL"), ("slam", "OFFENSIVE"),
+    ("pounce", "PHYSICAL"), ("pounce", "OFFENSIVE"),
+    ("hex", "SHADOW"), ("hex", "OFFENSIVE"),
+    ("drain", "SHADOW"), ("drain", "RESTORATION"),
     ("focus", "SUPPORT"), ("meditate", "SUPPORT"), ("channel", "ARCANE"), ("channel", "SUPPORT"),
     ("venom", "OFFENSIVE"), ("venom", "SHADOW"), ("toxin", "OFFENSIVE"), ("toxin", "SHADOW"),
     ("plague", "OFFENSIVE"), ("plague", "SHADOW"),
@@ -436,34 +573,64 @@ SEED_TAGS = [
     ("ring", "ARCANE"), ("ring", "SUPPORT"),
     ("amulet", "ARCANE"), ("amulet", "SUPPORT"),
     ("helm", "DEFENSIVE"), ("helm", "PHYSICAL"),
+    ("beer", "RESTORATION"), ("sip", "RESTORATION"),
+    # Melt tags
+    ("laser", "ELEMENTAL"), ("laser", "OFFENSIVE"),
+    ("forge", "ELEMENTAL"), ("forge", "OFFENSIVE"),
+    ("furnace", "ELEMENTAL"), ("furnace", "OFFENSIVE"),
+    ("smelt", "ELEMENTAL"), ("smelt", "OFFENSIVE"),
+    ("thaw", "ELEMENTAL"), ("thaw", "RESTORATION"),
+    # Interaction tags
+    ("enter", "SUPPORT"), ("go", "SUPPORT"), ("visit", "SUPPORT"),
+    ("talk", "SUPPORT"), ("speak", "SUPPORT"), ("greet", "SUPPORT"),
+    ("steal", "SHADOW"), ("swipe", "SHADOW"), ("pilfer", "SHADOW"),
+    ("search", "SUPPORT"), ("examine", "SUPPORT"), ("inspect", "SUPPORT"),
+    ("pray", "HOLY"), ("worship", "HOLY"),
+    ("rest", "RESTORATION"), ("sleep", "RESTORATION"), ("nap", "RESTORATION"),
+    ("open", "SUPPORT"), ("unlock", "SUPPORT"),
+    ("trade", "SUPPORT"), ("barter", "SUPPORT"),
+    ("recruit", "SUPPORT"), ("hire", "SUPPORT"),
+    ("leave", "SUPPORT"), ("exit", "SUPPORT"), ("depart", "SUPPORT"),
 ]
 
-# (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b)
+# (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b, tier, dexterity, constitution)
 SEED_UNITS = [
-    ("orc",      "ORC",      "enemy", 20, 8, 0, 4, 2, 1, 0, 0.0, 1.0, 0.0),
-    ("goblin",   "GOBLIN",   "enemy", 50, 6, 0, 4, 2, 2, 0, 0.2, 0.8, 0.2),
-    ("skeleton", "SKELETON", "enemy", 50, 8, 0, 5, 3, 2, 0, 0.9, 0.9, 0.8),
-    ("bat",      "BAT",      "enemy", 30, 4, 0, 3, 2, 3, 0, 0.6, 0.3, 0.8),
-    ("golem",    "GOLEM",    "enemy", 60, 5, 0, 8, 4, 0, 10, 0.5, 0.5, 0.6),
-    ("fortress", "FORTRESS", "structure", 40, 0, 0, 8, 4, 0, 10, 0.4, 0.4, 0.5),
-    ("totem",    "TOTEM",    "structure", 25, 0, 3, 2, 2, 0, 0,  0.6, 0.4, 0.2),
-    ("turret",   "TURRET",   "structure", 20, 6, 0, 4, 2, 0, 0,  0.5, 0.5, 0.5),
-    ("library",  "LIBRARY",  "structure", 20, 0, 5, 3, 5, 0, 0,  0.6, 0.5, 0.3),
-    ("grove",    "GROVE",    "structure", 25, 0, 4, 2, 3, 0, 0,  0.2, 0.7, 0.2),
-    ("sentinel", "SENTINEL", "structure", 30, 0, 0, 7, 4, 0, 8,  0.3, 0.3, 0.5),
-    ("pyre",     "PYRE",     "structure", 15, 0, 6, 2, 2, 0, 0,  0.9, 0.3, 0.1),
-    ("predator", "PREDATOR", "enemy",     25, 7, 0, 3, 1, 2, 0,  0.5, 0.1, 0.1),
+    # Tier 1 — Early Game
+    ("bat",      "BAT",      "enemy",     6,  3, 0, 1, 1, 3, 0, 0.6, 0.3, 0.8, 1, 0, 0),
+    ("goblin",   "GOBLIN",   "enemy",     10, 4, 0, 2, 1, 2, 0, 0.2, 0.8, 0.2, 1, 0, 0),
+    ("orc",      "ORC",      "enemy",     14, 6, 0, 3, 1, 1, 0, 0.0, 1.0, 0.0, 1, 0, 0),
+    ("skeleton", "SKELETON", "enemy",     8,  4, 2, 3, 2, 1, 0, 0.9, 0.9, 0.8, 1, 0, 0),
+    # Tier 2 — Mid/Late Game
+    ("golem",    "GOLEM",    "enemy",     25, 5, 0, 6, 3, 0, 5, 0.5, 0.5, 0.6, 2, 0, 0),
+    ("predator", "PREDATOR", "enemy",     12, 8, 0, 2, 1, 3, 0, 0.5, 0.1, 0.1, 2, 0, 0),
+    ("wraith",   "WRAITH",   "enemy",     10, 0, 7, 1, 5, 2, 0, 0.4, 0.2, 0.6, 2, 0, 0),
+    ("shaman",   "SHAMAN",   "enemy",     15, 2, 6, 2, 4, 2, 0, 0.5, 0.3, 0.7, 2, 0, 0),
+    # Summons (tier 0)
+    ("bones",    "BONES",    "enemy",     1,  1, 0, 0, 0, 0, 0, 0.9, 0.9, 0.8, 0, 0, 0),
+    # Structures (tier 0)
+    ("fortress", "FORTRESS", "structure", 20, 0, 0, 5, 3, 0, 5, 0.4, 0.4, 0.5, 0, 0, 0),
+    ("totem",    "TOTEM",    "structure", 12, 0, 3, 1, 1, 0, 0, 0.6, 0.4, 0.2, 0, 0, 0),
+    ("turret",   "TURRET",   "structure", 10, 4, 0, 2, 1, 0, 0, 0.5, 0.5, 0.5, 0, 0, 0),
+    ("library",  "LIBRARY",  "structure", 10, 0, 4, 2, 3, 0, 0, 0.6, 0.5, 0.3, 0, 0, 0),
+    ("grove",    "GROVE",    "structure", 12, 0, 3, 1, 2, 0, 0, 0.2, 0.7, 0.2, 0, 0, 0),
+    ("sentinel", "SENTINEL", "structure", 15, 0, 0, 5, 3, 0, 4, 0.3, 0.3, 0.5, 0, 0, 0),
+    ("pyre",     "PYRE",     "structure", 8,  0, 5, 1, 1, 0, 0, 0.9, 0.3, 0.1, 0, 0, 0),
 ]
 
 # (unit_id, word)
 SEED_UNIT_ABILITIES = [
-    ("orc", "shout"), ("orc", "mace"),
-    ("goblin", "scratch"), ("goblin", "hit"),
-    ("skeleton", "slash"), ("skeleton", "strike"), ("skeleton", "charge"), ("skeleton", "raise"),
-    ("bat", "scratch"),
-    ("golem", "smash"), ("golem", "crush"),
+    # Tier 1
+    ("bat", "scratch"), ("bat", "screech"),
+    ("goblin", "scratch"), ("goblin", "venom"),
+    ("orc", "mace"), ("orc", "shout"),
+    ("skeleton", "scratch"), ("skeleton", "raise"),
+    # Tier 2
+    ("golem", "slam"), ("golem", "smash"),
+    ("predator", "scratch"), ("predator", "pounce"),
+    ("wraith", "hex"), ("wraith", "drain"),
+    ("shaman", "spark"), ("shaman", "plague"),
+    # Structures
     ("turret", "hit"),
-    ("predator", "scratch"), ("predator", "charge"),
 ]
 
 # (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
@@ -480,6 +647,16 @@ SEED_UNIT_PASSIVES = [
     ("predator", "on_kill",      None, "heal",          None,      5, "Self",        0),
 ]
 
+# (unit_id, tag) — material/property tags for tag-based reactions
+SEED_UNIT_TAGS = [
+    ("golem", "conductive"),
+    ("golem", "meltable"),
+    ("fortress", "breakable"),
+    ("turret", "conductive"),
+    ("pyre", "flammable"),
+    ("grove", "flammable"),
+]
+
 # (item_id, display_name, item_type, durability, strength, magic_power, phys_defense, magic_defense, luck, max_health, max_mana, color_r, color_g, color_b)
 SEED_ITEMS = [
     ("gun",    "GUN",    "weapon",    4, 0, 0, 0, 0, 0, 0, 0,  0.5, 0.5, 0.5),
@@ -487,8 +664,9 @@ SEED_ITEMS = [
     ("crown",  "CROWN",  "head",      0, 0, 2, 0, 0, 1, 0, 0,  1.0, 0.84, 0.0),
     ("cloak",  "CLOAK",  "wear",      0, 0, 0, 2, 1, 0, 0, 0,  0.3, 0.2, 0.5),
     ("ring",   "RING",   "accessory", 0, 1, 0, 0, 0, 1, 0, 0,  0.9, 0.75, 0.0),
-    ("amulet", "AMULET", "trinket",   0, 0, 1, 0, 0, 0, 0, 0,  0.4, 0.8, 0.4),
+    ("amulet", "AMULET", "accessory", 0, 0, 1, 0, 0, 0, 0, 0,  0.4, 0.8, 0.4),
     ("helm",   "HELM",   "head",      0, 0, 0, 3, 0, 0, 0, 0,  0.6, 0.6, 0.6),
+    ("beer",   "BEER",   "consumable", 3, 0, 0, 0, 0, 0, 0, 0,  1.0, 0.85, 0.2),
 ]
 
 # (item_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
@@ -496,6 +674,39 @@ SEED_ITEM_PASSIVES = [
     ("amulet", "on_word_played", None, "mana", None, 1, "Self", 0),
     ("helm",   "on_self_hit",    None, "shield", None, 1, "Self", 0),
 ]
+
+# (encounter_id, display_name)
+SEED_EVENT_ENCOUNTERS = [
+    ("roadside_inn", "Roadside Inn"),
+    ("inn_interior", "Inn Interior"),
+]
+
+# (interactable_id, encounter_id, display_name, max_health, color_r, color_g, color_b, description, slot_index)
+SEED_INTERACTABLES = [
+    ("inn",    "roadside_inn", "INN",    5,  0.8, 0.6, 0.2, "A cozy roadside inn",       0),
+    ("chest",  "roadside_inn", "CHEST",  3,  0.6, 0.4, 0.1, "A dusty wooden chest",      1),
+    ("shrine", "roadside_inn", "SHRINE", 10, 0.4, 0.6, 0.9, "An ancient stone shrine",   2),
+    ("barkeep","inn_interior", "BARKEEP", 5, 0.8, 0.5, 0.3, "The innkeeper",             0),
+    ("bed",    "inn_interior", "BED",     1, 0.6, 0.5, 0.4, "A comfortable bed",         1),
+]
+
+# (encounter_id, interactable_id, action_id, outcome_id, outcome_param, value, chance, seq)
+SEED_INTERACTABLE_REACTIONS = [
+    ("roadside_inn", "inn",    "Enter",  "transition", "inn_interior",              0, 1.0, 0),
+    ("roadside_inn", "inn",    "Talk",   "message",    "The innkeeper nods warmly.", 0, 1.0, 0),
+    ("roadside_inn", "chest",  "Open",   "reward",     "gold",                     25, 1.0, 0),
+    ("roadside_inn", "chest",  "Open",   "consume",    None,                        0, 1.0, 1),
+    ("roadside_inn", "chest",  "Steal",  "reward",     "gold",                     10, 0.5, 0),
+    ("roadside_inn", "shrine", "Pray",   "heal",       None,                       20, 1.0, 0),
+    ("roadside_inn", "shrine", "Pray",   "mana",       None,                       10, 1.0, 1),
+    ("roadside_inn", "shrine", "Pray",   "message",    "The shrine glows softly.",   0, 1.0, 2),
+    ("inn_interior", "barkeep","Talk",   "message",    "Welcome to my inn!",         0, 1.0, 0),
+    ("inn_interior", "barkeep","Trade",  "message",    "I have rooms and drinks.",    0, 1.0, 0),
+    ("inn_interior", "bed",    "Rest",   "heal",       None,                       30, 1.0, 0),
+    ("inn_interior", "bed",    "Rest",   "mana",       None,                       15, 1.0, 1),
+    ("inn_interior", "bed",    "Rest",   "message",    "You feel well rested.",      0, 1.0, 2),
+]
+
 
 def main():
     os.makedirs(DB_DIR, exist_ok=True)
@@ -519,7 +730,7 @@ def main():
         SEED_TAGS,
     )
     cur.executemany(
-        "INSERT OR REPLACE INTO units (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO units (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b, tier, dexterity, constitution) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         SEED_UNITS,
     )
     cur.executemany(
@@ -529,6 +740,10 @@ def main():
     cur.executemany(
         "INSERT OR REPLACE INTO unit_passives (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         SEED_UNIT_PASSIVES,
+    )
+    cur.executemany(
+        "INSERT OR REPLACE INTO unit_tags (unit_id, tag) VALUES (?, ?)",
+        SEED_UNIT_TAGS,
     )
     cur.executemany(
         "INSERT OR REPLACE INTO items (item_id, display_name, item_type, durability, "
@@ -541,6 +756,20 @@ def main():
         "effect_id, effect_param, value, target, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         SEED_ITEM_PASSIVES,
     )
+    cur.executemany(
+        "INSERT OR REPLACE INTO event_encounters (encounter_id, display_name) VALUES (?, ?)",
+        SEED_EVENT_ENCOUNTERS,
+    )
+    cur.executemany(
+        "INSERT OR REPLACE INTO interactables (interactable_id, encounter_id, display_name, "
+        "max_health, color_r, color_g, color_b, description, slot_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        SEED_INTERACTABLES,
+    )
+    cur.executemany(
+        "INSERT OR REPLACE INTO interactable_reactions (encounter_id, interactable_id, action_id, "
+        "outcome_id, outcome_param, value, chance, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        SEED_INTERACTABLE_REACTIONS,
+    )
     conn.commit()
 
     action_count = cur.execute("SELECT COUNT(*) FROM word_actions").fetchone()[0]
@@ -550,14 +779,19 @@ def main():
     unit_count = cur.execute("SELECT COUNT(*) FROM units").fetchone()[0]
     ability_count = cur.execute("SELECT COUNT(*) FROM unit_abilities").fetchone()[0]
     passive_count = cur.execute("SELECT COUNT(*) FROM unit_passives").fetchone()[0]
+    unit_tag_count = cur.execute("SELECT COUNT(*) FROM unit_tags").fetchone()[0]
     item_count = cur.execute("SELECT COUNT(*) FROM items").fetchone()[0]
     item_passive_count = cur.execute("SELECT COUNT(*) FROM item_passives").fetchone()[0]
+    encounter_count = cur.execute("SELECT COUNT(*) FROM event_encounters").fetchone()[0]
+    interactable_count = cur.execute("SELECT COUNT(*) FROM interactables").fetchone()[0]
+    reaction_count = cur.execute("SELECT COUNT(*) FROM interactable_reactions").fetchone()[0]
     conn.close()
 
     print(f"Created {DB_PATH}")
     print(f"  {action_count} action rows, {unique_words} unique words, {meta_count} meta, {tag_count} tags")
-    print(f"  {unit_count} units, {ability_count} unit abilities, {passive_count} unit passives")
+    print(f"  {unit_count} units, {ability_count} unit abilities, {passive_count} unit passives, {unit_tag_count} unit tags")
     print(f"  {item_count} items, {item_passive_count} item passives")
+    print(f"  {encounter_count} event encounters, {interactable_count} interactables, {reaction_count} reactions")
 
 
 if __name__ == "__main__":

@@ -95,7 +95,7 @@ namespace TextRPG.Core.UnitRendering
             if (float.IsNaN(cellWidth) || cellWidth <= 0) cellWidth = 120f;
             if (float.IsNaN(cellHeight) || cellHeight <= 0) cellHeight = 100f;
 
-            var layout = UnitTextLayout.Calculate(displayName, cellWidth, cellHeight);
+            var layout = UnitTextLayout.Calculate(displayName.ToUpperInvariant(), cellWidth, cellHeight);
             UnitTextLabels.AddTo(layout, textColor, content);
         }
 

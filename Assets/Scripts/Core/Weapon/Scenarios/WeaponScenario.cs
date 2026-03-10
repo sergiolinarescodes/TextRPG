@@ -68,7 +68,7 @@ namespace TextRPG.Core.Weapon.Scenarios
             // Player
             _playerId = new EntityId("player");
             var playerId = _playerId;
-            _entityStats.RegisterEntity(playerId, 100, 10, 8, 5, 4, 3);
+            PlayerDefaults.Register(_entityStats, playerId);
 
             // Enemy
             var enemyId = new EntityId("goblin");

@@ -6,7 +6,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IStatusEffectService _statusEffects;
 
-        public string ActionId => "Burn";
+        public string ActionId => ActionNames.Burn;
 
         public BurnActionHandler(IActionHandlerContext ctx)
         {

@@ -7,6 +7,7 @@ using TextRPG.Core.CombatAI;
 using TextRPG.Core.CombatLoop;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Passive;
+using TextRPG.Core.Run;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.UnitRendering;
@@ -55,6 +56,9 @@ namespace TextRPG.Core.Bootstrap
 
             // CombatLoop — orchestrates turn loop, word submission, game-over detection
             installers.Add(new CombatLoopSystemInstaller());
+
+            // Run system — meta-progression through multiple encounters
+            installers.Add(new RunSystemInstaller());
         }
     }
 }

@@ -107,7 +107,7 @@ namespace TextRPG.Core.Encounter.Scenarios
 
             foreach (var enemy in _encounterService.EnemyEntities)
             {
-                var def = _encounterService.GetEnemyDefinition(enemy);
+                var def = _encounterService.GetEntityDefinition(enemy);
                 var hp = _entityStats.GetCurrentHealth(enemy);
                 var slot = _slotService.GetSlot(enemy);
                 var slotStr = slot.HasValue ? $"Slot {slot.Value.Type}[{slot.Value.Index}]" : "no slot";

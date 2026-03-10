@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SQLite;
+using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
 using UnityEngine;
 
@@ -82,7 +83,7 @@ namespace TextRPG.Core.WordAction
                 var assocWord = row.AssocWord ?? "";
 
                 if (!registry.Has(actionName))
-                    registry.Register(actionName, new ActionDefinition(actionName, actionName, Color.gray));
+                    registry.Register(actionName, new ActionDefinition(actionName, actionName, ProjectileStyle.GetColor(actionName)));
 
                 if (!mappings.TryGetValue(word, out var list))
                 {
