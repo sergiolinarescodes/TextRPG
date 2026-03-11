@@ -63,7 +63,20 @@ namespace TextRPG.Core.ActionExecution
             // 3. RestHeal
             registry.Register(ActionNames.RestHeal, new RestHealActionHandler(ctx));
 
-            // 4. Interaction actions
+            // 4. Scramble (slot position swap)
+            if (ctx.SlotService != null)
+                registry.Register(ActionNames.Scramble, new ScrambleActionHandler(ctx));
+
+            // 5. Creature actions (peck, screech) and cleansing actions (purify, awaken)
+            if (ctx.StatusEffects != null)
+            {
+                registry.Register(ActionNames.Peck, new PeckActionHandler(ctx));
+                registry.Register(ActionNames.Screech, new ScreechActionHandler(ctx));
+                registry.Register(ActionNames.Purify, new PurifyActionHandler(ctx));
+                registry.Register(ActionNames.Awaken, new AwakenActionHandler(ctx));
+            }
+
+            // 6. Interaction actions
             foreach (var action in ActionNames.InteractionActions)
                 registry.Register(action, new InteractionActionHandler(action, ctx));
 

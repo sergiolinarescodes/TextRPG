@@ -8,7 +8,9 @@ using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.Passive;
+using TextRPG.Core.PlayerClass;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Experience;
 using TextRPG.Core.Run;
 using TextRPG.Core.Scroll;
 using TextRPG.Core.StatusEffect;
@@ -30,7 +32,8 @@ namespace TextRPG.Core.Services
 {
     internal static class RunSessionFactory
     {
-        public static RunSession Create(EntityId playerId, GameObject sceneRoot, IAnimationResolver animResolver)
+        public static RunSession Create(EntityId playerId, GameObject sceneRoot, IAnimationResolver animResolver,
+            TextRPG.Core.PlayerClass.PlayerClass selectedClass = TextRPG.Core.PlayerClass.PlayerClass.Mage)
         {
             var eventBus = new EventBus();
             var drunkLetterService = new DrunkLetterService(eventBus, playerId);
@@ -90,8 +93,9 @@ namespace TextRPG.Core.Services
                 entityTagProvider: reactionService);
             var handlerRegistry = ActionHandlerFactory.CreateDefault(actionHandlerCtx);
 
-            // Player entity
-            PlayerDefaults.Register(entityStats, playerId);
+            // Player entity (class-based stats)
+            var classDef = ClassDefinitions.Get(selectedClass);
+            PlayerDefaults.Register(entityStats, playerId, classDef);
             combatContext.SetSourceEntity(playerId);
 
             // Player inventory
@@ -118,9 +122,7 @@ namespace TextRPG.Core.Services
             var previewService = new TargetingPreviewService(wordResolver, combatContext);
             var ammoPreviewService = new TargetingPreviewService(ammoResolver, combatContext);
 
-            // Action execution + match service (rebuilt with composite)
-            var actionExecution = new ActionExecutionService(eventBus, compositeResolver, handlerRegistry,
-                combatContext, entityStats, statusEffects, animResolver);
+            // Word match service (action execution created later, after ClassService)
             var wordMatchService = new WordMatchService(compositeResolver, actionRegistry);
 
             // Weapon executor
@@ -174,9 +176,24 @@ namespace TextRPG.Core.Services
             var spellService = new SpellService(eventBus, wordResolver, wordCooldown,
                 spellResolver, wordTagResolver);
 
+            // Class service (needs SpellService for Mage scroll learning)
+            var classService = new ClassService(eventBus, selectedClass, playerId,
+                wordTagResolver, spellService, wordResolver, resourceService);
+
+            // Register Merchant composable passives
+            if (classDef.Passives is { Length: > 0 })
+                passiveService.RegisterPassives(playerId, "class", classDef.Passives);
+
+            // Action execution (created after ClassService for IActionValueModifier)
+            var actionExecution = new ActionExecutionService(eventBus, compositeResolver, handlerRegistry,
+                combatContext, entityStats, statusEffects, animResolver, classService);
+
             // Loot reward service
             var lootRewardService = new LootRewardService(eventBus, itemRegistry,
                 inventoryService, playerInventoryId, playerId, spellService, wordResolver);
+
+            // Experience service
+            var experienceService = new ExperienceService(eventBus, lootRewardService);
 
             // Status visual service
             var statusVisualService = new StatusEffectVisualService(eventBus);
@@ -186,7 +203,7 @@ namespace TextRPG.Core.Services
             tickRunner.Initialize(new UnityTimeProvider(), new ITickable[] { animationService });
 
             // Run service
-            var runService = new RunService(eventBus);
+            var runService = new RunService(eventBus, lootRewardService);
 
             return new RunSession
             {
@@ -235,6 +252,8 @@ namespace TextRPG.Core.Services
                 AllUnits = allUnits,
                 AllEventEncounters = allEventEncounters,
                 AnxietyService = anxietyService,
+                ExperienceService = experienceService,
+                ClassService = classService,
             };
         }
 

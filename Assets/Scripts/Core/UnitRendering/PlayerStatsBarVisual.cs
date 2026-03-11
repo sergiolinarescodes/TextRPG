@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter.Reactions.Tags;
+using TextRPG.Core.PlayerClass;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
 using Unidad.Core.Resource;
 using Unidad.Core.UI.Components;
+using Unidad.Core.UI.Tooltip;
 using UnityEngine;
 using UnityEngine.UIElements;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
@@ -27,6 +29,8 @@ namespace TextRPG.Core.UnitRendering
         private readonly IEntityStatsService _entityStats;
         private readonly IStatusEffectService _statusEffects;
         private readonly IResourceService _resourceService;
+        private readonly IClassService _classService;
+        private readonly ITooltipService _tooltipService;
         private readonly EntityId _playerId;
         private readonly Dictionary<StatType, Label> _statLabels = new();
         private readonly List<IDisposable> _subscriptions = new();
@@ -42,15 +46,20 @@ namespace TextRPG.Core.UnitRendering
         public UnidadProgressBar ManaBar { get; private set; }
         public Label ManaLabel { get; private set; }
         public VisualElement ManaCostOverlay { get; private set; }
+        public Label LevelLabel { get; private set; }
+        public UnidadProgressBar XpBar { get; private set; }
 
         public PlayerStatsBarVisual(IEventBus eventBus, IEntityStatsService entityStats,
             IStatusEffectService statusEffects, EntityId playerId,
-            IResourceService resourceService = null)
+            IResourceService resourceService = null,
+            IClassService classService = null, ITooltipService tooltipService = null)
         {
             _eventBus = eventBus;
             _entityStats = entityStats;
             _statusEffects = statusEffects;
             _resourceService = resourceService;
+            _classService = classService;
+            _tooltipService = tooltipService;
             _playerId = playerId;
         }
 
@@ -68,8 +77,8 @@ namespace TextRPG.Core.UnitRendering
             Root.style.paddingTop = 4;
             Root.style.paddingBottom = 4;
 
-            BuildHpBar();
-            BuildManaBar();
+            BuildBarsRow();
+            BuildClassRow();
             BuildStatsAndStatusRow();
             BuildGoldDisplay();
             SubscribeToEvents();
@@ -150,6 +159,12 @@ namespace TextRPG.Core.UnitRendering
             ManaBar?.schedule.Execute(() => ManaBar?.SetVariant(ProgressVariant.Info)).ExecuteLater(500);
         }
 
+        public void UpdateLevelDisplay(int level, float xpProgress)
+        {
+            if (LevelLabel != null) LevelLabel.text = $"LVL {level}";
+            if (XpBar != null) XpBar.Value = xpProgress;
+        }
+
         public void Dispose()
         {
             foreach (var sub in _subscriptions) sub.Dispose();
@@ -163,53 +178,37 @@ namespace TextRPG.Core.UnitRendering
             ManaBar = null;
             ManaLabel = null;
             ManaCostOverlay = null;
+            LevelLabel = null;
+            XpBar = null;
             _goldLabel = null;
         }
 
-        private void BuildHpBar()
+        private void BuildBarsRow()
         {
-            var hpBarWrapper = new VisualElement();
-            hpBarWrapper.style.width = Length.Percent(100);
-            hpBarWrapper.style.height = 32;
-            hpBarWrapper.style.marginBottom = 4;
-            hpBarWrapper.style.justifyContent = Justify.Center;
+            var barsRow = new VisualElement();
+            barsRow.style.flexDirection = FlexDirection.Row;
+            barsRow.style.marginBottom = 4;
 
+            // HP column (green)
+            var hpCol = CreateBarColumn();
             HpBar = new UnidadProgressBar(1f);
             HpBar.SetVariant(ProgressVariant.Success);
             HpBar.style.width = Length.Percent(100);
             HpBar.style.height = 16;
-            hpBarWrapper.Add(HpBar);
+            hpCol.Add(HpBar);
 
             int hp = _entityStats.GetCurrentHealth(_playerId);
             int maxHp = _entityStats.GetStat(_playerId, StatType.MaxHealth);
-            HpLabel = new Label($"{hp}/{maxHp}");
-            HpLabel.style.position = Position.Absolute;
-            HpLabel.style.top = 0;
-            HpLabel.style.left = 0;
-            HpLabel.style.right = 0;
-            HpLabel.style.bottom = 0;
-            HpLabel.style.fontSize = 24;
-            HpLabel.style.color = Color.white;
-            HpLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            HpLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            hpBarWrapper.Add(HpLabel);
+            HpLabel = CreateBarLabel($"{hp}/{maxHp}");
+            hpCol.Add(HpLabel);
 
-            Root.Add(hpBarWrapper);
-        }
-
-        private void BuildManaBar()
-        {
-            var manaBarWrapper = new VisualElement();
-            manaBarWrapper.style.width = Length.Percent(100);
-            manaBarWrapper.style.height = 32;
-            manaBarWrapper.style.marginBottom = 4;
-            manaBarWrapper.style.justifyContent = Justify.Center;
-
+            // Mana column (blue)
+            var manaCol = CreateBarColumn();
             ManaBar = new UnidadProgressBar(0.5f);
             ManaBar.SetVariant(ProgressVariant.Info);
             ManaBar.style.width = Length.Percent(100);
             ManaBar.style.height = 16;
-            manaBarWrapper.Add(ManaBar);
+            manaCol.Add(ManaBar);
 
             ManaCostOverlay = new VisualElement();
             ManaCostOverlay.style.position = Position.Absolute;
@@ -221,19 +220,75 @@ namespace TextRPG.Core.UnitRendering
 
             int mana = _entityStats.GetCurrentMana(_playerId);
             int maxMana = _entityStats.GetStat(_playerId, StatType.MaxMana);
-            ManaLabel = new Label($"{mana}/{maxMana}");
-            ManaLabel.style.position = Position.Absolute;
-            ManaLabel.style.top = 0;
-            ManaLabel.style.left = 0;
-            ManaLabel.style.right = 0;
-            ManaLabel.style.bottom = 0;
-            ManaLabel.style.fontSize = 24;
-            ManaLabel.style.color = Color.white;
-            ManaLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            ManaLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            manaBarWrapper.Add(ManaLabel);
+            ManaLabel = CreateBarLabel($"{mana}/{maxMana}");
+            manaCol.Add(ManaLabel);
 
-            Root.Add(manaBarWrapper);
+            // Level column (white)
+            var lvlCol = CreateBarColumn();
+            XpBar = new UnidadProgressBar(0f);
+            XpBar.style.width = Length.Percent(100);
+            XpBar.style.height = 16;
+            var fill = XpBar.Q("unidad-progress__fill");
+            if (fill != null)
+                fill.style.backgroundColor = Color.white;
+            XpBar.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f);
+            lvlCol.Add(XpBar);
+
+            LevelLabel = CreateBarLabel("LVL 1");
+            lvlCol.Add(LevelLabel);
+
+            // Order: Level (left), HP (center), Mana (right)
+            barsRow.Add(lvlCol);
+            barsRow.Add(hpCol);
+            barsRow.Add(manaCol);
+
+            Root.Add(barsRow);
+        }
+
+        private static VisualElement CreateBarColumn()
+        {
+            var col = new VisualElement();
+            col.style.flexGrow = 1;
+            col.style.flexBasis = 0;
+            col.style.height = 32;
+            col.style.marginLeft = 2;
+            col.style.marginRight = 2;
+            col.style.justifyContent = Justify.Center;
+            return col;
+        }
+
+        private static Label CreateBarLabel(string text)
+        {
+            var label = new Label(text);
+            label.style.position = Position.Absolute;
+            label.style.top = 0;
+            label.style.left = 0;
+            label.style.right = 0;
+            label.style.bottom = 0;
+            label.style.fontSize = 24;
+            label.style.color = Color.white;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            return label;
+        }
+
+        private void BuildClassRow()
+        {
+            if (_classService == null) return;
+
+            var def = _classService.Definition;
+            var classLabel = new Label($"CLASS: {def.DisplayName.ToUpperInvariant()}");
+            classLabel.style.color = def.Color;
+            classLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            classLabel.style.fontSize = 22;
+            classLabel.style.marginBottom = 2;
+            Root.Add(classLabel);
+
+            if (_tooltipService != null && def.PassiveDescriptions is { Length: > 0 })
+            {
+                var tooltipText = string.Join("\n", def.PassiveDescriptions);
+                _tooltipService.Attach(classLabel, tooltipText);
+            }
         }
 
         private VisualElement _statsAndStatusRow;

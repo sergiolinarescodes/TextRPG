@@ -8,8 +8,10 @@ using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter;
+using TextRPG.Core.Experience;
 using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.Passive;
+using TextRPG.Core.PlayerClass;
 using TextRPG.Core.Run;
 using TextRPG.Core.Scroll;
 using TextRPG.Core.Services;
@@ -36,6 +38,9 @@ namespace TextRPG.Core.WordInput.Scenarios
         private static readonly ScenarioParameter FontScaleFactorParam = new(
             "fontScaleFactor", "Font Scale Factor", typeof(float), 1.0f, 0.5f, 1f);
 
+        private static readonly ScenarioParameter ClassParam = new(
+            "playerClass", "Player Class (0=Mage, 1=Warrior, 2=Merchant)", typeof(int), 0, 0, 2);
+
         private RunSession _session;
         private CombatEncounterScope _combatScope;
         private EventEncounterScope _eventScope;
@@ -46,6 +51,7 @@ namespace TextRPG.Core.WordInput.Scenarios
         private LootOverlayController _loot;
         private CombatVisualController _combat;
         private GameMessageController _messages;
+        private ExperienceVisualController _experience;
         private PlayerStatsBarVisual _playerStatsBar;
         private CombatSlotVisual _slotVisual;
 
@@ -65,17 +71,19 @@ namespace TextRPG.Core.WordInput.Scenarios
             "Word Input (Live)",
             "Full-screen word input with auto-scaling text, vibration animation, " +
             "slot-based combat, and stats bar. Type a word and press Enter to submit.",
-            new[] { VibrationAmplitudeParam, FontScaleFactorParam }
+            new[] { VibrationAmplitudeParam, FontScaleFactorParam, ClassParam }
         )) { }
 
         protected override void ExecuteInternal(ScenarioParameterOverrides overrides)
         {
             var vibrationAmplitude = ResolveParam<float>(overrides, "vibrationAmplitude");
             var fontScaleFactor = ResolveParam<float>(overrides, "fontScaleFactor");
+            var classIndex = ResolveParam<int>(overrides, "playerClass");
+            var selectedClass = (TextRPG.Core.PlayerClass.PlayerClass)classIndex;
 
             // --- Create run session (all run-lifetime services) ---
             var playerId = new EntityId("player");
-            _session = RunSessionFactory.Create(playerId, SceneRoot, new ScenarioAnimationResolver());
+            _session = RunSessionFactory.Create(playerId, SceneRoot, new ScenarioAnimationResolver(), selectedClass);
             var s = _session;
 
             // --- Build UI layout ---
@@ -112,8 +120,13 @@ namespace TextRPG.Core.WordInput.Scenarios
             middleArea.style.flexDirection = FlexDirection.Row;
             middleArea.style.flexGrow = 1;
 
+            // Framework tooltip service (created early so it can be passed to stats bar)
+            var elementAnimator = new ElementAnimator();
+            _frameworkTooltipService = new TooltipService(s.EventBus, elementAnimator);
+
             // Stats bar (created early so WordInputController can reference it for mana preview)
-            _playerStatsBar = new PlayerStatsBarVisual(s.EventBus, s.EntityStats, s.StatusEffects, playerId, s.ResourceService);
+            _playerStatsBar = new PlayerStatsBarVisual(s.EventBus, s.EntityStats, s.StatusEffects, playerId,
+                s.ResourceService, s.ClassService, _frameworkTooltipService);
 
             // Equipment controller (builds left + right bars)
             _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
@@ -188,6 +201,11 @@ namespace TextRPG.Core.WordInput.Scenarios
             _messages = new GameMessageController(s.EventBus, _positionProvider, playerId);
             root.Add(_messages.CreateOverlay());
 
+            // Experience visual controller
+            _experience = new ExperienceVisualController(s.EventBus, s.ExperienceService,
+                _playerStatsBar, _positionProvider);
+            root.Add(_experience.CreateOverlay());
+
             // Combat visual controller
             _combat = new CombatVisualController(s.EventBus, s.EntityStats, s.UnitService,
                 _slotVisual, s.AllUnits, playerId);
@@ -202,9 +220,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             tooltipLayer.pickingMode = PickingMode.Ignore;
             root.Add(tooltipLayer);
 
-            // Framework tooltip service
-            var elementAnimator = new ElementAnimator();
-            _frameworkTooltipService = new TooltipService(s.EventBus, elementAnimator);
+            // Set tooltip layer (service was created earlier for stats bar)
             _frameworkTooltipService.SetTooltipLayer(tooltipLayer);
 
             // Entity tooltip service
@@ -413,6 +429,8 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             _loot?.Dispose();
             _loot = null;
+            _experience?.Dispose();
+            _experience = null;
             _messages?.Dispose();
             _messages = null;
             _combat?.Dispose();

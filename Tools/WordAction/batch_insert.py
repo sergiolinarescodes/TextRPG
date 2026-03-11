@@ -42,11 +42,13 @@ VALID_ACTIONS = {
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
-    "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal",
+    "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal", "Scramble",
+    "Peck", "Screech", "Purify", "Awaken",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",
     "Enter", "Talk", "Steal", "Search", "Pray", "Rest", "Open", "Trade", "Recruit", "Leave",
+    "Charm",
 }
 
 # Backward compatibility alias
@@ -72,6 +74,7 @@ VALID_STATUS_EFFECTS = {
     "Buffed", "Shielded", "ExtraTurn", "Stun", "Concussion", "Fear",
     "Bleeding", "Concentrated",
     "Growing", "Thorns", "Reflecting", "Hardening",
+    "Awakened",
 }
 
 def is_valid_target(target):
@@ -89,7 +92,7 @@ VALID_AREAS = {
 VALID_TAGS = {
     "NATURE", "ELEMENTAL", "OFFENSIVE", "RESTORATION", "SHADOW",
     "PHYSICAL", "DEFENSIVE", "ARCANE", "HOLY", "SUPPORT", "PSYCHIC",
-    "SPELL",
+    "SPELL", "MELEE", "SOCIAL", "BEAST", "FLYING", "LIGHT", "CLEANSING",
 }
 
 VALID_TRIGGERS = {
@@ -112,6 +115,7 @@ def main():
         print(f"Error: database not found at {DB_PATH}", file=sys.stderr)
         sys.exit(1)
 
+    is_draft = "--draft" in sys.argv
     data = json.load(sys.stdin)
     if not isinstance(data, list):
         print("Error: expected a JSON array", file=sys.stderr)
@@ -151,7 +155,8 @@ def main():
             print(f"Warning: Summon word '{word}' has cost {cost}, clamping to 1", file=sys.stderr)
             cost = 1
 
-        meta_rows.append((word, target, cost, range_val, area))
+        status = "draft" if is_draft else None
+        meta_rows.append((word, target, cost, range_val, area, status))
 
         for seq, action in enumerate(actions):
             action_name = ACTION_ALIASES.get(action["action"], action["action"])
@@ -342,7 +347,7 @@ def main():
         action_rows,
     )
     conn.executemany(
-        "INSERT OR REPLACE INTO word_meta (word, target, cost, range, area) VALUES (?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO word_meta (word, target, cost, range, area, status) VALUES (?, ?, ?, ?, ?, ?)",
         meta_rows,
     )
     conn.executemany(
@@ -394,9 +399,10 @@ def main():
 
     words_with_actions = sum(1 for e in data if e.get("actions"))
     words_without = len(data) - words_with_actions
+    draft_label = " [DRAFT — needs refinement]" if is_draft else ""
     print(
         f"Inserted {len(action_rows)} actions, {len(meta_rows)} meta, {len(tag_rows)} tags "
-        f"from {len(data)} words ({words_with_actions} with actions, {words_without} without)",
+        f"from {len(data)} words ({words_with_actions} with actions, {words_without} without){draft_label}",
         file=sys.stderr,
     )
     if unit_rows:

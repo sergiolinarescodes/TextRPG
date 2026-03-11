@@ -12,6 +12,7 @@ namespace TextRPG.Core.Run
 {
     internal sealed class RunService : SystemServiceBase, IRunService, IReservedWordHandler
     {
+        private readonly ILootRewardService _lootRewardService;
         private RunDefinition _currentRun;
         private int _currentNodeIndex;
         private EntityId _player;
@@ -29,8 +30,9 @@ namespace TextRPG.Core.Run
         public bool IsRunComplete => _currentRun != null && _currentNodeIndex >= _currentRun.Nodes.Length;
         public bool IsAwaitingAdvance => _awaitingAdvance;
 
-        public RunService(IEventBus eventBus) : base(eventBus)
+        public RunService(IEventBus eventBus, ILootRewardService lootRewardService = null) : base(eventBus)
         {
+            _lootRewardService = lootRewardService;
             Subscribe<EncounterEndedEvent>(OnEncounterEnded);
             Subscribe<LootRewardSelectedEvent>(OnLootSelected);
             Subscribe<EventEncounterEndedEvent>(OnEventEncounterEnded);
@@ -131,6 +133,11 @@ namespace TextRPG.Core.Run
         private void OnLootSelected(LootRewardSelectedEvent evt)
         {
             if (!_awaitingLoot) return;
+
+            // Check if more loot is pending (e.g. level-up rewards)
+            if (_lootRewardService != null && _lootRewardService.IsAwaitingSelection)
+                return;
+
             _awaitingLoot = false;
 
             if (CurrentNode != null)

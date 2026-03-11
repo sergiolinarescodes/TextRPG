@@ -1,3 +1,5 @@
+using TextRPG.Core.PlayerClass;
+
 namespace TextRPG.Core.EntityStats
 {
     public static class PlayerDefaults
@@ -18,5 +20,11 @@ namespace TextRPG.Core.EntityStats
                 PhysicalDefense, MagicDefense, Luck,
                 MaxMana, ManaRegen, StartingMana,
                 constitution: Constitution);
+
+        public static void Register(IEntityStatsService stats, EntityId playerId, ClassDefinition classDef)
+            => stats.RegisterEntity(playerId, classDef.MaxHealth, classDef.Strength, classDef.MagicPower,
+                classDef.PhysicalDefense, classDef.MagicDefense, classDef.Luck,
+                classDef.MaxMana, classDef.ManaRegen, classDef.StartingMana,
+                constitution: classDef.Constitution);
     }
 }

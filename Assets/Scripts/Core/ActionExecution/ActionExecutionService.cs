@@ -18,11 +18,12 @@ namespace TextRPG.Core.ActionExecution
         private readonly IEntityStatsService _entityStats;
         private readonly IStatusEffectService _statusEffects;
         private readonly IAnimationResolver _animationResolver;
+        private readonly IActionValueModifier _valueModifier;
 
         public ActionExecutionService(IEventBus eventBus, IWordResolver wordResolver,
             IActionHandlerRegistry handlerRegistry, ICombatContext combatContext,
             IEntityStatsService entityStats = null, IStatusEffectService statusEffects = null,
-            IAnimationResolver animationResolver = null)
+            IAnimationResolver animationResolver = null, IActionValueModifier valueModifier = null)
             : base(eventBus)
         {
             _wordResolver = wordResolver;
@@ -31,6 +32,7 @@ namespace TextRPG.Core.ActionExecution
             _entityStats = entityStats;
             _statusEffects = statusEffects;
             _animationResolver = animationResolver;
+            _valueModifier = valueModifier;
             Subscribe<WordSubmittedEvent>(OnWordSubmitted);
         }
 
@@ -126,8 +128,12 @@ namespace TextRPG.Core.ActionExecution
 
                 if (_handlerRegistry.TryGet(mapping.ActionId, out _))
                 {
+                    var value = mapping.Value;
+                    if (_valueModifier != null)
+                        value = _valueModifier.ModifyValue(mapping.ActionId, value, word, _combatContext.SourceEntity);
+
                     resolved.Add(new ResolvedAction(
-                        mapping.ActionId, mapping.Value,
+                        mapping.ActionId, value,
                         _combatContext.SourceEntity, targets, word, mapping.AssocWord));
                 }
             }

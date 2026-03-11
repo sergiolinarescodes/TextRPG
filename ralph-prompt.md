@@ -171,7 +171,12 @@ python Tools/WordAction/stats.py
 | `Relax` | Noop action — tag-driven. RELAX-tagged words remove 1 Anxiety stack from source. Value ignored. |
 | `Sleep` | Apply Sleep to self — skip turns, wake on damage (resist chance = 20% per stack). Value = stacks. |
 | `RestHeal` | Heal self. Base heal from value, +5 if no enemies, +10 if DWELLING entity present. Scales with MagicPower/3. |
+| `Scramble` | Swap target's slot position with another unit in the same row. Disrupts enemy formations. Value is ignored (use 1). Target should be an enemy — the handler picks the swap partner automatically. Great on AoE words (tsunami, earthquake) to represent chaotic displacement. |
 | `Time` | Time manipulation (Value = intensity) |
+| `Peck` | Physical damage (Str vs PDef) + apply Bleeding in one action. Value = base damage. Use for sharp, piercing animal attacks (beak, claw, fang). Reusable by bird/beast creature words. Always pair with `BEAST` or `MELEE` tag. |
+| `Screech` | Apply Fear + Concussion to targets in one action. Value = Fear duration (Concussion is always 1 stack). A terrifying shriek that disorients. Use for loud, disruptive creature abilities. Always pair with `BEAST` tag. |
+| `Purify` | Remove up to Value negative statuses from targets (prioritizes Stun > Fear > Sleep > Frostbitten > Burning > Poisoned > Bleeding > others). Use for cleansing, curing, washing away debuffs. Target should be Self or AllAlliesAndSelf. Always pair with `CLEANSING` or `HOLY` tag. |
+| `Awaken` | Remove Sleep, Stun, and Frostbitten from targets, then apply Awakened status (+1 all stats for 1 turn). Use for rousing, reviving, energizing allies from crowd control. Value is ignored. Always pair with `LIGHT` or `HOLY` tag. |
 
 ### INTERACTION ACTIONS
 
@@ -259,7 +264,7 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 | `mana` | — | Restore `value` mana to targets |
 | `apply_status` | status name (e.g. `"Burning"`) | Apply status effect to targets for `value` duration |
 
-Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`
+Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`, `Awakened`
 
 ### Available passive targets
 
@@ -469,7 +474,7 @@ Use `BaseType+StatusEffect` format to target enemies with a specific status. Any
 - `LowestHealthEnemy+Poisoned` — lowest-HP poisoned enemy
 - `SingleEnemy+Bleeding` — single bleeding enemy
 
-Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Buffed`, `Shielded`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`
+Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Buffed`, `Shielded`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`, `Awakened`
 
 ---
 
@@ -481,7 +486,35 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 
 ## TAGS
 
-`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`, `THOUGHTS`, `RELAX`, `DWELLING`
+`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`, `THOUGHTS`, `RELAX`, `DWELLING`, `MELEE`, `SOCIAL`, `BEAST`, `FLYING`, `LIGHT`, `CLEANSING`
+
+- `MELEE`: Close-combat physical attacks (shove, thrust, hit, strike, smash, crush, charge, slam, pounce, etc.). Triggers Warrior's "Brute Force" passive (+50% damage).
+- `SOCIAL`: Social interaction words (talk, speak, greet, trade, barter, charm, flatter, persuade). Triggers Merchant's "Charming Presence" passive (grants Shield).
+- `BEAST`: Animals, creatures, and monsters (wolf, hawk, serpent, bear, spider, raven, bat, etc.). Use for creature-themed attack words.
+- `FLYING`: Airborne creatures and wind-related effects (hawk, eagle, bat, owl, raven, fairy, moth, etc.).
+- `LIGHT`: Light, radiance, dawn, sun. Distinct from HOLY (not religious). Use for: glow, shine, flash, beam, sunrise, aurora, luminous, bright.
+- `CLEANSING`: Purification, removal, washing away. Use for: purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure.
+
+---
+
+## WORD FAMILIES — Pre-Classified Action Hints
+
+**IMPORTANT**: Before classifying a word, check this table first. If the word appears here, it has already been pre-approved for the listed actions/tags. Use these as your primary classification and add supplementary actions only if they fit naturally. Some of these words are already in the DB with `status='draft'` — when you encounter them, refine their classification (your INSERT OR REPLACE will overwrite the draft with a finalized entry).
+
+| Action | Pre-classified words (use this action when you encounter them) |
+|--------|--------------------------------------------------------------|
+| `Peck` | peck, pecks, nip, nips, nibble, nibbles, jab, jabs, bite, bites, claw, claws, talon, talons, fang, fangs, gouge, gouges, stab (bird/beast variant) |
+| `Screech` | screech, shriek, shrikes, howl, howls, wail, wails, roar, roars, bellow, bellows, screams, cry, cries (creature variant) |
+| `Purify` | purify, cleanse, cure, remedy, antidote, baptize, absolve, wash, rinse, disinfect, sanitize, sterilize, detox, detoxify, exorcise, dispel |
+| `Awaken` | awaken, rouse, wake, stir, revive, arouse, invigorate, resuscitate, animate, enliven, vivify, rally, rejuvenate |
+| `Summon` (raven unit) | raven, ravens, crow, crows, jackdaw, magpie, corvid |
+
+| Tag | Pre-classified words (apply this tag when you encounter them) |
+|-----|--------------------------------------------------------------|
+| `BEAST` | wolf, wolves, hawk, hawks, serpent, serpents, bear, bears, spider, spiders, eagle, eagles, falcon, falcons, vulture, vultures, hyena, hyenas, jackal, jackals, panther, panthers, tiger, tigers, lion, lions, shark, sharks |
+| `FLYING` | hawk, hawks, eagle, eagles, falcon, falcons, owl, owls, bat, bats, moth, moths, butterfly, dragonfly, fairy, sprite, phoenix, griffin, pegasus, wyvern |
+| `LIGHT` | glow, shine, flash, beam, ray, sunrise, aurora, luminous, bright, radiant, brilliant, gleam, shimmer, sparkle, dazzle, illuminate, lantern, torch, candle, lighthouse |
+| `CLEANSING` | purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure, remedy, sanitize, sterilize, detox, soap, lather, bathe, shower, launder |
 
 ---
 
@@ -541,6 +574,20 @@ Revise any weak entries. It's better to downgrade a borderline game word to non-
 ---
 
 ## CLASSIFICATION GUIDELINES
+
+### CRITICAL: Multiple Actions Per Word
+
+**Words should have as many actions as realistically make sense.** This is the core design philosophy — words are realistic representations of what would actually happen. A single action per word is almost always too simplistic. Think about ALL the effects a real-world phenomenon would cause:
+
+- "tsunami" → Water (it's water) + Damage (destructive force) + Push (displacement) + Scramble (chaotic repositioning) = **4 actions**
+- "avalanche" → Damage (crushing) + Push (displacement) + Water (snow/ice) + Freeze (cold) = **4 actions**
+- "inferno" → Fire (elemental) + Burn (ignition) + Damage (heat) + Light (illumination) = **4 actions**
+- "lightning" → Shock (electricity) + Damage (strike) + Light (flash) + Stun (paralyze) = **4 actions**
+- "earthquake" → Damage (destruction) + Scramble (displacement) + Stun (disorientation) = **3 actions**
+
+**The more actions that relate to the word's real meaning, the better.** Ask yourself: "What would ACTUALLY happen if this occurred?" Each real consequence should be an action. A word with 1 action should be the exception (simple words like "drip"), not the rule. Most game words should have 2-4 actions.
+
+This makes the game richer — typing a powerful word triggers a cascade of realistic effects, making combat feel dynamic and rewarding vocabulary mastery.
 
 - **Word meaning drives effects**: "avalanche" → Damage + Push + Water; "whisper" → Fear; "fortress" → Heal + Shield (Self)
 - **Longer/rarer words = stronger**: 3-4 letter words are weak (1-2 value), 7+ letter words are powerful (4-6 value)

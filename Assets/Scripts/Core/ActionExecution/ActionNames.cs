@@ -37,6 +37,11 @@ namespace TextRPG.Core.ActionExecution
         public const string Relax = "Relax";
         public const string SleepAction = "Sleep";
         public const string RestHeal = "RestHeal";
+        public const string Scramble = "Scramble";
+        public const string Peck = "Peck";
+        public const string Screech = "Screech";
+        public const string Purify = "Purify";
+        public const string Awaken = "Awaken";
 
         public static readonly string[] InteractionActions =
         {

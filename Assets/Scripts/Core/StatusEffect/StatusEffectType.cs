@@ -25,6 +25,7 @@ namespace TextRPG.Core.StatusEffect
         Energetic,
         Tired,
         Sleep,
-        Anxiety
+        Anxiety,
+        Awakened
     }
 }

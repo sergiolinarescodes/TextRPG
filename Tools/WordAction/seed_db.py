@@ -3,6 +3,8 @@
 
 import os
 import sqlite3
+import subprocess
+import sys
 
 DB_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "Assets", "StreamingAssets")
 DB_PATH = os.path.join(DB_DIR, "wordactions.db")
@@ -26,7 +28,8 @@ CREATE TABLE IF NOT EXISTS word_meta (
     target TEXT NOT NULL DEFAULT 'SingleEnemy',
     cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 10),
     range  INTEGER NOT NULL DEFAULT 0,
-    area   TEXT NOT NULL DEFAULT 'Single'
+    area   TEXT NOT NULL DEFAULT 'Single',
+    status TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS word_tags (
@@ -145,6 +148,10 @@ CREATE TABLE IF NOT EXISTS interactable_reactions (
     PRIMARY KEY (encounter_id, interactable_id, action_id, outcome_id, seq),
     FOREIGN KEY (encounter_id, interactable_id) REFERENCES interactables(encounter_id, interactable_id)
 );
+
+CREATE TABLE IF NOT EXISTS processed_words (
+    word TEXT PRIMARY KEY COLLATE NOCASE
+);
 """
 
 # (word, action_name, value, target, range, area, assoc_word, seq)
@@ -155,7 +162,7 @@ SEED_ACTIONS = [
     ("wave",       "Water", 3, None, None, None, "", 0),  ("wave",       "Push", 2, None, None, None, "", 0),  ("wave",       "Damage", 2, None, None, None, "", 0),
     ("stream",     "Water", 2, None, None, None, "", 0),  ("stream",     "Damage", 1, None, None, None, "", 0),
     ("torrent",    "Water", 4, None, None, None, "", 0),  ("torrent",    "Damage", 3, None, None, None, "", 0),  ("torrent",    "Push", 2, None, None, None, "", 0),
-    ("tsunami",    "Water", 5, None, None, None, "", 0),  ("tsunami",    "Damage", 5, None, None, None, "", 0),  ("tsunami",    "Push", 2, None, None, None, "", 0),
+    ("tsunami",    "Water", 5, None, None, None, "", 0),  ("tsunami",    "Damage", 5, None, None, None, "", 0),  ("tsunami",    "Push", 2, None, None, None, "", 0),  ("tsunami",    "Scramble", 1, None, None, None, "", 0),
     ("ocean",      "Water", 3, None, None, None, "", 0),  ("ocean",      "Damage", 2, None, None, None, "", 0),
     ("flood",      "Water", 4, None, None, None, "", 0),  ("flood",      "Damage", 3, None, None, None, "", 0),
     ("deluge",     "Water", 5, None, None, None, "", 0),  ("deluge",     "Damage", 4, None, None, None, "", 0),
@@ -219,7 +226,7 @@ SEED_ACTIONS = [
     ("shout",      "Fear", 2, None, None, None, "", 0),
     ("mace",       "Damage", 2, None, None, None, "", 0),
     ("raise",      "Summon", 1, None, None, None, "bones", 0),
-    ("screech",    "Fear", 1, None, None, None, "", 0),
+    ("screech",    "Screech", 1, "AllEnemies", None, None, "", 0),
     ("slam",       "Damage", 2, None, None, None, "", 0),
     ("pounce",     "Damage", 4, None, None, None, "", 0),
     ("hex",        "Curse", 2, None, None, None, "", 0),  ("hex", "MagicDamage", 1, None, None, None, "", 1),
@@ -306,6 +313,11 @@ SEED_ACTIONS = [
     ("smelt",      "Melt", 3, None, None, None, "", 0),    ("smelt",      "Fire", 1, None, None, None, "", 0),
     ("thaw",       "Melt", 2, None, None, None, "", 0),    ("thaw",       "Heal", 1, None, None, None, "", 0),
 
+    # Charm words (social interaction)
+    ("charm",      "Charm", 1, "SingleEnemy", None, None, "", 0),
+    ("flatter",    "Charm", 1, "SingleEnemy", None, None, "", 0),
+    ("persuade",   "Charm", 1, "SingleEnemy", None, None, "", 0),
+
     # Interaction words
     ("enter",      "Enter", 1, "SingleEnemy", None, None, "", 0),
     ("go",         "Enter", 1, "SingleEnemy", None, None, "", 0),
@@ -333,6 +345,28 @@ SEED_ACTIONS = [
     ("leave",      "Leave", 1, "SingleEnemy", None, None, "", 0),
     ("exit",       "Leave", 1, "SingleEnemy", None, None, "", 0),
     ("depart",     "Leave", 1, "SingleEnemy", None, None, "", 0),
+
+    # Peck words (damage + bleed)
+    ("peck",       "Peck", 2, "SingleEnemy", None, None, "", 0),
+    ("pecks",      "Peck", 2, "SingleEnemy", None, None, "", 0),
+
+    # Purify showcase (family words are pre-registered as drafts in the DB)
+    ("purify",     "Purify", 2, "AllAlliesAndSelf", None, None, "", 0),
+
+    # Awaken showcase (family words are pre-registered as drafts in the DB)
+    ("awaken",     "Awaken", 1, "AllAlliesAndSelf", None, None, "", 0),
+
+    # Dawning/Dawn (combo: purify + buff + awaken — premium cost)
+    ("dawning",    "Purify", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("dawning",    "BuffMagicDefense", 1, "Self", None, None, "", 1),
+    ("dawning",    "Awaken", 1, "AllAlliesAndSelf", None, None, "", 2),
+    ("dawn",       "Purify", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("dawn",       "BuffMagicDefense", 1, "Self", None, None, "", 1),
+    ("dawn",       "Awaken", 1, "AllAlliesAndSelf", None, None, "", 2),
+
+    # Raven summon words (singular=1 unit, plural=2 units, higher cost)
+    ("raven",      "Summon", 1, "Self", None, None, "", 0),
+    ("ravens",     "Summon", 2, "Self", None, None, "", 0),
 ]
 
 # (word, target, cost, range, area)
@@ -391,6 +425,14 @@ SEED_META = [
     ("raise",       "Self",         1, 0, "Single"),
     # New enemy ability meta
     ("screech",     "AllEnemies",   1, 0, "Single"),
+    ("peck",        "SingleEnemy",  0, 0, "Single"),
+    ("pecks",       "SingleEnemy",  0, 0, "Single"),
+    ("purify",      "AllAlliesAndSelf", 2, 0, "Single"),
+    ("awaken",      "AllAlliesAndSelf", 2, 0, "Single"),
+    ("dawning",     "AllAlliesAndSelf", 4, 0, "Single"),
+    ("dawn",        "AllAlliesAndSelf", 4, 0, "Single"),
+    ("raven",       "Self",         5, 0, "Single"),
+    ("ravens",      "Self",         10, 0, "Single"),
     ("slam",        "SingleEnemy",  0, 0, "Single"),
     ("pounce",      "SingleEnemy",  2, 0, "Single"),
     ("hex",         "SingleEnemy",  0, 0, "Single"),
@@ -457,6 +499,10 @@ SEED_META = [
     ("furnace",     "SingleEnemy",  2, 2, "Single"),
     ("smelt",       "SingleEnemy",  1, 2, "Single"),
     ("thaw",        "SingleEnemy",  0, 3, "Single"),
+    # Charm meta
+    ("charm",       "SingleEnemy",  0, 0, "Single"),
+    ("flatter",     "SingleEnemy",  0, 0, "Single"),
+    ("persuade",    "SingleEnemy",  0, 0, "Single"),
     # Interaction meta
     ("enter",       "SingleEnemy",  0, 0, "Single"),
     ("go",          "SingleEnemy",  0, 0, "Single"),
@@ -505,16 +551,16 @@ SEED_TAGS = [
     ("inferno", "ELEMENTAL"), ("inferno", "OFFENSIVE"),
     ("torch", "ELEMENTAL"), ("torch", "OFFENSIVE"),
     ("scorch", "ELEMENTAL"), ("scorch", "OFFENSIVE"),
-    ("shove", "PHYSICAL"), ("shove", "OFFENSIVE"),
-    ("thrust", "PHYSICAL"), ("thrust", "OFFENSIVE"),
+    ("shove", "PHYSICAL"), ("shove", "OFFENSIVE"), ("shove", "MELEE"),
+    ("thrust", "PHYSICAL"), ("thrust", "OFFENSIVE"), ("thrust", "MELEE"),
     ("gust", "ELEMENTAL"), ("gust", "NATURE"),
     ("hurricane", "ELEMENTAL"), ("hurricane", "NATURE"), ("hurricane", "OFFENSIVE"),
-    ("scratch", "PHYSICAL"), ("scratch", "OFFENSIVE"),
-    ("hit", "PHYSICAL"), ("hit", "OFFENSIVE"),
-    ("strike", "PHYSICAL"), ("strike", "OFFENSIVE"),
-    ("smash", "PHYSICAL"), ("smash", "OFFENSIVE"),
-    ("obliterate", "PHYSICAL"), ("obliterate", "OFFENSIVE"),
-    ("crush", "PHYSICAL"), ("crush", "OFFENSIVE"),
+    ("scratch", "PHYSICAL"), ("scratch", "OFFENSIVE"), ("scratch", "MELEE"),
+    ("hit", "PHYSICAL"), ("hit", "OFFENSIVE"), ("hit", "MELEE"),
+    ("strike", "PHYSICAL"), ("strike", "OFFENSIVE"), ("strike", "MELEE"),
+    ("smash", "PHYSICAL"), ("smash", "OFFENSIVE"), ("smash", "MELEE"),
+    ("obliterate", "PHYSICAL"), ("obliterate", "OFFENSIVE"), ("obliterate", "MELEE"),
+    ("crush", "PHYSICAL"), ("crush", "OFFENSIVE"), ("crush", "MELEE"),
     ("bandage", "RESTORATION"),
     ("mend", "RESTORATION"),
     ("restore", "RESTORATION"), ("restore", "SUPPORT"),
@@ -531,23 +577,25 @@ SEED_TAGS = [
     ("eclipse", "SHADOW"), ("eclipse", "OFFENSIVE"),
     ("abyss", "SHADOW"), ("abyss", "OFFENSIVE"),
     ("absorb", "SHADOW"), ("absorb", "RESTORATION"),
-    ("charge", "PHYSICAL"), ("charge", "OFFENSIVE"),
-    ("engage", "PHYSICAL"), ("engage", "OFFENSIVE"),
-    ("flank", "PHYSICAL"), ("flank", "OFFENSIVE"),
+    ("charge", "PHYSICAL"), ("charge", "OFFENSIVE"), ("charge", "MELEE"),
+    ("engage", "PHYSICAL"), ("engage", "OFFENSIVE"), ("engage", "MELEE"),
+    ("flank", "PHYSICAL"), ("flank", "OFFENSIVE"), ("flank", "MELEE"),
     ("retreat", "DEFENSIVE"),
-    ("rush", "PHYSICAL"), ("rush", "OFFENSIVE"),
-    ("shout", "OFFENSIVE"), ("mace", "PHYSICAL"), ("mace", "OFFENSIVE"),
+    ("rush", "PHYSICAL"), ("rush", "OFFENSIVE"), ("rush", "MELEE"),
+    ("shout", "OFFENSIVE"), ("mace", "PHYSICAL"), ("mace", "OFFENSIVE"), ("mace", "MELEE"),
     ("raise", "SHADOW"),
-    ("screech", "OFFENSIVE"), ("screech", "SHADOW"),
-    ("slam", "PHYSICAL"), ("slam", "OFFENSIVE"),
-    ("pounce", "PHYSICAL"), ("pounce", "OFFENSIVE"),
+    ("screech", "OFFENSIVE"), ("screech", "SHADOW"), ("screech", "BEAST"),
+    ("slam", "PHYSICAL"), ("slam", "OFFENSIVE"), ("slam", "MELEE"),
+    ("pounce", "PHYSICAL"), ("pounce", "OFFENSIVE"), ("pounce", "MELEE"),
     ("hex", "SHADOW"), ("hex", "OFFENSIVE"),
     ("drain", "SHADOW"), ("drain", "RESTORATION"),
     ("focus", "SUPPORT"), ("meditate", "SUPPORT"), ("channel", "ARCANE"), ("channel", "SUPPORT"),
     ("venom", "OFFENSIVE"), ("venom", "SHADOW"), ("toxin", "OFFENSIVE"), ("toxin", "SHADOW"),
     ("plague", "OFFENSIVE"), ("plague", "SHADOW"),
-    ("lacerate", "PHYSICAL"), ("lacerate", "OFFENSIVE"), ("gash", "PHYSICAL"), ("gash", "OFFENSIVE"),
-    ("barrage", "PHYSICAL"), ("barrage", "OFFENSIVE"), ("soothe", "RESTORATION"),
+    ("lacerate", "PHYSICAL"), ("lacerate", "OFFENSIVE"), ("lacerate", "MELEE"),
+    ("gash", "PHYSICAL"), ("gash", "OFFENSIVE"), ("gash", "MELEE"),
+    ("barrage", "PHYSICAL"), ("barrage", "OFFENSIVE"), ("barrage", "MELEE"),
+    ("soothe", "RESTORATION"),
     ("flourish", "NATURE"), ("flourish", "RESTORATION"),
     ("bloom", "NATURE"), ("bloom", "RESTORATION"),
     ("regenerate", "NATURE"), ("regenerate", "RESTORATION"),
@@ -582,15 +630,32 @@ SEED_TAGS = [
     ("thaw", "ELEMENTAL"), ("thaw", "RESTORATION"),
     # Interaction tags
     ("enter", "SUPPORT"), ("go", "SUPPORT"), ("visit", "SUPPORT"),
-    ("talk", "SUPPORT"), ("speak", "SUPPORT"), ("greet", "SUPPORT"),
+    ("talk", "SUPPORT"), ("talk", "SOCIAL"), ("speak", "SUPPORT"), ("speak", "SOCIAL"), ("greet", "SUPPORT"), ("greet", "SOCIAL"),
     ("steal", "SHADOW"), ("swipe", "SHADOW"), ("pilfer", "SHADOW"),
     ("search", "SUPPORT"), ("examine", "SUPPORT"), ("inspect", "SUPPORT"),
     ("pray", "HOLY"), ("worship", "HOLY"),
     ("rest", "RESTORATION"), ("sleep", "RESTORATION"), ("nap", "RESTORATION"),
     ("open", "SUPPORT"), ("unlock", "SUPPORT"),
-    ("trade", "SUPPORT"), ("barter", "SUPPORT"),
+    ("trade", "SUPPORT"), ("trade", "SOCIAL"), ("barter", "SUPPORT"), ("barter", "SOCIAL"),
     ("recruit", "SUPPORT"), ("hire", "SUPPORT"),
     ("leave", "SUPPORT"), ("exit", "SUPPORT"), ("depart", "SUPPORT"),
+    # Charm tags
+    ("charm", "SUPPORT"), ("charm", "SOCIAL"),
+    ("flatter", "SUPPORT"), ("flatter", "SOCIAL"),
+    ("persuade", "SUPPORT"), ("persuade", "SOCIAL"),
+    # Purify showcase tags (family words are pre-registered as drafts in the DB)
+    ("purify", "HOLY"), ("purify", "RESTORATION"), ("purify", "SUPPORT"), ("purify", "CLEANSING"),
+    # Awaken showcase tags (family words are pre-registered as drafts in the DB)
+    ("awaken", "HOLY"), ("awaken", "RESTORATION"), ("awaken", "SUPPORT"), ("awaken", "LIGHT"),
+    # Dawning/Dawn tags
+    ("dawning", "HOLY"), ("dawning", "RESTORATION"), ("dawning", "SUPPORT"), ("dawning", "DEFENSIVE"), ("dawning", "LIGHT"), ("dawning", "CLEANSING"),
+    ("dawn", "HOLY"), ("dawn", "RESTORATION"), ("dawn", "SUPPORT"), ("dawn", "DEFENSIVE"), ("dawn", "LIGHT"), ("dawn", "CLEANSING"),
+    # Peck tags
+    ("peck", "PHYSICAL"), ("peck", "OFFENSIVE"), ("peck", "MELEE"), ("peck", "BEAST"),
+    ("pecks", "PHYSICAL"), ("pecks", "OFFENSIVE"), ("pecks", "MELEE"), ("pecks", "BEAST"),
+    # Raven tags
+    ("raven", "SHADOW"), ("raven", "NATURE"), ("raven", "MELEE"), ("raven", "BEAST"), ("raven", "FLYING"),
+    ("ravens", "SHADOW"), ("ravens", "NATURE"), ("ravens", "MELEE"), ("ravens", "BEAST"), ("ravens", "FLYING"),
 ]
 
 # (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b, tier, dexterity, constitution)
@@ -606,6 +671,7 @@ SEED_UNITS = [
     ("wraith",   "WRAITH",   "enemy",     10, 0, 7, 1, 5, 2, 0, 0.4, 0.2, 0.6, 2, 0, 0),
     ("shaman",   "SHAMAN",   "enemy",     15, 2, 6, 2, 4, 2, 0, 0.5, 0.3, 0.7, 2, 0, 0),
     # Summons (tier 0)
+    ("raven",    "RAVEN",    "enemy",     12, 4, 2, 1, 2, 3, 0, 0.2, 0.2, 0.3, 1, 0, 0),
     ("bones",    "BONES",    "enemy",     1,  1, 0, 0, 0, 0, 0, 0.9, 0.9, 0.8, 0, 0, 0),
     # Structures (tier 0)
     ("fortress", "FORTRESS", "structure", 20, 0, 0, 5, 3, 0, 5, 0.4, 0.4, 0.5, 0, 0, 0),
@@ -624,6 +690,7 @@ SEED_UNIT_ABILITIES = [
     ("goblin", "scratch"), ("goblin", "venom"),
     ("orc", "mace"), ("orc", "shout"),
     ("skeleton", "scratch"), ("skeleton", "raise"),
+    ("raven", "peck"), ("raven", "screech"),
     # Tier 2
     ("golem", "slam"), ("golem", "smash"),
     ("predator", "scratch"), ("predator", "pounce"),
@@ -645,6 +712,7 @@ SEED_UNIT_PASSIVES = [
     ("sentinel", "taunt",        None, "",              None,      0, "Self",        1),
     ("pyre",     "on_round_start", None, "apply_status", "Burning", 2, "AllEnemies", 0),
     ("predator", "on_kill",      None, "heal",          None,      5, "Self",        0),
+    ("raven",    "on_ally_hit",  None, "damage",        None,      1, "Attacker",    0),
 ]
 
 # (unit_id, tag) — material/property tags for tag-based reactions
@@ -792,6 +860,11 @@ def main():
     print(f"  {unit_count} units, {ability_count} unit abilities, {passive_count} unit passives, {unit_tag_count} unit tags")
     print(f"  {item_count} items, {item_passive_count} item passives")
     print(f"  {encounter_count} event encounters, {interactable_count} interactables, {reaction_count} reactions")
+
+    # Layer draft word families on top of seeds
+    families_script = os.path.join(os.path.dirname(__file__), "preregister_families.py")
+    if os.path.exists(families_script):
+        subprocess.run([sys.executable, families_script], check=True)
 
 
 if __name__ == "__main__":

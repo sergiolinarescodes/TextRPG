@@ -80,6 +80,8 @@ namespace TextRPG.Core.Services
                 statusEffects: s.StatusEffects, anxietyService: s.AnxietyService);
             ((CombatLoopService)scope.CombatLoop).Start();
 
+            s.ExperienceService?.SetEncounterService(encounterAdapter);
+
             // Register passives and tags for enemies
             for (int i = 0; i < encounter.Enemies.Length && i < 3; i++)
             {

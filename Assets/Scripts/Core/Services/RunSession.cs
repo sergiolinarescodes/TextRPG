@@ -13,7 +13,9 @@ using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.Passive;
+using TextRPG.Core.PlayerClass;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Experience;
 using TextRPG.Core.Run;
 using TextRPG.Core.Scroll;
 using TextRPG.Core.StatusEffect;
@@ -85,10 +87,14 @@ namespace TextRPG.Core.Services
         public ReactionService ReactionService { get; init; }
         public EventEncounterContext ReactionContext { get; init; }
 
-        // Run/Resource
+        // Class
+        public IClassService ClassService { get; init; }
+
+        // Run/Resource/Experience
         public IRunService RunService { get; init; }
         public Unidad.Core.Resource.IResourceService ResourceService { get; init; }
         public ILootRewardService LootRewardService { get; init; }
+        public ExperienceService ExperienceService { get; init; }
         public StatusEffectVisualService StatusVisualService { get; init; }
 
         // Misc
@@ -131,6 +137,7 @@ namespace TextRPG.Core.Services
             ((CombatContext)CombatContext).SetEnemies(Array.Empty<EntityId>());
             ((CombatContext)CombatContext).SetAllies(Array.Empty<EntityId>());
             WordCooldown?.Reset();
+            ExperienceService?.SetEncounterService(null);
         }
 
         public void Dispose()
@@ -150,6 +157,8 @@ namespace TextRPG.Core.Services
             (ConsumableService as IDisposable)?.Dispose();
             (ConsumableExecutor as IDisposable)?.Dispose();
             (LootRewardService as IDisposable)?.Dispose();
+            (ExperienceService as IDisposable)?.Dispose();
+            (ClassService as IDisposable)?.Dispose();
             (SpellService as IDisposable)?.Dispose();
             (EquipmentService as IDisposable)?.Dispose();
             (InventoryService as IDisposable)?.Dispose();
