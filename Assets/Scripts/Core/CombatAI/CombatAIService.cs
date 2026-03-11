@@ -6,6 +6,7 @@ using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Passive;
+using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
@@ -26,6 +27,7 @@ namespace TextRPG.Core.CombatAI
         private readonly EnemyWordResolver _enemyResolver;
         private readonly IReadOnlyDictionary<string, EntityDefinition> _unitRegistry;
         private readonly IPassiveService _passiveService;
+        private readonly IStatusEffectService _statusEffects;
 
         private readonly Dictionary<EntityId, string[]> _summonAbilities = new();
         private readonly Dictionary<EntityId, EntityId> _summonOwners = new();
@@ -35,7 +37,8 @@ namespace TextRPG.Core.CombatAI
             ICombatContext combatContext, IActionExecutionService actionExecution,
             IContributorRegistry<AIDecisionContext> scorers, EnemyWordResolver enemyResolver,
             IReadOnlyDictionary<string, EntityDefinition> unitRegistry = null,
-            IPassiveService passiveService = null)
+            IPassiveService passiveService = null,
+            IStatusEffectService statusEffects = null)
             : base(eventBus)
         {
             _encounterService = encounterService;
@@ -48,6 +51,7 @@ namespace TextRPG.Core.CombatAI
             _enemyResolver = enemyResolver;
             _unitRegistry = unitRegistry;
             _passiveService = passiveService;
+            _statusEffects = statusEffects;
 
             if (!_enemyResolver.HasWord("scratch"))
                 _enemyResolver.RegisterWord("scratch",
@@ -66,6 +70,15 @@ namespace TextRPG.Core.CombatAI
 
             if (!_turnService.IsTurnActive)
                 return;
+
+            // Skip turn if stunned or frozen
+            if (_statusEffects != null
+                && (_statusEffects.HasEffect(entityId, StatusEffectType.Stun)
+                 || _statusEffects.HasEffect(entityId, StatusEffectType.Frozen)))
+            {
+                Publish(new ActionAnimationCompletedEvent());
+                return;
+            }
 
             string[] abilities;
             if (_encounterService.IsEnemy(entityId))

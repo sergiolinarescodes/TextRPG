@@ -115,6 +115,12 @@ namespace TextRPG.Core.Encounter
             _enemyDefinitions[entityId] = definition;
         }
 
+        public void UnregisterEnemy(EntityId entityId)
+        {
+            _enemyEntities.Remove(entityId);
+            _enemyDefinitions.Remove(entityId);
+        }
+
         public bool IsEnemy(EntityId entityId) => _enemyDefinitions.ContainsKey(entityId);
 
         public EntityDefinition GetEntityDefinition(EntityId entityId)

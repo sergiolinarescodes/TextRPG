@@ -14,6 +14,7 @@ namespace TextRPG.Core.ActionExecution
             var registry = new ActionHandlerRegistry();
 
             registry.Register(ActionNames.Damage, new DamageActionHandler(ctx));
+            registry.Register(ActionNames.Smash, new SmashActionHandler(ctx));
             registry.Register(ActionNames.MagicDamage, new MagicDamageActionHandler(ctx));
             registry.Register(ActionNames.WeaponDamage, new WeaponDamageActionHandler(ctx));
             registry.Register(ActionNames.Heal, new HealActionHandler(ctx));
@@ -21,6 +22,7 @@ namespace TextRPG.Core.ActionExecution
             registry.Register(ActionNames.Fire, new FireActionHandler(ctx));
             registry.Register(ActionNames.Shield, new ShieldActionHandler(ctx));
             registry.Register(ActionNames.Thinking, new ThinkingActionHandler(ctx));
+            registry.Register(ActionNames.Pay, new PayActionHandler());
 
             var stats = new[]
             {

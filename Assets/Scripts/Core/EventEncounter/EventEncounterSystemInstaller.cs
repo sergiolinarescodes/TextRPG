@@ -32,7 +32,7 @@ namespace TextRPG.Core.EventEncounter
                 var outcomeRegistry = CreateOutcomeRegistry();
                 var tagReactions = CreateTagReactionRegistry();
                 var encounterContext = new EventEncounterContext(entityStats, slotService, eventBus, statusEffects);
-                var reactionService = new ReactionService(eventBus, outcomeRegistry, encounterContext, tagReactions);
+                var reactionService = new ReactionService(eventBus, outcomeRegistry, encounterContext, tagReactions, combatContext);
                 var service = new EventEncounterService(eventBus, entityStats, slotService, combatContext, reactionService);
                 encounterContext.EncounterService = service;
 
@@ -50,6 +50,8 @@ namespace TextRPG.Core.EventEncounter
             registry.Register("test_shrine", new AncientShrineEncounter());
             registry.Register("test_iron_vault", new IronVaultEncounter());
             registry.Register("test_armored_crate", new ArmoredCrateEncounter());
+            registry.Register("tavern", new TavernEncounter());
+            registry.Register("fruit_shop", new FruitShopEncounter());
             EventEncounterDatabaseLoader.LoadIntoRegistry(registry);
             return registry;
         }
@@ -70,25 +72,19 @@ namespace TextRPG.Core.EventEncounter
             registry.Register("spawn_combat", new SpawnCombatOutcome());
             registry.Register("recruit", new RecruitOutcome());
             registry.Register("leave", new LeaveOutcome());
+            registry.Register("give_item", new GiveItemOutcome());
             return registry;
         }
 
         internal static TagReactionRegistry CreateTagReactionRegistry()
         {
             var registry = new TagReactionRegistry();
-
-            registry.Register("flammable", "Burn", new InteractionReaction("Burn", "damage_target", null, 3));
-            registry.Register("flammable", "Burn", new InteractionReaction("Burn", "message", "It catches fire!", 0));
-            registry.Register("flammable", "Fire", new InteractionReaction("Fire", "message", "It catches fire!", 0));
-
-            registry.Register("meltable", "Melt", new InteractionReaction("Melt", "consume", null, 0));
-            registry.Register("meltable", "Melt", new InteractionReaction("Melt", "message", "It melts open!", 0));
-
-            registry.Register("breakable", "Damage", new InteractionReaction("Damage", "message", "It cracks under the force!", 0));
-
-            registry.Register("conductive", "Shock", new InteractionReaction("Shock", "damage_target", null, 2));
-            registry.Register("conductive", "Shock", new InteractionReaction("Shock", "message", "Electricity surges through it!", 0));
-
+            registry.Register(new Reactions.Tags.Definitions.FlammableTagDefinition());
+            registry.Register(new Reactions.Tags.Definitions.MeltableTagDefinition());
+            registry.Register(new Reactions.Tags.Definitions.BreakableTagDefinition());
+            registry.Register(new Reactions.Tags.Definitions.ConductiveTagDefinition());
+            registry.Register(new Reactions.Tags.Definitions.SocialTagDefinition());
+            registry.Register(new Reactions.Tags.Definitions.MercenaryTagDefinition());
             return registry;
         }
     }

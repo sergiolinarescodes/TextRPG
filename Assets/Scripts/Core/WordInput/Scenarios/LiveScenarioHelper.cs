@@ -10,6 +10,7 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.Passive;
+using TextRPG.Core.Scroll;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.StatusEffect.Handlers;
@@ -68,8 +69,9 @@ namespace TextRPG.Core.WordInput.Scenarios
         public IWordResolver EnemyResolver;
         public EntityId PlayerId;
         public IAnimationResolver ScenarioAnimResolver;
-        public FloatingMessagePool MessagePool;
+        public GameMessageService GameMessages;
         public Func<EntityId, Vector3> PositionProvider;
+        public Unidad.Core.Resource.IResourceService ResourceService;
     }
 
     internal sealed class LiveScenarioLayout
@@ -100,14 +102,17 @@ namespace TextRPG.Core.WordInput.Scenarios
         public int DragSourceSlot = -1;
         public bool DragFromEquipment;
         public string LastMatchedWord = "";
+        public bool GivePrefixDetected;
         public bool IsPreviewingManaCost;
         public IVisualElementScheduledItem DrunkWobbleSchedule;
+        public Label GoldLabel;
     }
 
     internal static class LiveScenarioHelper
     {
         private static readonly Color HighlightEnemy = new(1f, 0.3f, 0.3f, 0.4f);
         private static readonly Color HighlightSelf = new(0.3f, 1f, 0.3f, 0.4f);
+        private static readonly Color GivePrefixColor = new(0.55f, 0.65f, 0.82f);
 
         public static LiveScenarioServices CreateCoreServices(EntityId playerId, GameObject sceneRoot)
         {
@@ -193,18 +198,19 @@ namespace TextRPG.Core.WordInput.Scenarios
         }
 
         public static void CreatePassiveService(LiveScenarioServices svc, IEncounterService encounterService,
-            Dictionary<string, EntityDefinition> allUnits)
+            Dictionary<string, EntityDefinition> allUnits, IWordTagResolver tagResolver = null)
         {
             var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
             var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
             var targetResolver = new PassiveTargetResolver();
             var passiveContext = new PassiveContext(svc.EntityStats, svc.SlotService, svc.EventBus,
-                encounterService, animationService: svc.AnimationService);
+                encounterService, tagResolver: tagResolver, animationService: svc.AnimationService);
             svc.PassiveService = new PassiveService(svc.EventBus, triggerRegistry, effectRegistry,
                 targetResolver, passiveContext, allUnits);
         }
 
-        public static void CreateEquipmentAndLoot(LiveScenarioServices svc)
+        public static void CreateEquipmentAndLoot(LiveScenarioServices svc,
+            ISpellService spellService = null, IWordResolver baseResolver = null)
         {
             svc.EquipmentService = new EquipmentService(svc.EventBus, svc.ItemRegistry, svc.EntityStats,
                 svc.PassiveService, svc.WeaponService, svc.ConsumableService);
@@ -215,7 +221,7 @@ namespace TextRPG.Core.WordInput.Scenarios
                 svc.InventoryService, svc.PlayerInventoryId, svc.EquipmentService, svc.ItemRegistry));
 
             svc.LootRewardService = new LootRewardService(svc.EventBus, svc.ItemRegistry,
-                svc.InventoryService, svc.PlayerInventoryId, svc.PlayerId);
+                svc.InventoryService, svc.PlayerInventoryId, svc.PlayerId, spellService, baseResolver);
         }
 
         public static LiveScenarioLayout BuildLayout(VisualElement root, LiveScenarioServices svc,
@@ -328,7 +334,7 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             BuildHpBar(layout, svc);
             BuildManaBar(layout, svc);
-            BuildStatsRow(layout);
+            BuildStatsRow(layout, svc);
 
             // Projectile overlay
             var projectileOverlay = ProjectilePool.CreateOverlay();
@@ -356,11 +362,11 @@ namespace TextRPG.Core.WordInput.Scenarios
             var statusTextOverlay = StatusEffectFloatingTextPool.CreateOverlay();
             root.Add(statusTextOverlay);
 
-            // Floating message overlay (generic arc+bounce messages)
-            var messageOverlay = FloatingMessagePool.CreateOverlay();
+            // Game message overlay (generic arc+bounce messages)
+            var messageOverlay = GameMessageService.CreateOverlay();
             root.Add(messageOverlay);
-            svc.MessagePool = new FloatingMessagePool();
-            svc.MessagePool.Initialize(messageOverlay);
+            svc.GameMessages = new GameMessageService();
+            svc.GameMessages.Initialize(messageOverlay);
 
             layout.TooltipLayer = new VisualElement { name = "tooltip-layer" };
             layout.TooltipLayer.style.position = Position.Absolute;
@@ -473,6 +479,14 @@ namespace TextRPG.Core.WordInput.Scenarios
                     layout.ConsumableDurabilityLabel.RemoveFromHierarchy();
             }));
 
+            // Gold resource display
+            subs.Add(bus.Subscribe<Unidad.Core.Resource.ResourceChangedEvent>(evt =>
+            {
+                if (evt.Id != EventEncounter.Reactions.Tags.ResourceIds.Gold) return;
+                if (layout.GoldLabel != null)
+                    layout.GoldLabel.text = $"\U0001FA99 {(int)evt.NewValue}";
+            }));
+
             // Drunk letter changes
             subs.Add(bus.Subscribe<DrunkLettersChangedEvent>(_ => RefreshDrunkVisuals(svc, layout)));
 
@@ -538,11 +552,13 @@ namespace TextRPG.Core.WordInput.Scenarios
                     Debug.Log($"[Turn:Enemy] {evt.ActionId}({evt.Value}) → {evt.Targets.Count} target(s)");
             }));
 
-            // Summon registration
+            // Summon registration (skip if already registered, e.g. recruited interactable)
             subs.Add(bus.Subscribe<UnitSummonedEvent>(evt =>
             {
-                var word = evt.Word.ToLowerInvariant();
                 var uid = new UnitId(evt.EntityId.Value);
+                if (svc.UnitService.TryGetUnit(uid, out _)) return;
+
+                var word = evt.Word.ToLowerInvariant();
                 if (allUnits.TryGetValue(word, out var unitDef))
                 {
                     svc.UnitService.Register(uid,
@@ -565,6 +581,15 @@ namespace TextRPG.Core.WordInput.Scenarios
                 int visualIndex = evt.Slot.Type == SlotType.Enemy ? evt.Slot.Index : 3 + evt.Slot.Index;
                 if (visualIndex >= 0 && visualIndex < slotElements.Count)
                     layout.SlotVisual.RegisterEntity(evt.EntityId, slotElements[visualIndex]);
+            }));
+
+            // Slot visual removal for recruitment (not death — death has its own animation)
+            subs.Add(bus.Subscribe<SlotEntityRemovedEvent>(evt =>
+            {
+                if (layout.SlotVisual == null) return;
+                // Skip if entity is dead (death animation handles cleanup)
+                if (svc.EntityStats.GetCurrentHealth(evt.EntityId) <= 0) return;
+                layout.SlotVisual.UnregisterEntity(evt.EntityId);
             }));
 
             // Loot reward
@@ -621,7 +646,7 @@ namespace TextRPG.Core.WordInput.Scenarios
                     if (word.Length == 0) return;
 
                     var result = submitFunc(word);
-                    if (result == WordSubmitResult.InsufficientMana)
+                    if (result == WordSubmitResult.InsufficientMana || result == WordSubmitResult.WordOnCooldown || result == WordSubmitResult.NoItemToGive)
                     {
                         PlayManaRejection(layout);
                         layout.CodeField?.schedule.Execute(() => layout.CodeField?.Focus());
@@ -734,7 +759,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             {
                 svc.TooltipService?.Dispose();
                 (svc.FrameworkTooltipService as IDisposable)?.Dispose();
-                svc.MessagePool?.Dispose();
+                svc.GameMessages?.Dispose();
                 svc.StatusVisualService?.Dispose();
                 svc.AnimationService?.Dispose();
                 (svc.PassiveService as IDisposable)?.Dispose();
@@ -778,31 +803,58 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             RecalculateFontSize(layout, fontScaleFactor);
 
-            bool isAmmo = IsAmmoWord(svc, matchText);
+            // Detect "give " prefix
+            var lowerText = matchText.ToLowerInvariant();
+            bool isGivePrefix = lowerText.StartsWith("give ");
+            var matchWord = isGivePrefix ? lowerText.Substring(5) : matchText;
+            int prefixLen = isGivePrefix ? 5 : 0;
+
+            // Wave animation on "give " when first detected
+            if (isGivePrefix && !layout.GivePrefixDetected)
+            {
+                layout.GivePrefixDetected = true;
+                var giveIndices = new List<int> { 0, 1, 2, 3, 4 };
+                layout.CodeField.PlayHighlightAnimation(giveIndices);
+            }
+            else if (!isGivePrefix)
+            {
+                layout.GivePrefixDetected = false;
+            }
+
+            bool isAmmo = IsAmmoWord(svc, matchWord);
             var matchService = isAmmo ? svc.AmmoMatchService : svc.WordMatchService;
             var wasMatched = matchService.IsMatched;
-            var colors = matchService.CheckMatch(matchText);
+            var colors = matchService.CheckMatch(matchWord);
+
+            // Apply "give " prefix color
+            if (isGivePrefix)
+            {
+                var labels = layout.CodeField.CharLabels;
+                for (int i = 0; i < prefixLen && i < labels.Count; i++)
+                    labels[i].style.color = GivePrefixColor;
+            }
+
             if (colors.Count > 0)
             {
                 var labels = layout.CodeField.CharLabels;
-                for (int i = 0; i < colors.Count && i < labels.Count; i++)
-                    labels[i].style.color = colors[i].Color;
+                for (int i = 0; i < colors.Count && i + prefixLen < labels.Count; i++)
+                    labels[i + prefixLen].style.color = colors[i].Color;
 
                 if (!wasMatched)
                 {
                     var indices = new List<int>();
                     for (int i = 0; i < colors.Count; i++)
-                        indices.Add(i);
+                        indices.Add(i + prefixLen);
                     layout.CodeField.PlayHighlightAnimation(indices);
                 }
 
-                var currentWord = matchText.ToLowerInvariant();
+                var currentWord = lowerText;
                 if (currentWord != layout.LastMatchedWord)
                 {
                     layout.LastMatchedWord = currentWord;
                     ShowTargetingPreview(layout, svc, matchText);
                     if (!isAmmo)
-                        ShowManaCostPreview(layout, svc, currentWord);
+                        ShowManaCostPreview(layout, svc, matchWord.ToLowerInvariant());
                     else
                         ClearManaCostPreview(layout, svc);
                 }
@@ -810,8 +862,15 @@ namespace TextRPG.Core.WordInput.Scenarios
             else
             {
                 var labels = layout.CodeField.CharLabels;
-                for (int i = 0; i < labels.Count; i++)
+                // Reset non-prefix chars to white
+                for (int i = prefixLen; i < labels.Count; i++)
                     labels[i].style.color = Color.white;
+
+                if (!isGivePrefix)
+                {
+                    for (int i = 0; i < labels.Count; i++)
+                        labels[i].style.color = Color.white;
+                }
 
                 layout.LastMatchedWord = "";
                 ClearTargetingPreview(layout);
@@ -846,20 +905,33 @@ namespace TextRPG.Core.WordInput.Scenarios
             if (svc.PreviewService == null) return;
 
             var word = text.ToLowerInvariant();
-            var previewService = IsAmmoWord(svc, word) ? svc.AmmoPreviewService : svc.PreviewService;
-            var preview = previewService.PreviewWord(word);
-            if (preview.ActionPreviews.Count == 0) return;
 
-            var sourceEntity = svc.CombatContext.SourceEntity;
-            foreach (var actionPreview in preview.ActionPreviews)
+            bool isGive = WordPrefixHelper.TryStripGivePrefix(ref word);
+            if (isGive)
+                svc.CombatContext.SetTargetingInverted(true);
+            else if (word.Length == 0) return;
+
+            try
             {
-                foreach (var entityId in actionPreview.AffectedEntities)
+                var previewService = IsAmmoWord(svc, word) ? svc.AmmoPreviewService : svc.PreviewService;
+                var preview = previewService.PreviewWord(word);
+                if (preview.ActionPreviews.Count == 0) return;
+
+                var sourceEntity = svc.CombatContext.SourceEntity;
+                foreach (var actionPreview in preview.ActionPreviews)
                 {
-                    var element = layout.SlotVisual.GetSlotElement(entityId);
-                    if (element == null) continue;
-                    var color = entityId.Equals(sourceEntity) ? HighlightSelf : HighlightEnemy;
-                    element.style.backgroundColor = color;
+                    foreach (var entityId in actionPreview.AffectedEntities)
+                    {
+                        var element = layout.SlotVisual.GetSlotElement(entityId);
+                        if (element == null) continue;
+                        var color = entityId.Equals(sourceEntity) ? HighlightSelf : HighlightEnemy;
+                        element.style.backgroundColor = color;
+                    }
                 }
+            }
+            finally
+            {
+                if (isGive) svc.CombatContext.SetTargetingInverted(false);
             }
         }
 
@@ -992,7 +1064,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             layout.StatsBar.Add(manaBarWrapper);
         }
 
-        private static void BuildStatsRow(LiveScenarioLayout layout)
+        private static void BuildStatsRow(LiveScenarioLayout layout, LiveScenarioServices svc)
         {
             var statsRow = new VisualElement();
             statsRow.style.flexDirection = FlexDirection.Row;
@@ -1010,7 +1082,20 @@ namespace TextRPG.Core.WordInput.Scenarios
             statusLabel.style.color = Color.white;
             statusLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             statusLabel.style.fontSize = 38;
+            statusLabel.style.flexGrow = 1;
             statsRow.Add(statusLabel);
+
+            // Gold display — right-aligned
+            int gold = 0;
+            if (svc.ResourceService != null
+                && svc.ResourceService.Has(EventEncounter.Reactions.Tags.ResourceIds.Gold))
+                gold = (int)svc.ResourceService.Get(EventEncounter.Reactions.Tags.ResourceIds.Gold);
+            layout.GoldLabel = new Label($"\U0001FA99 {gold}");
+            layout.GoldLabel.style.color = new Color(1f, 0.85f, 0.2f);
+            layout.GoldLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            layout.GoldLabel.style.fontSize = 38;
+            layout.GoldLabel.style.unityTextAlign = TextAnchor.MiddleRight;
+            statsRow.Add(layout.GoldLabel);
         }
 
         private static void UpdatePlayerHpBar(LiveScenarioLayout layout, LiveScenarioServices svc)
@@ -1034,6 +1119,8 @@ namespace TextRPG.Core.WordInput.Scenarios
         private static void ShowManaCostPreview(LiveScenarioLayout layout, LiveScenarioServices svc, string word)
         {
             if (layout.ManaBar == null || layout.ManaLabel == null || layout.ManaCostOverlay == null) return;
+
+            if (!WordPrefixHelper.TryStripGivePrefix(ref word) && word.Length == 0) { ClearManaCostPreview(layout, svc); return; }
 
             var meta = svc.WordResolver.GetStats(word);
             int cost = meta.Cost;
@@ -1230,7 +1317,7 @@ namespace TextRPG.Core.WordInput.Scenarios
         // --- Loot overlay ---
 
         private static void ShowLootSelection(LiveScenarioLayout layout, LiveScenarioServices svc,
-            EquipmentItemDefinition[] options)
+            LootRewardOption[] options)
         {
             SetInputEnabled(layout, false);
 
@@ -1261,9 +1348,8 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             for (int i = 0; i < options.Length; i++)
             {
-                var item = options[i];
+                var option = options[i];
                 var cardIndex = i;
-                var slotIndex = (int)item.SlotType;
 
                 var card = new VisualElement();
                 card.style.marginLeft = 12;
@@ -1271,12 +1357,13 @@ namespace TextRPG.Core.WordInput.Scenarios
                 card.style.alignItems = Align.Center;
                 card.pickingMode = PickingMode.Position;
 
-                card.Add(TooltipContentBuilder.CreateMiniWordBox(item.DisplayName, item.Color, 120, 100));
+                card.Add(TooltipContentBuilder.CreateMiniWordBox(option.DisplayName, option.Color, 120, 100));
 
                 card.RegisterCallback<PointerEnterEvent>(_ =>
                 {
-                    ShowLootTooltip(layout, item, card);
-                    HighlightEquipmentSlot(layout, slotIndex);
+                    ShowLootTooltip(layout, option, card);
+                    if (!option.IsScroll)
+                        HighlightEquipmentSlot(layout, (int)option.Equipment.SlotType);
                 });
                 card.RegisterCallback<PointerLeaveEvent>(_ =>
                 {
@@ -1300,7 +1387,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             ClearEquipmentSlotHighlight(layout);
         }
 
-        private static void ShowLootTooltip(LiveScenarioLayout layout, EquipmentItemDefinition item, VisualElement card)
+        private static void ShowLootTooltip(LiveScenarioLayout layout, LootRewardOption option, VisualElement card)
         {
             HideLootTooltip(layout);
 
@@ -1321,8 +1408,41 @@ namespace TextRPG.Core.WordInput.Scenarios
             layout.LootTooltip.style.paddingBottom = 12;
             layout.LootTooltip.pickingMode = PickingMode.Ignore;
 
-            layout.LootTooltip.Add(TooltipContentBuilder.BuildHeader(item.DisplayName, item.Color, item.SlotType.ToString()));
-            layout.LootTooltip.Add(TooltipContentBuilder.BuildArmorContent(item));
+            if (option.IsScroll)
+            {
+                var scroll = option.Scroll;
+                layout.LootTooltip.Add(TooltipContentBuilder.BuildHeader(scroll.DisplayName, scroll.Color, "SCROLL"));
+
+                var spellLabel = new Label($"Spell: {scroll.OriginalWord}");
+                spellLabel.style.color = Color.white;
+                spellLabel.style.fontSize = 14;
+                spellLabel.style.marginTop = 4;
+                layout.LootTooltip.Add(spellLabel);
+
+                var costLabel = new Label($"Mana cost: {scroll.ManaCost}");
+                costLabel.style.color = new Color(0.4f, 0.7f, 1f);
+                costLabel.style.fontSize = 14;
+                costLabel.style.marginTop = 2;
+                layout.LootTooltip.Add(costLabel);
+
+                var cdLabel = new Label("Cooldown: 2 rounds (fixed)");
+                cdLabel.style.color = new Color(1f, 0.8f, 0.4f);
+                cdLabel.style.fontSize = 14;
+                cdLabel.style.marginTop = 2;
+                layout.LootTooltip.Add(cdLabel);
+
+                var typeLabel = new Label("MagicDamage");
+                typeLabel.style.color = new Color(0.8f, 0.5f, 1f);
+                typeLabel.style.fontSize = 14;
+                typeLabel.style.marginTop = 2;
+                layout.LootTooltip.Add(typeLabel);
+            }
+            else
+            {
+                var item = option.Equipment;
+                layout.LootTooltip.Add(TooltipContentBuilder.BuildHeader(item.DisplayName, item.Color, item.SlotType.ToString()));
+                layout.LootTooltip.Add(TooltipContentBuilder.BuildArmorContent(item));
+            }
 
             var rootVe = layout.CodeField.panel?.visualTree ?? layout.MainTextPanel.parent;
             rootVe.Add(layout.LootTooltip);

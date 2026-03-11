@@ -87,6 +87,16 @@ namespace TextRPG.Core.UnitRendering
             RenderSlotContent(cell, entityId);
         }
 
+        public void UnregisterEntity(EntityId entityId)
+        {
+            if (!_slotElements.TryGetValue(entityId, out var cell)) return;
+            _slotElements.Remove(entityId);
+            cell.Clear();
+            cell.style.backgroundColor = Color.black;
+            if (_allyCells.Contains(cell))
+                RenderPlaceholder(cell, "SUMMON");
+        }
+
         public VisualElement GetSlotElement(EntityId entityId)
         {
             return _slotElements.TryGetValue(entityId, out var cell) ? cell : null;

@@ -21,5 +21,10 @@ namespace TextRPG.Core.ActionExecution
         void SetFocusedTarget(EntityId target);
         void ClearFocusedTarget();
         void SetPassiveService(IPassiveService passiveService);
+
+        void SetTargetingInverted(bool inverted);
+
+        bool IsGiveCommand { get; }
+        void SetGiveCommand(bool isGive);
     }
 }

@@ -44,7 +44,8 @@
       "Bash(sed:*)",
       "Bash(sqlite3:*)",
       "Bash(pip install:*)",
-      "Bash(pip run:*)"
+      "Bash(pip run:*)",
+      "Bash(cd \"C:\\\\Users\\\\kelns\\\\repos\\\\TextRPG\" && sqlite3 \"./Assets/StreamingAssets/wordactions.db\" \"SELECT * FROM units WHERE unit_id = 'sellsword';\" 2>&1 | head -20)"
     ]
   }
 }

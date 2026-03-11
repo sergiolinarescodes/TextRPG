@@ -129,7 +129,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             {
                 Debug.Log($"[EventEncounter] Message: {evt.Message}");
                 var pos = _svc.PositionProvider?.Invoke(evt.SourceEntityId) ?? Vector3.zero;
-                _svc.MessagePool?.Spawn(new Vector2(pos.x, pos.y), evt.Message, new Color(1f, 0.9f, 0.5f));
+                _svc.GameMessages?.Spawn(new Vector2(pos.x, pos.y), evt.Message, new Color(1f, 0.9f, 0.5f));
             }));
             _subscriptions.Add(_svc.EventBus.Subscribe<RewardGrantedEvent>(evt =>
                 Debug.Log($"[EventEncounter] Reward: {evt.RewardType} x{evt.Value}")));

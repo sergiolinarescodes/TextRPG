@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.EventEncounter.Reactions.Tags;
 using Unidad.Core.EventBus;
 using Unidad.Core.Systems;
 using UnityEngine;
@@ -16,17 +17,20 @@ namespace TextRPG.Core.EventEncounter.Reactions
         private readonly InteractionOutcomeRegistry _outcomes;
         private readonly IEventEncounterContext _ctx;
         private readonly TagReactionRegistry _tagReactions;
+        private readonly ICombatContext _combatContext;
         private bool _isProcessing;
 
         public ReactionService(
             IEventBus eventBus,
             InteractionOutcomeRegistry outcomes,
             IEventEncounterContext ctx,
-            TagReactionRegistry tagReactions = null) : base(eventBus)
+            TagReactionRegistry tagReactions = null,
+            ICombatContext combatContext = null) : base(eventBus)
         {
             _outcomes = outcomes;
             _ctx = ctx;
             _tagReactions = tagReactions;
+            _combatContext = combatContext;
 
             Subscribe<InteractionActionEvent>(OnInteractionAction);
             Subscribe<ActionHandlerExecutedEvent>(OnCombatAction);
@@ -45,12 +49,14 @@ namespace TextRPG.Core.EventEncounter.Reactions
         {
             _reactions.Clear();
             _entityTags.Clear();
+            _tagReactions?.ClearAllState();
         }
 
         public void ClearReactions(EntityId entityId)
         {
             _reactions.Remove(entityId);
             _entityTags.Remove(entityId);
+            _tagReactions?.ClearEntityState(entityId);
         }
 
         private void OnInteractionAction(InteractionActionEvent evt)
@@ -75,22 +81,42 @@ namespace TextRPG.Core.EventEncounter.Reactions
 
             if (!hasEntityReactions && !hasTagReactions) return;
 
+            bool isGive = _combatContext?.IsGiveCommand == true;
+
             _isProcessing = true;
             try
             {
                 if (hasEntityReactions)
                 {
-                    for (int i = 0; i < reactions.Count; i++)
-                        ExecuteReaction(reactions[i], source, target, actionId, value);
+                    if (isGive)
+                    {
+                        // First affordable match wins
+                        for (int i = 0; i < reactions.Count; i++)
+                        {
+                            if (TryExecuteGiveReaction(reactions[i], source, target, actionId, value))
+                                break;
+                        }
+                        _combatContext?.SetGiveCommand(false);
+                    }
+                    else
+                    {
+                        for (int i = 0; i < reactions.Count; i++)
+                            ExecuteReaction(reactions[i], source, target, actionId, value);
+                    }
                 }
 
                 if (hasTagReactions)
                 {
                     for (int t = 0; t < tags.Length; t++)
                     {
-                        var tagList = _tagReactions.GetReactions(tags[t], actionId);
-                        for (int i = 0; i < tagList.Count; i++)
-                            ExecuteReaction(tagList[i], source, target, actionId, value);
+                        if (_tagReactions.TryGet(tags[t], out var tagDef))
+                        {
+                            var tagCtx = new TagReactionContext(
+                                source, target, actionId, value,
+                                _ctx, _tagReactions.StateStore, tagDef.TagId);
+                            try { tagDef.React(tagCtx); }
+                            catch (Exception ex) { Debug.LogException(ex); }
+                        }
                     }
                 }
             }
@@ -98,6 +124,28 @@ namespace TextRPG.Core.EventEncounter.Reactions
             {
                 _isProcessing = false;
             }
+        }
+
+        private bool TryExecuteGiveReaction(InteractionReaction reaction, EntityId source,
+            EntityId target, string actionId, int value)
+        {
+            if (!string.Equals(reaction.ActionId, actionId, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            // Value check: if reaction has a cost, verify payment meets cost
+            if (reaction.Value > 0 && value > 0 && value < reaction.Value)
+                return false;
+
+            if (reaction.Chance < 1.0f && UnityEngine.Random.value > reaction.Chance)
+                return false;
+
+            if (!_outcomes.TryGet(reaction.OutcomeId, out var outcome))
+                return false;
+
+            var outcomeValue = reaction.Value != 0 ? reaction.Value : value;
+            var context = new InteractionOutcomeContext(source, target, actionId, outcomeValue, reaction.OutcomeParam, _ctx);
+            outcome.Execute(context);
+            return true;
         }
 
         private void ExecuteReaction(InteractionReaction reaction, EntityId source, EntityId target, string actionId, int value)

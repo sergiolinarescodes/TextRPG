@@ -46,37 +46,44 @@ namespace TextRPG.Core.ActionExecution
 
         private void ProcessWord(string word)
         {
-            if (!_wordResolver.HasWord(word))
-                return;
-
-            var actions = _wordResolver.Resolve(word);
-            var meta = _wordResolver.GetStats(word);
-            Publish(new WordResolvedEvent(word, actions, meta));
-
-            if (_entityStats != null && meta.Cost > 0)
+            try
             {
-                if (!_entityStats.TrySpendMana(_combatContext.SourceEntity, meta.Cost))
-                {
-                    Publish(new WordRejectedEvent(word, meta.Cost));
+                if (!_wordResolver.HasWord(word))
                     return;
+
+                var actions = _wordResolver.Resolve(word);
+                var meta = _wordResolver.GetStats(word);
+                Publish(new WordResolvedEvent(word, actions, meta));
+
+                if (_entityStats != null && meta.Cost > 0)
+                {
+                    if (!_entityStats.TrySpendMana(_combatContext.SourceEntity, meta.Cost))
+                    {
+                        Publish(new WordRejectedEvent(word, meta.Cost));
+                        return;
+                    }
+                }
+
+                var resolved = ResolveActions(word, actions, meta);
+
+                Publish(new ActionExecutionStartedEvent(word, resolved.Count));
+
+                bool isInstant = _animationResolver == null || _animationResolver.IsInstant;
+
+                if (isInstant)
+                {
+                    ExecuteAllImmediately(resolved);
+                    Publish(new ActionResolvedEvent(word, resolved, _combatContext.SourceEntity, true));
+                    Publish(new ActionExecutionCompletedEvent(word));
+                }
+                else
+                {
+                    Publish(new ActionResolvedEvent(word, resolved, _combatContext.SourceEntity, false));
                 }
             }
-
-            var resolved = ResolveActions(word, actions, meta);
-
-            Publish(new ActionExecutionStartedEvent(word, resolved.Count));
-
-            bool isInstant = _animationResolver == null || _animationResolver.IsInstant;
-
-            if (isInstant)
+            finally
             {
-                ExecuteAllImmediately(resolved);
-                Publish(new ActionResolvedEvent(word, resolved, _combatContext.SourceEntity, true));
-                Publish(new ActionExecutionCompletedEvent(word));
-            }
-            else
-            {
-                Publish(new ActionResolvedEvent(word, resolved, _combatContext.SourceEntity, false));
+                _combatContext.SetTargetingInverted(false);
             }
         }
 

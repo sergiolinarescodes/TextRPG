@@ -110,7 +110,8 @@ python Tools/WordAction/stats.py
 
 | ActionId | Effect |
 |----------|--------|
-| `Damage` | Deal direct damage (Value = amount) |
+| `Damage` | Deal physical direct damage (Value = amount). Use for physical attacks (punch, slash, crush). Do NOT use for magical/elemental attacks — use `MagicDamage` instead. |
+| `MagicDamage` | Deal magic damage scaled by MagicPower vs MagicDefense (Value = amount). Use for ALL magical/elemental damage: fire spells, water spells, shadow magic, holy attacks, etc. Any word that deals damage through magical means should use `MagicDamage` instead of `Damage`. Always pair with `SPELL` tag. |
 | `Heal` | Restore health (Value = amount) |
 | `Burn` | Apply Burning DoT (Value = duration) |
 | `Water` | Apply Wet status (Value = duration) |
@@ -150,6 +151,8 @@ python Tools/WordAction/stats.py
 | `Shield` | Apply shield (Value = amount) |
 | `Item` | Equippable item — goes to player inventory. Value = durability (0 = infinite). Requires an `"item"` field with type, stats, and optional passives. Weapon-type items use `assoc_word` to link ammo words. Consumable-type items auto-equip and have durability = uses. |
 | `Melt` | Melts or softens materials through intense heat — differs from Burn (combustion of flammable materials). Melt works on metal, ice, wax. In combat, debuffs physical defense (Value = amount). |
+| `Smash` | Powerful physical impact that deals heavy damage and can break objects (Value = damage amount). Works on breakable targets in events. |
+| `Pay` | Spend currency/valuables — used for bribery, trading, recruitment. Target is Self (payment comes from the payer). Value = gold amount paid. Used with "give" prefix to target NPCs (e.g. "give money" pays an NPC). |
 | `Time` | Time manipulation (Value = intensity) |
 
 ### INTERACTION ACTIONS
@@ -290,10 +293,13 @@ Words with the `Item` action become equippable items. When classifying an item w
         "phys_defense": 0, "magic_defense": 0,
         "luck": 1, "max_health": 0, "max_mana": 0,
         "color": [1.0, 0.85, 0.2],
-        "passives": []
+        "passives": [],
+        "tags": []
     }
 }
 ```
+
+**Item tags**: Optional `"tags"` array on the `"item"` field. Used for inventory-gated mechanics like "give" prefix. Words with SILVER/VALUABLE word_tags require a matching tagged item in inventory when used with "give" — the item is consumed. Words with a Pay action (e.g. "give money", "give gold") deduct from the player's gold resource instead. Example: `"tags": ["SILVER"]` on a silver bar item means it can be consumed when the player types "give silver".
 
 Weapon-type items use `assoc_word` to link ammo words:
 ```json

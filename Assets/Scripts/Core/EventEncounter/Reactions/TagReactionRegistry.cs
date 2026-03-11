@@ -1,40 +1,26 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.EventEncounter.Reactions.Tags;
+using EntityId = TextRPG.Core.EntityStats.EntityId;
 
 namespace TextRPG.Core.EventEncounter.Reactions
 {
     internal sealed class TagReactionRegistry
     {
-        private readonly Dictionary<(string Tag, string ActionId), List<InteractionReaction>> _reactions = new(TagActionComparer.Instance);
+        private readonly Dictionary<string, ITagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
+        private readonly TagStateStore _stateStore = new();
 
-        public void Register(string tag, string actionId, InteractionReaction reaction)
+        public void Register(ITagDefinition tag)
         {
-            var key = (tag, actionId);
-            if (!_reactions.TryGetValue(key, out var list))
-            {
-                list = new List<InteractionReaction>();
-                _reactions[key] = list;
-            }
-            list.Add(reaction);
+            _tags[tag.TagId] = tag;
         }
 
-        public IReadOnlyList<InteractionReaction> GetReactions(string tag, string actionId)
-        {
-            return _reactions.TryGetValue((tag, actionId), out var list) ? list : Array.Empty<InteractionReaction>();
-        }
+        public bool TryGet(string tagId, out ITagDefinition tag) => _tags.TryGetValue(tagId, out tag);
 
-        private sealed class TagActionComparer : IEqualityComparer<(string Tag, string ActionId)>
-        {
-            public static readonly TagActionComparer Instance = new();
+        public TagStateStore StateStore => _stateStore;
 
-            public bool Equals((string Tag, string ActionId) x, (string Tag, string ActionId) y) =>
-                string.Equals(x.Tag, y.Tag, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(x.ActionId, y.ActionId, StringComparison.OrdinalIgnoreCase);
+        public void ClearEntityState(EntityId entity) => _stateStore.ClearEntity(entity);
 
-            public int GetHashCode((string Tag, string ActionId) obj) =>
-                HashCode.Combine(
-                    StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Tag),
-                    StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ActionId));
-        }
+        public void ClearAllState() => _stateStore.ClearAll();
     }
 }

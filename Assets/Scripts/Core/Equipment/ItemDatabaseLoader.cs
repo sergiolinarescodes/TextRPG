@@ -41,6 +41,13 @@ namespace TextRPG.Core.Equipment
             [Column("target")] public string Target { get; set; }
         }
 
+        [Table("item_tags")]
+        private class ItemTagRow
+        {
+            [Column("item_id")] public string ItemId { get; set; }
+            [Column("tag")] public string Tag { get; set; }
+        }
+
         public static Dictionary<string, EquipmentItemDefinition> LoadAll(
             WordActionData wordActionData = null, string dbPath = null)
         {
@@ -78,6 +85,24 @@ namespace TextRPG.Core.Equipment
             }
             catch (SQLiteException) { }
 
+            var tags = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var tagRows = db.Table<ItemTagRow>().ToList();
+                foreach (var row in tagRows)
+                {
+                    var normalized = WordAction.TagNormalizer.Normalize(row.Tag);
+                    if (string.IsNullOrEmpty(normalized)) continue;
+                    if (!tags.TryGetValue(row.ItemId, out var list))
+                    {
+                        list = new List<string>();
+                        tags[row.ItemId] = list;
+                    }
+                    list.Add(normalized);
+                }
+            }
+            catch (SQLiteException) { }
+
             // Use pre-built ammo-per-item lookup from WordActionData
             var ammoWordsByItem = wordActionData?.AmmoWordsByItem;
 
@@ -101,10 +126,13 @@ namespace TextRPG.Core.Equipment
                 var passiveArray = passives.TryGetValue(item.ItemId, out var pList)
                     ? pList.ToArray()
                     : Array.Empty<PassiveEntry>();
+                var tagArray = tags.TryGetValue(item.ItemId, out var tList)
+                    ? tList.ToArray()
+                    : null;
 
                 result[item.ItemId] = new EquipmentItemDefinition(
                     item.ItemId, item.DisplayName, slotType, item.Durability,
-                    stats, color, ammoWords, passiveArray);
+                    stats, color, ammoWords, passiveArray, tagArray);
             }
 
             return result;

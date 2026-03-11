@@ -38,11 +38,11 @@ DB_PATH = os.path.join(
 )
 
 VALID_ACTIONS = {
-    "Water", "Fire", "Earth", "Wind", "Push", "Damage", "Slow", "Burn",
+    "Water", "Fire", "Earth", "Wind", "Push", "Damage", "MagicDamage", "Slow", "Burn",
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
-    "Drunk",
+    "Drunk", "Smash", "Pay",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",
@@ -89,6 +89,7 @@ VALID_AREAS = {
 VALID_TAGS = {
     "NATURE", "ELEMENTAL", "OFFENSIVE", "RESTORATION", "SHADOW",
     "PHYSICAL", "DEFENSIVE", "ARCANE", "HOLY", "SUPPORT", "PSYCHIC",
+    "SPELL",
 }
 
 VALID_TRIGGERS = {
@@ -124,6 +125,7 @@ def main():
     passive_rows = []
     item_rows = []
     item_passive_rows = []
+    item_tag_rows = []
     processed_rows = []
     skipped_actions = 0
 
@@ -327,6 +329,10 @@ def main():
 
                 item_passive_rows.append((item_id, i_trigger, i_trigger_param, i_effect, i_effect_param, ip_value, ip_target, i_seq))
 
+            for i_tag in item.get("tags", []):
+                i_tag_upper = i_tag.upper()
+                item_tag_rows.append((item_id, i_tag_upper))
+
         elif "item" in entry and not has_item:
             print(f"Warning: '{word}' has item definition but no Item action, ignoring item", file=sys.stderr)
 
@@ -374,6 +380,11 @@ def main():
             "effect_id, effect_param, value, target, seq) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             item_passive_rows,
         )
+    if item_tag_rows:
+        conn.executemany(
+            "INSERT OR REPLACE INTO item_tags (item_id, tag) VALUES (?, ?)",
+            item_tag_rows,
+        )
     conn.executemany(
         "INSERT OR IGNORE INTO processed_words (word) VALUES (?)",
         processed_rows,
@@ -395,7 +406,7 @@ def main():
         )
     if item_rows:
         print(
-            f"  {len(item_rows)} items, {len(item_passive_rows)} item passives",
+            f"  {len(item_rows)} items, {len(item_passive_rows)} item passives, {len(item_tag_rows)} item tags",
             file=sys.stderr,
         )
     if skipped_actions:

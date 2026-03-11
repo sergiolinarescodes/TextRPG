@@ -12,6 +12,7 @@ namespace TextRPG.Core.Encounter
         bool IsEnemy(EntityId entityId);
         EntityDefinition GetEntityDefinition(EntityId entityId);
         void RegisterEnemy(EntityId entityId, EntityDefinition definition = null);
+        void UnregisterEnemy(EntityId entityId);
         EntityId PlayerEntity { get; }
     }
 }

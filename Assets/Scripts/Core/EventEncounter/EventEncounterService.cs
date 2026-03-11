@@ -44,6 +44,7 @@ namespace TextRPG.Core.EventEncounter
             _reactionService = reactionService;
 
             Subscribe<EntityDiedEvent>(OnEntityDied);
+            Subscribe<EntityRecruitedEvent>(OnEntityRecruited);
         }
 
         public void StartEncounter(EventEncounterDefinition encounter, EntityId player)
@@ -115,6 +116,17 @@ namespace TextRPG.Core.EventEncounter
             return def;
         }
 
+        private void OnEntityRecruited(EntityRecruitedEvent e)
+        {
+            if (!IsEncounterActive) return;
+
+            // Remove from interactable tracking (also updates CombatContext enemies since it holds same list reference)
+            _interactableEntities.Remove(e.EntityId);
+            _definitions.Remove(e.EntityId);
+            _entityDefinitions.Remove(e.EntityId);
+            _reactionService.ClearReactions(e.EntityId);
+        }
+
         private void OnEntityDied(EntityDiedEvent e)
         {
             if (!IsEncounterActive || !_definitions.TryGetValue(e.EntityId, out var def))
@@ -123,6 +135,9 @@ namespace TextRPG.Core.EventEncounter
             if (def.DeathReward != null)
                 Publish(new RewardGrantedEvent(def.DeathReward, def.DeathRewardValue));
 
+            _interactableEntities.Remove(e.EntityId);
+            _definitions.Remove(e.EntityId);
+            _entityDefinitions.Remove(e.EntityId);
             _slotService.RemoveEntity(e.EntityId);
             _reactionService.ClearReactions(e.EntityId);
         }

@@ -1,25 +1,21 @@
 using System;
 using System.Collections.Generic;
 using PrimeTween;
-using TextAnimationsForUIToolkit;
 using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace TextRPG.Core.UnitRendering
 {
-    internal sealed class FloatingMessagePool : IDisposable
+    internal sealed class GameMessageService : IGameMessageService, IDisposable
     {
         private const int MaxPoolSize = 8;
         private const float ArcTravelDuration = 0.6f;
         private const float BounceDuration = 1.0f;
         private const float FadeDuration = 0.5f;
         private const float ArcHeight = 80f;
-        private const float LandingRangeX = 120f;
-        private const float LandingOffsetY = 200f;
-        private const float MessageFontSize = 26f;
+        private const float LandingRangeX = 60f;
+        private const float MessageFontSize = 30f;
         private const float MessageSpacingY = 40f;
-
-        private static readonly string SmashMarkup = "<shake a=0.15 f=8>{0}</shake>";
 
         private VisualElement _overlayRoot;
         private readonly Queue<MessageEntry> _available = new();
@@ -29,7 +25,7 @@ namespace TextRPG.Core.UnitRendering
 
         public static VisualElement CreateOverlay()
         {
-            var overlay = new VisualElement { name = "floating-message-overlay" };
+            var overlay = new VisualElement { name = "game-message-overlay" };
             overlay.style.position = Position.Absolute;
             overlay.style.left = 0;
             overlay.style.top = 0;
@@ -69,8 +65,7 @@ namespace TextRPG.Core.UnitRendering
             _active.Add(entry);
             entry.WordContainer.Clear();
 
-            // Single AnimatedLabel with the full phrase (not boxed layout)
-            var label = new AnimatedLabel();
+            var label = new Label();
             label.style.fontSize = MessageFontSize;
             label.style.color = color;
             label.style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -86,10 +81,12 @@ namespace TextRPG.Core.UnitRendering
             label.text = message;
             entry.WordContainer.Add(label);
 
-            // Compute landing position: random X offset, stacked Y to avoid overlap
+            // Land at screen center with slight random offset, stacked upward
+            float centerX = _overlayRoot.resolvedStyle.width / 2;
+            float centerY = _overlayRoot.resolvedStyle.height / 2;
             var rng = new System.Random();
-            float landingX = sourcePos.x + (float)(rng.NextDouble() * LandingRangeX * 2 - LandingRangeX);
-            float landingY = sourcePos.y + LandingOffsetY + _active.Count * MessageSpacingY;
+            float landingX = centerX + (float)(rng.NextDouble() * LandingRangeX * 2 - LandingRangeX);
+            float landingY = centerY - _active.Count * MessageSpacingY;
 
             entry.Root.style.display = DisplayStyle.Flex;
             entry.Root.style.opacity = 1f;
@@ -109,13 +106,12 @@ namespace TextRPG.Core.UnitRendering
                 ease: Ease.InOutQuad
             ).OnComplete(this, pool =>
             {
-                // Phase 2: Smash — trigger per-character animation on impact
-                pool.StartSmash(entry, landingX, landingY, label, message);
+                // Phase 2: Bounce at landing
+                pool.StartBounce(entry, landingX, landingY);
             });
         }
 
-        private void StartSmash(MessageEntry entry, float landingX, float landingY,
-            AnimatedLabel animLabel, string message)
+        private void StartBounce(MessageEntry entry, float landingX, float landingY)
         {
             if (_disposed || entry.Root == null) return;
 
@@ -124,42 +120,18 @@ namespace TextRPG.Core.UnitRendering
             entry.Root.style.left = landingX;
             entry.Root.style.top = startY;
 
-            // OutBounce hits ground at roughly t=0.0, t=0.36, t=0.73, t=0.91
-            bool hit1 = false, hit2 = false, hit3 = false, hit4 = false;
-
             entry.BounceTween = Tween.Custom(entry, 0f, 1f, BounceDuration,
                 onValueChange: (e, t) =>
                 {
                     if (e.Root == null) return;
                     float y = Mathf.Lerp(startY, landingY, t);
                     e.Root.style.top = y;
-
-                    // Trigger a brief shake burst at each bounce impact
-                    if (!hit1 && t >= 0.0f) { hit1 = true; ShakeBurst(animLabel, message); }
-                    if (!hit2 && t >= 0.36f) { hit2 = true; ShakeBurst(animLabel, message); }
-                    if (!hit3 && t >= 0.73f) { hit3 = true; ShakeBurst(animLabel, message); }
-                    if (!hit4 && t >= 0.91f) { hit4 = true; ShakeBurst(animLabel, message); }
                 },
                 ease: Ease.OutBounce
             ).OnComplete(this, pool =>
             {
-                // Settle to plain text before fading
-                animLabel.text = message;
                 pool.StartFade(entry);
             });
-        }
-
-        private static void ShakeBurst(AnimatedLabel label, string message)
-        {
-            label.text = string.Format(SmashMarkup, message);
-            label.Play();
-
-            // Stop the shake after a brief moment
-            label.schedule.Execute(() =>
-            {
-                if (label.parent != null)
-                    label.text = message;
-            }).ExecuteLater(120);
         }
 
         private void StartFade(MessageEntry entry)
@@ -206,7 +178,7 @@ namespace TextRPG.Core.UnitRendering
         private MessageEntry CreateEntry()
         {
             var root = new VisualElement();
-            root.name = $"floating-msg_{_instanceCount++}";
+            root.name = $"game-msg_{_instanceCount++}";
             root.style.position = Position.Absolute;
             root.style.translate = new Translate(Length.Percent(-50), Length.Percent(-50));
             root.pickingMode = PickingMode.Ignore;

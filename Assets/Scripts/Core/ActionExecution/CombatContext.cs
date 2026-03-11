@@ -18,11 +18,12 @@ namespace TextRPG.Core.ActionExecution
         private IEntityStatsService _entityStats;
         private IStatusEffectService _statusEffects;
         private IPassiveService _passiveService;
+        private bool _invertTargeting;
+        private bool _isGiveCommand;
 
         public EntityId SourceEntity => _sourceEntity;
         public EntityId? FocusedTarget => _focusedTarget;
         public ICombatSlotService SlotService => _slotService;
-
         public void SetSourceEntity(EntityId source) => _sourceEntity = source;
         public void SetEnemies(IReadOnlyList<EntityId> enemies) => _enemies = enemies;
         public void SetAllies(IReadOnlyList<EntityId> allies) => _allies = allies;
@@ -32,10 +33,16 @@ namespace TextRPG.Core.ActionExecution
         public void SetFocusedTarget(EntityId target) => _focusedTarget = target;
         public void ClearFocusedTarget() => _focusedTarget = null;
         public void SetPassiveService(IPassiveService passiveService) => _passiveService = passiveService;
+        public void SetTargetingInverted(bool inverted) => _invertTargeting = inverted;
+        public bool IsGiveCommand => _isGiveCommand;
+        public void SetGiveCommand(bool isGive) => _isGiveCommand = isGive;
 
         public IReadOnlyList<EntityId> GetTargets(TargetType targetType, int range = 0, StatusEffectType? statusFilter = null)
         {
-            if (IsSingleEnemyTarget(targetType))
+            if (_invertTargeting)
+                targetType = InvertTargetType(targetType);
+
+            if (!_invertTargeting && IsSingleEnemyTarget(targetType))
             {
                 var taunt = FindTauntTarget(_enemies);
                 if (taunt.HasValue) return new[] { taunt.Value };
@@ -46,6 +53,38 @@ namespace TextRPG.Core.ActionExecution
             if (statusFilter.HasValue)
                 enemies = FilterByStatus(enemies, statusFilter.Value);
             return ResolveTargets(targetType, enemies, allies);
+        }
+
+        private static TargetType InvertTargetType(TargetType targetType)
+        {
+            return targetType switch
+            {
+                TargetType.Self => TargetType.SingleEnemy,
+                TargetType.SingleEnemy => TargetType.Self,
+                TargetType.AllEnemies => TargetType.AllAlliesAndSelf,
+                TargetType.Area => TargetType.AllAlliesAndSelf,
+                TargetType.AllAlliesAndSelf => TargetType.AllEnemies,
+                TargetType.AllAllies => TargetType.AllEnemies,
+                TargetType.FrontEnemy => TargetType.Self,
+                TargetType.MiddleEnemy => TargetType.Self,
+                TargetType.BackEnemy => TargetType.Self,
+                TargetType.Melee => TargetType.Self,
+                TargetType.RandomEnemy => TargetType.Self,
+                TargetType.RandomAlly => TargetType.RandomEnemy,
+                TargetType.LowestHealthEnemy => TargetType.Self,
+                TargetType.HighestHealthEnemy => TargetType.Self,
+                TargetType.LowestDefenseEnemy => TargetType.Self,
+                TargetType.HighestDefenseEnemy => TargetType.Self,
+                TargetType.LowestStrengthEnemy => TargetType.Self,
+                TargetType.HighestStrengthEnemy => TargetType.Self,
+                TargetType.LowestMagicEnemy => TargetType.Self,
+                TargetType.HighestMagicEnemy => TargetType.Self,
+                TargetType.RandomLowestHealthEnemy => TargetType.Self,
+                TargetType.RandomHighestHealthEnemy => TargetType.Self,
+                TargetType.RandomEnemyWithStatus => TargetType.Self,
+                TargetType.RandomEnemyWithoutStatus => TargetType.Self,
+                _ => targetType
+            };
         }
 
         private IReadOnlyList<EntityId> ResolveTargets(TargetType targetType,

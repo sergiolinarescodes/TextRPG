@@ -52,6 +52,12 @@ namespace TextRPG.Core.WordInput.Scenarios
                 ? def
                 : throw new KeyNotFoundException($"'{id.Value}' is not an enemy.");
 
+        public void UnregisterEnemy(EntityId id)
+        {
+            _enemies.Remove(id);
+            _definitions.Remove(id);
+        }
+
         // No-ops — scenario manages slots/entities directly
         public void StartEncounter(EncounterDefinition e, EntityId p) { }
         public void EndEncounter() { _active = false; }

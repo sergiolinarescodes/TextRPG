@@ -5,6 +5,7 @@ using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.Run;
 using TextRPG.Core.WordAction;
+using TextRPG.Core.WordCooldown;
 using TextRPG.Core.WordInput;
 using Unidad.Core.EventBus;
 using Unidad.Core.Systems;
@@ -19,10 +20,16 @@ namespace TextRPG.Core.EventEncounterLoop
         private readonly IWordResolver _wordResolver;
         private readonly IEventEncounterService _encounterService;
         private readonly IReservedWordHandler _reservedWordHandler;
+        private readonly ICombatContext _combatContext;
+        private readonly IWordCooldownService _wordCooldown;
+        private readonly IGiveValidator _giveValidator;
         private readonly EntityId _playerId;
+
+        private readonly int _maxInteractions;
 
         private bool _active;
         private bool _waitingForAnimation;
+        private int _submitCount;
 
         public bool IsActive => _active;
 
@@ -32,13 +39,21 @@ namespace TextRPG.Core.EventEncounterLoop
             IWordResolver wordResolver,
             IEventEncounterService encounterService,
             EntityId playerId,
-            IReservedWordHandler reservedWordHandler = null) : base(eventBus)
+            IReservedWordHandler reservedWordHandler = null,
+            ICombatContext combatContext = null,
+            IWordCooldownService wordCooldown = null,
+            IGiveValidator giveValidator = null,
+            int maxInteractions = 0) : base(eventBus)
         {
             _entityStats = entityStats;
             _wordResolver = wordResolver;
             _encounterService = encounterService;
             _reservedWordHandler = reservedWordHandler;
+            _combatContext = combatContext;
+            _wordCooldown = wordCooldown;
+            _giveValidator = giveValidator;
             _playerId = playerId;
+            _maxInteractions = maxInteractions;
 
             Subscribe<ActionAnimationCompletedEvent>(_ => OnAnimationCompleted());
             Subscribe<EventEncounterEndedEvent>(_ => OnEncounterEnded());
@@ -56,6 +71,15 @@ namespace TextRPG.Core.EventEncounterLoop
             word = word?.Trim()?.ToLowerInvariant() ?? "";
             if (word.Length == 0) return WordSubmitResult.InvalidWord;
 
+            bool isGive = WordPrefixHelper.TryStripGivePrefix(ref word);
+            if (isGive && word.Length == 0) return WordSubmitResult.InvalidWord;
+
+            if (isGive && _giveValidator != null && _giveValidator.RequiresItemForGive(word))
+            {
+                if (!_giveValidator.TryConsumeForGive(word))
+                    return WordSubmitResult.NoItemToGive;
+            }
+
             if (_reservedWordHandler?.TryHandleReservedWord(word) == true)
                 return WordSubmitResult.ReservedWord;
 
@@ -71,6 +95,19 @@ namespace TextRPG.Core.EventEncounterLoop
                 return WordSubmitResult.InsufficientMana;
             }
 
+            if (WordCooldownHelper.TryRejectCooldown(_wordCooldown, word, _submitCount, EventBus))
+                return WordSubmitResult.WordOnCooldown;
+
+            _wordCooldown?.MarkWordUsed(word, _submitCount);
+            _submitCount++;
+
+            // Set target inversion before action execution
+            if (isGive)
+            {
+                _combatContext?.SetTargetingInverted(true);
+                _combatContext?.SetGiveCommand(true);
+            }
+
             _waitingForAnimation = true;
             Publish(new WordSubmittedEvent(word));
             return WordSubmitResult.Accepted;
@@ -80,6 +117,11 @@ namespace TextRPG.Core.EventEncounterLoop
         {
             if (!_active) return;
             _waitingForAnimation = false;
+
+            if (_maxInteractions > 0 && _submitCount >= _maxInteractions)
+            {
+                _encounterService.EndEncounter();
+            }
         }
 
         private void OnEncounterEnded()

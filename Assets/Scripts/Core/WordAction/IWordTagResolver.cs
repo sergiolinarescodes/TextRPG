@@ -8,6 +8,7 @@ namespace TextRPG.Core.WordAction
         IReadOnlyList<string> GetWordsByTag(string tag);
         string GetRandomWordByTag(string tag);
         bool HasTag(string word, string tag);
+        void AddTag(string word, string tag);
         IEnumerable<string> AllTags { get; }
     }
 }

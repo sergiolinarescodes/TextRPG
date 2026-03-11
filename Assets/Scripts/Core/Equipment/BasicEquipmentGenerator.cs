@@ -8,37 +8,35 @@ namespace TextRPG.Core.Equipment
     {
         private static int _counter;
 
-        private static readonly string[] HeadAdj = { "Iron", "Rusty", "Worn", "Copper", "Thick", "Padded" };
-        private static readonly string[] HeadNoun = { "Helm", "Cap", "Hood", "Crown", "Visor", "Coif" };
-
-        private static readonly string[] WearAdj = { "Leather", "Chain", "Torn", "Quilted", "Woven", "Heavy" };
-        private static readonly string[] WearNoun = { "Vest", "Mail", "Cloak", "Tunic", "Shirt", "Robe" };
-
-        private static readonly string[] AccAdj = { "Silver", "Bone", "Old", "Lucky", "Jade", "Amber" };
-        private static readonly string[] AccNoun = { "Ring", "Charm", "Pendant", "Brooch", "Amulet", "Bead" };
+        private static readonly string[] HeadNames = { "Helm", "Cap", "Hood", "Crown", "Visor", "Coif", "Hat", "Mask", "Cowl", "Tiara" };
+        private static readonly string[] WearNames = { "Vest", "Mail", "Cloak", "Tunic", "Robe", "Cape", "Coat", "Garb", "Wrap", "Pelt" };
+        private static readonly string[] AccNames = { "Ring", "Charm", "Brooch", "Amulet", "Bead", "Gem", "Seal", "Orb", "Rune", "Sash" };
 
         private static readonly Color HeadColor = new(0.6f, 0.7f, 0.8f);
         private static readonly Color WearColor = new(0.7f, 0.5f, 0.3f);
         private static readonly Color AccColor = new(1f, 0.85f, 0.3f);
 
-        public static EquipmentItemDefinition[] GenerateRewards(System.Random rng = null)
+        public static EquipmentItemDefinition[] GenerateRewards(System.Random rng = null, int count = 3)
         {
             rng ??= new System.Random();
-            return new[]
+            var slots = new (EquipmentSlotType, string[], Color)[]
             {
-                Generate(EquipmentSlotType.Head, HeadAdj, HeadNoun, HeadColor, rng),
-                Generate(EquipmentSlotType.Wear, WearAdj, WearNoun, WearColor, rng),
-                Generate(EquipmentSlotType.Accessory, AccAdj, AccNoun, AccColor, rng),
+                (EquipmentSlotType.Head, HeadNames, HeadColor),
+                (EquipmentSlotType.Wear, WearNames, WearColor),
+                (EquipmentSlotType.Accessory, AccNames, AccColor),
             };
+            var results = new EquipmentItemDefinition[Math.Min(count, slots.Length)];
+            for (int i = 0; i < results.Length; i++)
+                results[i] = Generate(slots[i].Item1, slots[i].Item2, slots[i].Item3, rng);
+            return results;
         }
 
         private static EquipmentItemDefinition Generate(
-            EquipmentSlotType slot, string[] adjectives, string[] nouns, Color color, System.Random rng)
+            EquipmentSlotType slot, string[] names, Color color, System.Random rng)
         {
-            var adj = adjectives[rng.Next(adjectives.Length)];
-            var noun = nouns[rng.Next(nouns.Length)];
-            var displayName = $"{adj} {noun}";
-            var itemWord = $"basic_{adj.ToLowerInvariant()}_{noun.ToLowerInvariant()}_{_counter++}";
+            var name = names[rng.Next(names.Length)];
+            var displayName = name;
+            var itemWord = $"{name.ToLowerInvariant()}_{_counter++}";
 
             var stats = GenerateStats(rng);
 

@@ -29,7 +29,6 @@ namespace TextRPG.Core.StatusEffect
             _handlerContext = handlerContext;
             _interactionTable = interactionTable ?? new StatusEffectInteractionTable();
             Subscribe<TurnEndedEvent>(OnTurnEnded);
-            Subscribe<TurnStartedEvent>(OnTurnStarted);
             Subscribe<EntityStats.HealedEvent>(OnHealed);
             Subscribe<EntityStats.DamageTakenEvent>(OnDamageTaken);
         }
@@ -169,13 +168,6 @@ namespace TextRPG.Core.StatusEffect
             var bleeding = list.Find(x => x.Type == StatusEffectType.Bleeding);
             if (bleeding != null)
                 bleeding.WasHealedThisTurn = true;
-        }
-
-        private void OnTurnStarted(TurnStartedEvent e)
-        {
-            var entity = e.EntityId;
-            if (HasEffect(entity, StatusEffectType.Stun) || HasEffect(entity, StatusEffectType.Frozen))
-                _turnService.EndTurn();
         }
 
         private void OnTurnEnded(TurnEndedEvent e)

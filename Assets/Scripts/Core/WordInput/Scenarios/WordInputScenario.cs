@@ -15,12 +15,14 @@ using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.Passive;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Run;
+using TextRPG.Core.Scroll;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.UnitRendering;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
+using TextRPG.Core.WordCooldown;
 using Unidad.Core.Abstractions;
 using Unidad.Core.EventBus;
 using Unidad.Core.Inventory;
@@ -118,12 +120,21 @@ namespace TextRPG.Core.WordInput.Scenarios
         private IEventEncounterLoopService _eventEncounterLoop;
         private ReactionService _reactionService;
         private EventEncounterContext _reactionContext;
+        private Unidad.Core.Resource.IResourceService _resourceService;
         private Label _nodeProgressLabel;
-        private FloatingMessagePool _messagePool;
+        private GameMessageService _gameMessages;
         private Func<EntityId, Vector3> _positionProvider;
+        private IWordCooldownService _wordCooldown;
+        private IGiveValidator _giveValidator;
+        private IWordTagResolver _wordTagResolver;
+        private SpellWordResolver _spellResolver;
+        private ISpellService _spellService;
+
+        private bool _givePrefixDetected;
 
         private static readonly Color HighlightEnemy = new(1f, 0.3f, 0.3f, 0.4f);
         private static readonly Color HighlightSelf = new(0.3f, 1f, 0.3f, 0.4f);
+        private static readonly Color GivePrefixColor = new(0.55f, 0.65f, 0.82f);
 
         public WordInputScenario() : base(new TestScenarioDefinition(
             "word-input",
@@ -150,6 +161,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             _wordResolver = new FilteredWordResolver(wordActionData.Resolver, wordActionData.AmmoWordSet);
             _ammoResolver = wordActionData.AmmoResolver;
             _actionRegistry = wordActionData.ActionRegistry;
+            _wordTagResolver = wordActionData.TagResolver;
             _wordMatchService = new WordMatchService(_wordResolver, _actionRegistry);
             _ammoMatchService = new WordMatchService(_ammoResolver, _actionRegistry);
 
@@ -221,9 +233,15 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Shared animation resolver for entire run
             _scenarioAnimResolver = new ScenarioAnimationResolver();
 
-            // Action execution — uses composite resolver (rebuilt per encounter)
-            var compositeResolver = new CompositeWordResolver(_wordResolver, _enemyResolver);
+            // Spell system — run-lifetime
+            _spellResolver = new SpellWordResolver();
+
+            // Action execution — uses composite resolver (spell resolver first for priority)
+            var compositeResolver = new CompositeWordResolver(_spellResolver, _wordResolver, _enemyResolver);
             _actionExecution = new ActionExecutionService(_eventBus, compositeResolver, handlerRegistry, _combatContext, _entityStats, statusEffects, _scenarioAnimResolver);
+
+            // Rebuild match service with composite resolver so spell words are detected while typing
+            _wordMatchService = new WordMatchService(compositeResolver, _actionRegistry);
 
             // Weapon executor
             _weaponExecutor = new WeaponActionExecutor(
@@ -245,14 +263,21 @@ namespace TextRPG.Core.WordInput.Scenarios
             var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
             var targetResolver = new PassiveTargetResolver();
             var passiveContext = new PassiveContext(_entityStats, _slotService, _eventBus, _encounterAdapter,
-                animationService: _animationService);
+                tagResolver: _wordTagResolver, animationService: _animationService);
             _passiveService = new PassiveService(_eventBus, triggerRegistry, effectRegistry, targetResolver, passiveContext, _allUnits);
+
+            // Resource service — run-lifetime gold tracking
+            _resourceService = new Unidad.Core.Resource.ResourceService(_eventBus);
+            _resourceService.Define(
+                EventEncounter.Reactions.Tags.ResourceIds.Gold,
+                new Unidad.Core.Resource.ResourceDefinition(0, 0, 99999));
 
             // Reaction service — run-lifetime, enables tag reactions in both combat and events
             var tagReactions = EventEncounterSystemInstaller.CreateTagReactionRegistry();
             var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry();
-            _reactionContext = new EventEncounterContext(_entityStats, _slotService, _eventBus, _statusEffects);
-            _reactionService = new ReactionService(_eventBus, outcomeRegistry, _reactionContext, tagReactions);
+            _reactionContext = new EventEncounterContext(_entityStats, _slotService, _eventBus, _statusEffects, _resourceService,
+                _inventoryService, _playerInventoryId, _itemRegistry);
+            _reactionService = new ReactionService(_eventBus, outcomeRegistry, _reactionContext, tagReactions, _combatContext);
 
             // DrunkLetterService needs StatusEffectService reference
             _drunkLetterService.SetStatusEffects(_statusEffects);
@@ -265,13 +290,25 @@ namespace TextRPG.Core.WordInput.Scenarios
             _handlerRegistry = handlerRegistry;
             handlerRegistry.Register("Item", new ItemActionHandler(actionHandlerCtx, _inventoryService, _playerInventoryId, _equipmentService, _itemRegistry));
 
-            // Loot reward service
-            _lootRewardService = new LootRewardService(_eventBus, _itemRegistry, _inventoryService, _playerInventoryId, _playerId);
+            // Loot reward service (with scroll support)
+            _lootRewardService = new LootRewardService(_eventBus, _itemRegistry, _inventoryService,
+                _playerInventoryId, _playerId, _spellService, _wordResolver);
 
             _statusVisualService = new StatusEffectVisualService(_eventBus);
 
             var tickRunner = SceneRoot.AddComponent<TickRunner>();
             tickRunner.Initialize(new UnityTimeProvider(), new ITickable[] { _animationService });
+
+            // Word cooldown — run-lifetime, resets per encounter
+            _wordCooldown = new WordCooldownService();
+
+            // Give validator — run-lifetime, checks inventory for giveable items or gold resource for Pay words
+            _giveValidator = new GiveValidator(
+                _wordTagResolver, _inventoryService, _playerInventoryId, _itemRegistry,
+                _wordResolver, _resourceService);
+
+            // Spell service — run-lifetime (persists learned spells across encounters)
+            _spellService = new SpellService(_eventBus, _wordResolver, _wordCooldown, _spellResolver, _wordTagResolver);
 
             // Run service — manages node progression
             _runService = new RunService(_eventBus);
@@ -289,7 +326,16 @@ namespace TextRPG.Core.WordInput.Scenarios
             {
                 Debug.Log($"[EventEncounter] Message: {evt.Message}");
                 var pos = _positionProvider?.Invoke(evt.SourceEntityId) ?? Vector3.zero;
-                _messagePool?.Spawn(new Vector2(pos.x, pos.y), evt.Message, new Color(1f, 0.9f, 0.5f));
+                _gameMessages?.Spawn(new Vector2(pos.x, pos.y), evt.Message, new Color(1f, 0.9f, 0.5f));
+            }));
+            _subscriptions.Add(_eventBus.Subscribe<WordCooldownEvent>(evt =>
+            {
+                var msg = evt.Permanent
+                    ? $"\"{evt.Word}\" is permanently exhausted!"
+                    : $"\"{evt.Word}\" on cooldown ({evt.RemainingRounds} rounds)";
+                Debug.Log($"[WordCooldown] {msg}");
+                var pos = _positionProvider?.Invoke(_playerId) ?? Vector3.zero;
+                _gameMessages?.Spawn(new Vector2(pos.x, pos.y), msg, new Color(1f, 0.4f, 0.4f));
             }));
 
             _runService.StartRun(runDef, _playerId);
@@ -397,8 +443,10 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Register summoned units with the unit service for proper text rendering
             _subscriptions.Add(_eventBus.Subscribe<UnitSummonedEvent>(evt =>
             {
-                var word = evt.Word.ToLowerInvariant();
                 var uid = new UnitId(evt.EntityId.Value);
+                if (_unitService.TryGetUnit(uid, out _)) return;
+
+                var word = evt.Word.ToLowerInvariant();
                 if (_allUnits.TryGetValue(word, out var unitDef))
                 {
                     _unitService.Register(uid,
@@ -425,12 +473,28 @@ namespace TextRPG.Core.WordInput.Scenarios
                         _slotVisual.RegisterEntity(evt.EntityId, slotElements[visualIndex]);
                     }
                 }
-                // Ally row always visible — no display toggle needed
+            }));
+
+            // Slot visual removal for recruitment (not death — death has its own animation)
+            _subscriptions.Add(_eventBus.Subscribe<SlotEntityRemovedEvent>(evt =>
+            {
+                if (_slotVisual == null) return;
+                if (_entityStats.GetCurrentHealth(evt.EntityId) <= 0) return;
+                _slotVisual.UnregisterEntity(evt.EntityId);
             }));
 
             // Loot reward events
             _subscriptions.Add(_eventBus.Subscribe<LootRewardOfferedEvent>(evt => ShowLootSelection(evt.Options)));
             _subscriptions.Add(_eventBus.Subscribe<LootRewardSelectedEvent>(_ => HideLootSelection()));
+
+            // Spell learned event
+            _subscriptions.Add(_eventBus.Subscribe<SpellLearnedEvent>(evt =>
+            {
+                Debug.Log($"[Scroll] Learned spell: {evt.ScrambledWord} (from {evt.OriginalWord}, cost={evt.ManaCost})");
+                var pos = _positionProvider?.Invoke(_playerId) ?? Vector3.zero;
+                _gameMessages?.Spawn(new Vector2(pos.x, pos.y),
+                    $"Learned: {evt.ScrambledWord.ToUpperInvariant()}", ScrollDefinition.ScrollPurple);
+            }));
 
             // --- Build UI ---
             BuildUI(vibrationAmplitude);
@@ -551,7 +615,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             _slotVisual.BuildAllyRow(_allyRow);
 
             // Stats bar (HP, Mana, Stats, Status Effects)
-            _playerStatsBar = new PlayerStatsBarVisual(_eventBus, _entityStats, _statusEffects, _playerId);
+            _playerStatsBar = new PlayerStatsBarVisual(_eventBus, _entityStats, _statusEffects, _playerId, _resourceService);
             root.Add(_playerStatsBar.Build());
 
             // Projectile overlay
@@ -581,11 +645,11 @@ namespace TextRPG.Core.WordInput.Scenarios
             var statusTextOverlay = StatusEffectFloatingTextPool.CreateOverlay();
             root.Add(statusTextOverlay);
 
-            // Floating message overlay (generic arc+bounce messages)
-            var messageOverlay = FloatingMessagePool.CreateOverlay();
+            // Game message overlay (generic arc+bounce messages)
+            var messageOverlay = GameMessageService.CreateOverlay();
             root.Add(messageOverlay);
-            _messagePool = new FloatingMessagePool();
-            _messagePool.Initialize(messageOverlay);
+            _gameMessages = new GameMessageService();
+            _gameMessages.Initialize(messageOverlay);
 
             _tooltipLayer = new VisualElement { name = "tooltip-layer" };
             _tooltipLayer.style.position = Position.Absolute;
@@ -699,31 +763,58 @@ namespace TextRPG.Core.WordInput.Scenarios
                     labels[i].text = displayText[i].ToString();
             }
 
-            bool isAmmo = IsAmmoWord(displayText);
+            // Detect "give " prefix
+            var lowerText = displayText.ToLowerInvariant();
+            bool isGivePrefix = lowerText.StartsWith("give ");
+            var matchWord = isGivePrefix ? lowerText.Substring(5) : displayText;
+            int prefixLen = isGivePrefix ? 5 : 0;
+
+            // Wave animation on "give " when first detected
+            if (isGivePrefix && !_givePrefixDetected)
+            {
+                _givePrefixDetected = true;
+                var giveIndices = new List<int> { 0, 1, 2, 3, 4 };
+                _codeField.PlayHighlightAnimation(giveIndices);
+            }
+            else if (!isGivePrefix)
+            {
+                _givePrefixDetected = false;
+            }
+
+            bool isAmmo = IsAmmoWord(matchWord);
             var matchService = isAmmo ? _ammoMatchService : _wordMatchService;
             var wasMatched = matchService.IsMatched;
-            var colors = matchService.CheckMatch(displayText);
+            var colors = matchService.CheckMatch(matchWord);
+
+            // Apply "give " prefix color
+            if (isGivePrefix)
+            {
+                var labels = _codeField.CharLabels;
+                for (int i = 0; i < prefixLen && i < labels.Count; i++)
+                    labels[i].style.color = GivePrefixColor;
+            }
+
             if (colors.Count > 0)
             {
                 var labels = _codeField.CharLabels;
-                for (int i = 0; i < colors.Count && i < labels.Count; i++)
-                    labels[i].style.color = colors[i].Color;
+                for (int i = 0; i < colors.Count && i + prefixLen < labels.Count; i++)
+                    labels[i + prefixLen].style.color = colors[i].Color;
 
                 if (!wasMatched)
                 {
                     var indices = new List<int>();
                     for (int i = 0; i < colors.Count; i++)
-                        indices.Add(i);
+                        indices.Add(i + prefixLen);
                     _codeField.PlayHighlightAnimation(indices);
                 }
 
-                var currentWord = displayText.ToLowerInvariant();
+                var currentWord = lowerText;
                 if (currentWord != _lastMatchedWord)
                 {
                     _lastMatchedWord = currentWord;
                     ShowTargetingPreview(displayText);
                     if (!isAmmo)
-                        ShowManaCostPreview(currentWord);
+                        ShowManaCostPreview(matchWord.ToLowerInvariant());
                     else
                         ClearManaCostPreview();
                 }
@@ -731,8 +822,15 @@ namespace TextRPG.Core.WordInput.Scenarios
             else
             {
                 var labels = _codeField.CharLabels;
-                for (int i = 0; i < labels.Count; i++)
+                // Reset non-prefix chars to white
+                for (int i = prefixLen; i < labels.Count; i++)
                     labels[i].style.color = Color.white;
+
+                if (!isGivePrefix)
+                {
+                    for (int i = 0; i < labels.Count; i++)
+                        labels[i].style.color = Color.white;
+                }
 
                 _lastMatchedWord = "";
                 ClearTargetingPreview();
@@ -766,20 +864,33 @@ namespace TextRPG.Core.WordInput.Scenarios
             if (_previewService == null) return;
 
             var word = text.ToLowerInvariant();
-            var previewService = IsAmmoWord(word) ? _ammoPreviewService : _previewService;
-            var preview = previewService.PreviewWord(word);
-            if (preview.ActionPreviews.Count == 0) return;
 
-            var sourceEntity = _combatContext.SourceEntity;
-            foreach (var actionPreview in preview.ActionPreviews)
+            bool isGive = WordPrefixHelper.TryStripGivePrefix(ref word);
+            if (isGive)
+                _combatContext.SetTargetingInverted(true);
+            else if (word.Length == 0) return;
+
+            try
             {
-                foreach (var entityId in actionPreview.AffectedEntities)
+                var previewService = IsAmmoWord(word) ? _ammoPreviewService : _previewService;
+                var preview = previewService.PreviewWord(word);
+                if (preview.ActionPreviews.Count == 0) return;
+
+                var sourceEntity = _combatContext.SourceEntity;
+                foreach (var actionPreview in preview.ActionPreviews)
                 {
-                    var element = _slotVisual.GetSlotElement(entityId);
-                    if (element == null) continue;
-                    var color = entityId.Equals(sourceEntity) ? HighlightSelf : HighlightEnemy;
-                    element.style.backgroundColor = color;
+                    foreach (var entityId in actionPreview.AffectedEntities)
+                    {
+                        var element = _slotVisual.GetSlotElement(entityId);
+                        if (element == null) continue;
+                        var color = entityId.Equals(sourceEntity) ? HighlightSelf : HighlightEnemy;
+                        element.style.backgroundColor = color;
+                    }
                 }
+            }
+            finally
+            {
+                if (isGive) _combatContext.SetTargetingInverted(false);
             }
         }
 
@@ -806,7 +917,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             else
                 return;
 
-            if (result == WordSubmitResult.InsufficientMana)
+            if (result == WordSubmitResult.InsufficientMana || result == WordSubmitResult.WordOnCooldown || result == WordSubmitResult.NoItemToGive)
             {
                 PlayManaRejection();
                 _codeField?.schedule.Execute(() => _codeField?.Focus());
@@ -906,6 +1017,8 @@ namespace TextRPG.Core.WordInput.Scenarios
         private void ShowManaCostPreview(string word)
         {
             if (_playerStatsBar.ManaBar == null || _playerStatsBar.ManaLabel == null || _playerStatsBar.ManaCostOverlay == null) return;
+
+            if (!WordPrefixHelper.TryStripGivePrefix(ref word) && word.Length == 0) { ClearManaCostPreview(); return; }
 
             var meta = _wordResolver.GetStats(word);
             int cost = meta.Cost;
@@ -1289,7 +1402,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             return new ScenarioVerificationResult(checks);
         }
 
-        private void ShowLootSelection(EquipmentItemDefinition[] options)
+        private void ShowLootSelection(LootRewardOption[] options)
         {
             SetInputEnabled(false);
 
@@ -1320,9 +1433,8 @@ namespace TextRPG.Core.WordInput.Scenarios
 
             for (int i = 0; i < options.Length; i++)
             {
-                var item = options[i];
+                var option = options[i];
                 var cardIndex = i;
-                var slotIndex = (int)item.SlotType;
 
                 var card = new VisualElement();
                 card.style.marginLeft = 12;
@@ -1330,12 +1442,13 @@ namespace TextRPG.Core.WordInput.Scenarios
                 card.style.alignItems = Align.Center;
                 card.pickingMode = PickingMode.Position;
 
-                card.Add(TooltipContentBuilder.CreateMiniWordBox(item.DisplayName, item.Color, 120, 100));
+                card.Add(TooltipContentBuilder.CreateMiniWordBox(option.DisplayName, option.Color, 120, 100));
 
                 card.RegisterCallback<PointerEnterEvent>(_ =>
                 {
-                    ShowLootTooltip(item, card);
-                    HighlightEquipmentSlot(slotIndex);
+                    ShowLootTooltip(option, card);
+                    if (!option.IsScroll)
+                        HighlightEquipmentSlot((int)option.Equipment.SlotType);
                 });
                 card.RegisterCallback<PointerLeaveEvent>(_ =>
                 {
@@ -1358,7 +1471,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             ClearEquipmentSlotHighlight();
         }
 
-        private void ShowLootTooltip(EquipmentItemDefinition item, VisualElement card)
+        private void ShowLootTooltip(LootRewardOption option, VisualElement card)
         {
             HideLootTooltip();
 
@@ -1379,8 +1492,41 @@ namespace TextRPG.Core.WordInput.Scenarios
             _lootTooltip.style.paddingBottom = 12;
             _lootTooltip.pickingMode = PickingMode.Ignore;
 
-            _lootTooltip.Add(TooltipContentBuilder.BuildHeader(item.DisplayName, item.Color, item.SlotType.ToString()));
-            _lootTooltip.Add(TooltipContentBuilder.BuildArmorContent(item));
+            if (option.IsScroll)
+            {
+                var scroll = option.Scroll;
+                _lootTooltip.Add(TooltipContentBuilder.BuildHeader(scroll.DisplayName, scroll.Color, "SCROLL"));
+
+                var spellLabel = new Label($"Spell: {scroll.OriginalWord}");
+                spellLabel.style.color = Color.white;
+                spellLabel.style.fontSize = 14;
+                spellLabel.style.marginTop = 4;
+                _lootTooltip.Add(spellLabel);
+
+                var costLabel = new Label($"Mana cost: {scroll.ManaCost}");
+                costLabel.style.color = new Color(0.4f, 0.7f, 1f);
+                costLabel.style.fontSize = 14;
+                costLabel.style.marginTop = 2;
+                _lootTooltip.Add(costLabel);
+
+                var cdLabel = new Label("Cooldown: 2 rounds (fixed)");
+                cdLabel.style.color = new Color(1f, 0.8f, 0.4f);
+                cdLabel.style.fontSize = 14;
+                cdLabel.style.marginTop = 2;
+                _lootTooltip.Add(cdLabel);
+
+                var typeLabel = new Label("MagicDamage");
+                typeLabel.style.color = new Color(0.8f, 0.5f, 1f);
+                typeLabel.style.fontSize = 14;
+                typeLabel.style.marginTop = 2;
+                _lootTooltip.Add(typeLabel);
+            }
+            else
+            {
+                var item = option.Equipment;
+                _lootTooltip.Add(TooltipContentBuilder.BuildHeader(item.DisplayName, item.Color, item.SlotType.ToString()));
+                _lootTooltip.Add(TooltipContentBuilder.BuildArmorContent(item));
+            }
 
             RootVisualElement.Add(_lootTooltip);
 
@@ -1486,7 +1632,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             // CombatAI service
             _combatAI = new CombatAIService(_eventBus, _encounterAdapter, _entityStats,
                 _turnService, _slotService, _combatContext, _actionExecution, scorers,
-                (_enemyResolver as EnemyWordResolver), _allUnits);
+                (_enemyResolver as EnemyWordResolver), _allUnits, statusEffects: _statusEffects);
 
             // Turn order: player first, then enemies
             var turnOrder = new List<EntityId> { _playerId };
@@ -1496,7 +1642,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             // CombatLoop with RunService as reserved word handler
             _combatLoop = new CombatLoopService(
                 _eventBus, _turnService, _entityStats, _wordResolver, _weaponService, _playerId,
-                _consumableService, (IReservedWordHandler)_runService);
+                _consumableService, (IReservedWordHandler)_runService, _combatContext, _wordCooldown, _giveValidator);
             _combatLoop.Start();
 
             // Register passives and tags for enemies
@@ -1510,6 +1656,12 @@ namespace TextRPG.Core.WordInput.Scenarios
                 if (def.Tags != null && def.Tags.Length > 0)
                     _reactionService.RegisterReactions(eid, null, def.Tags);
             }
+
+            // Recruitment: unregister enemy when recruited
+            _subscriptions.Add(_eventBus.Subscribe<EntityRecruitedEvent>(evt =>
+            {
+                _encounterAdapter.UnregisterEnemy(evt.EntityId);
+            }));
 
             // Update slot visual
             // Slot visual refreshes via SlotEntityRegisteredEvent/RemovedEvent subscriptions
@@ -1551,7 +1703,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Event encounter loop with RunService as reserved word handler
             _eventEncounterLoop = new EventEncounterLoopService(
                 _eventBus, _entityStats, _wordResolver, _eventEncounterService, _playerId,
-                (IReservedWordHandler)_runService);
+                (IReservedWordHandler)_runService, _combatContext, _wordCooldown, _giveValidator,
+                maxInteractions: 2);
             _eventEncounterLoop.Start();
 
             // Update slot visual
@@ -1594,6 +1747,9 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Reset combat context enemies
             _combatContext.SetEnemies(Array.Empty<EntityId>());
             _combatContext.SetAllies(Array.Empty<EntityId>());
+
+            // Reset word cooldowns per encounter
+            _wordCooldown?.Reset();
 
             // Update slot visual
             // Slot visual refreshes via SlotEntityRegisteredEvent/RemovedEvent subscriptions
@@ -1663,8 +1819,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             _tooltipService = null;
             (_frameworkTooltipService as IDisposable)?.Dispose();
             _frameworkTooltipService = null;
-            _messagePool?.Dispose();
-            _messagePool = null;
+            _gameMessages?.Dispose();
+            _gameMessages = null;
             _positionProvider = null;
             _statusVisualService?.Dispose();
             _statusVisualService = null;
@@ -1677,12 +1833,14 @@ namespace TextRPG.Core.WordInput.Scenarios
             (_eventEncounterService as IDisposable)?.Dispose();
             (_runService as IDisposable)?.Dispose();
             (_reactionService as IDisposable)?.Dispose();
+            (_resourceService as IDisposable)?.Dispose();
             (_turnService as IDisposable)?.Dispose();
             _eventBus?.ClearAllSubscriptions();
             _animationService = null;
             _passiveService = null;
             _reactionService = null;
             _reactionContext = null;
+            _resourceService = null;
             _combatLoop = null;
             _combatAI = null;
             _eventEncounterLoop = null;
@@ -1724,6 +1882,9 @@ namespace TextRPG.Core.WordInput.Scenarios
             CancelDrag();
             (_lootRewardService as IDisposable)?.Dispose();
             _lootRewardService = null;
+            (_spellService as IDisposable)?.Dispose();
+            _spellService = null;
+            _spellResolver = null;
             _lootOverlay?.RemoveFromHierarchy();
             _lootOverlay = null;
             HideLootTooltip();
@@ -1741,6 +1902,8 @@ namespace TextRPG.Core.WordInput.Scenarios
             _equipmentService = null;
             _inventoryService = null;
             _itemRegistry = null;
+            _giveValidator = null;
+            _wordTagResolver = null;
             _leftBar = null;
             _rightBar = null;
             _allyRow = null;

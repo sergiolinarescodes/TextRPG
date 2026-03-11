@@ -11,5 +11,6 @@ namespace TextRPG.Core.Equipment
         StatBonus Stats,
         Color Color,
         string[] AmmoWords,
-        PassiveEntry[] Passives);
+        PassiveEntry[] Passives,
+        string[] Tags = null);
 }

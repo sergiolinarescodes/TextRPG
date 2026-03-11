@@ -29,11 +29,15 @@ namespace TextRPG.Core.ActionExecution
         public const string Buff = "Buff";
         public const string Melt = "Melt";
         public const string Curse = "Curse";
+        public const string Smash = "Smash";
+        public const string Charm = "Charm";
+        public const string Pay = "Pay";
 
         public static readonly string[] InteractionActions =
         {
             "Enter", "Talk", "Steal", "Search", "Pray",
-            "Rest", "Open", "Trade", "Recruit", "Leave"
+            "Rest", "Open", "Trade", "Recruit", "Leave",
+            "Charm"
         };
     }
 }

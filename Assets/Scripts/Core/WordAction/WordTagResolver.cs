@@ -77,6 +77,28 @@ namespace TextRPG.Core.WordAction
             return false;
         }
 
+        public void AddTag(string word, string tag)
+        {
+            var normalizedWord = word.ToLowerInvariant();
+            var normalizedTag = TagNormalizer.Normalize(tag);
+            if (string.IsNullOrEmpty(normalizedTag)) return;
+
+            if (!_wordToTags.TryGetValue(normalizedWord, out var tags))
+            {
+                tags = new List<string>();
+                _wordToTags[normalizedWord] = tags;
+            }
+            if (!tags.Contains(normalizedTag))
+                tags.Add(normalizedTag);
+
+            if (!_tagToWords.TryGetValue(normalizedTag, out var wordSet))
+            {
+                wordSet = new HashSet<string>();
+                _tagToWords[normalizedTag] = wordSet;
+            }
+            wordSet.Add(normalizedWord);
+        }
+
         public IEnumerable<string> AllTags => _tagToWords.Keys;
     }
 }

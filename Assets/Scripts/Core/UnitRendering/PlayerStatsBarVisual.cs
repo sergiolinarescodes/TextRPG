@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.EventEncounter.Reactions.Tags;
 using TextRPG.Core.StatusEffect;
 using Unidad.Core.EventBus;
+using Unidad.Core.Resource;
 using Unidad.Core.UI.Components;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -22,12 +24,14 @@ namespace TextRPG.Core.UnitRendering
         private readonly IEventBus _eventBus;
         private readonly IEntityStatsService _entityStats;
         private readonly IStatusEffectService _statusEffects;
+        private readonly IResourceService _resourceService;
         private readonly EntityId _playerId;
         private readonly Dictionary<StatType, Label> _statLabels = new();
         private readonly List<IDisposable> _subscriptions = new();
 
         private VisualElement _statusRow;
         private VisualElement _statusEffectsContainer;
+        private Label _goldLabel;
 
         public VisualElement Root { get; private set; }
         public UnidadProgressBar HpBar { get; private set; }
@@ -37,11 +41,13 @@ namespace TextRPG.Core.UnitRendering
         public VisualElement ManaCostOverlay { get; private set; }
 
         public PlayerStatsBarVisual(IEventBus eventBus, IEntityStatsService entityStats,
-            IStatusEffectService statusEffects, EntityId playerId)
+            IStatusEffectService statusEffects, EntityId playerId,
+            IResourceService resourceService = null)
         {
             _eventBus = eventBus;
             _entityStats = entityStats;
             _statusEffects = statusEffects;
+            _resourceService = resourceService;
             _playerId = playerId;
         }
 
@@ -63,6 +69,7 @@ namespace TextRPG.Core.UnitRendering
             BuildManaBar();
             BuildStatsGrid();
             BuildStatusEffects();
+            BuildGoldDisplay();
             SubscribeToEvents();
 
             return Root;
@@ -99,6 +106,7 @@ namespace TextRPG.Core.UnitRendering
             ManaBar = null;
             ManaLabel = null;
             ManaCostOverlay = null;
+            _goldLabel = null;
         }
 
         private void BuildHpBar()
@@ -233,6 +241,26 @@ namespace TextRPG.Core.UnitRendering
             _statusRow.Add(_statusEffectsContainer);
         }
 
+        private void BuildGoldDisplay()
+        {
+            if (_resourceService == null || !_resourceService.Has(ResourceIds.Gold)) return;
+
+            var goldRow = new VisualElement();
+            goldRow.style.flexDirection = FlexDirection.Row;
+            goldRow.style.justifyContent = Justify.FlexEnd;
+            goldRow.style.alignItems = Align.Center;
+            goldRow.style.marginTop = 4;
+            Root.Add(goldRow);
+
+            int gold = (int)_resourceService.Get(ResourceIds.Gold);
+            _goldLabel = new Label($"\U0001FA99 {gold}");
+            _goldLabel.style.color = new Color(1f, 0.85f, 0.2f);
+            _goldLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _goldLabel.style.fontSize = 30;
+            _goldLabel.style.unityTextAlign = TextAnchor.MiddleRight;
+            goldRow.Add(_goldLabel);
+        }
+
         private void SubscribeToEvents()
         {
             _subscriptions.Add(_eventBus.Subscribe<DamageTakenEvent>(evt =>
@@ -266,6 +294,11 @@ namespace TextRPG.Core.UnitRendering
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectExpiredEvent>(evt =>
             {
                 if (evt.Target.Equals(_playerId)) UpdateStatusEffects();
+            }));
+            _subscriptions.Add(_eventBus.Subscribe<ResourceChangedEvent>(evt =>
+            {
+                if (evt.Id != ResourceIds.Gold || _goldLabel == null) return;
+                _goldLabel.text = $"\U0001FA99 {(int)evt.NewValue}";
             }));
         }
 

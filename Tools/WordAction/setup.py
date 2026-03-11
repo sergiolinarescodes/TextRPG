@@ -58,6 +58,13 @@ def main():
             PRIMARY KEY (word, tag)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS item_tags (
+            item_id TEXT NOT NULL COLLATE NOCASE,
+            tag     TEXT NOT NULL,
+            PRIMARY KEY (item_id, tag)
+        )
+    """)
 
     # Migration: add per-action targeting columns to word_actions if missing
     cols = {row[1] for row in conn.execute("PRAGMA table_info(word_actions)")}

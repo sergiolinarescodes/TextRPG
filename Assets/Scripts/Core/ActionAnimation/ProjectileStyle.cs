@@ -9,6 +9,7 @@ namespace TextRPG.Core.ActionAnimation
             return actionId?.ToLowerInvariant() switch
             {
                 "damage" => new Color(1f, 0.2f, 0.2f),
+                "magicdamage" => new Color(0.6f, 0.3f, 1f),
                 "heal" => new Color(0.2f, 1f, 0.3f),
                 "burn" => new Color(1f, 0.6f, 0f),
                 "poison" => new Color(0.6f, 0.1f, 0.9f),
