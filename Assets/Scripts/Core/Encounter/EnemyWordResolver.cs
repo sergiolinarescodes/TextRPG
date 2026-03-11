@@ -6,14 +6,13 @@ namespace TextRPG.Core.Encounter
 {
     internal sealed class EnemyWordResolver : IWordResolver
     {
-        private readonly Dictionary<string, List<WordActionMapping>> _mappings = new();
-        private readonly Dictionary<string, WordMeta> _stats = new();
+        private readonly Dictionary<string, List<WordActionMapping>> _mappings = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, WordMeta> _stats = new(StringComparer.OrdinalIgnoreCase);
 
         public void RegisterWord(string word, List<WordActionMapping> actions, WordMeta meta)
         {
-            var key = word.ToLowerInvariant();
-            _mappings[key] = actions;
-            _stats[key] = meta;
+            _mappings[word] = actions;
+            _stats[word] = meta;
         }
 
         public void Clear()
@@ -25,7 +24,7 @@ namespace TextRPG.Core.Encounter
         public IReadOnlyList<WordActionMapping> Resolve(string word)
         {
             if (word == null) return Array.Empty<WordActionMapping>();
-            return _mappings.TryGetValue(word.ToLowerInvariant(), out var actions)
+            return _mappings.TryGetValue(word, out var actions)
                 ? actions
                 : Array.Empty<WordActionMapping>();
         }
@@ -33,12 +32,12 @@ namespace TextRPG.Core.Encounter
         public WordMeta GetStats(string word)
         {
             if (word == null) return default;
-            return _stats.TryGetValue(word.ToLowerInvariant(), out var stats) ? stats : default;
+            return _stats.TryGetValue(word, out var stats) ? stats : default;
         }
 
         public bool HasWord(string word)
         {
-            return word != null && _mappings.ContainsKey(word.ToLowerInvariant());
+            return word != null && _mappings.ContainsKey(word);
         }
 
         public int WordCount => _mappings.Count;

@@ -66,6 +66,14 @@ namespace TextRPG.Core.ActionExecution
 
                 var resolved = ResolveActions(word, actions, meta);
 
+                if (_statusEffects != null && _statusEffects.HasEffect(_combatContext.SourceEntity, StatusEffectType.Energetic))
+                {
+                    resolved = DuplicateForEnergetic(resolved);
+                    _statusEffects.RemoveEffect(_combatContext.SourceEntity, StatusEffectType.Energetic);
+                    _statusEffects.ApplyEffect(_combatContext.SourceEntity, StatusEffectType.Tired,
+                        StatusEffectInstance.PermanentDuration, _combatContext.SourceEntity);
+                }
+
                 Publish(new ActionExecutionStartedEvent(word, resolved.Count));
 
                 bool isInstant = _animationResolver == null || _animationResolver.IsInstant;
@@ -84,6 +92,7 @@ namespace TextRPG.Core.ActionExecution
             finally
             {
                 _combatContext.SetTargetingInverted(false);
+                _combatContext.SetGiveCommand(false);
             }
         }
 
@@ -124,6 +133,18 @@ namespace TextRPG.Core.ActionExecution
             }
 
             return resolved;
+        }
+
+        private List<ResolvedAction> DuplicateForEnergetic(List<ResolvedAction> original)
+        {
+            var result = new List<ResolvedAction>(original.Count * 2);
+            foreach (var action in original)
+            {
+                int halved = (action.Value + 1) / 2;
+                result.Add(action with { Value = halved });
+                result.Add(action with { Value = halved });
+            }
+            return result;
         }
 
         private void ExecuteAllImmediately(List<ResolvedAction> resolved)

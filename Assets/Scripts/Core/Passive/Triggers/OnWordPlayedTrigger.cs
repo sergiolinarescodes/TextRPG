@@ -1,11 +1,13 @@
 using System;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.Passive.Triggers
 {
+    [AutoScan]
     internal sealed class OnWordPlayedTrigger : IPassiveTrigger
     {
         public string TriggerId => "on_word_played";

@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
 
 namespace TextRPG.Core.Passive.Effects
 {
+    [AutoScan]
     internal sealed class ShieldEffect : IPassiveEffect
     {
         public string EffectId => "shield";

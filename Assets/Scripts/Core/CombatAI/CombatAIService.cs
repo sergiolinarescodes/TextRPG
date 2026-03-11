@@ -71,10 +71,11 @@ namespace TextRPG.Core.CombatAI
             if (!_turnService.IsTurnActive)
                 return;
 
-            // Skip turn if stunned or frozen
+            // Skip turn if stunned, frozen, or asleep
             if (_statusEffects != null
                 && (_statusEffects.HasEffect(entityId, StatusEffectType.Stun)
-                 || _statusEffects.HasEffect(entityId, StatusEffectType.Frozen)))
+                 || _statusEffects.HasEffect(entityId, StatusEffectType.Frozen)
+                 || _statusEffects.HasEffect(entityId, StatusEffectType.Sleep)))
             {
                 Publish(new ActionAnimationCompletedEvent());
                 return;

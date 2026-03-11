@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.EventEncounter.Reactions;
+using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
@@ -20,5 +22,7 @@ namespace TextRPG.Core.ActionExecution
         StatusEffectInteractionTable InteractionTable { get; }
         IReadOnlyDictionary<string, EntityDefinition> UnitRegistry { get; }
         ICombatSlotService SlotService { get; }
+        IGameServices Services { get; }
+        IEntityTagProvider EntityTagProvider { get; }
     }
 }

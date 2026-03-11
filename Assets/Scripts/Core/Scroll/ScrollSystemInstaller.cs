@@ -1,4 +1,5 @@
 using Reflex.Core;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.WordAction;
 using TextRPG.Core.WordCooldown;
 using Unidad.Core.Bootstrap;
@@ -11,14 +12,14 @@ namespace TextRPG.Core.Scroll
     {
         public void Install(ContainerBuilder builder)
         {
-            builder.AddSingleton(_ => new SpellWordResolver(), typeof(SpellWordResolver));
+            builder.AddSingleton(_ => new EnemyWordResolver(), typeof(EnemyWordResolver));
 
             builder.AddSingleton(container =>
             {
                 var eventBus = container.Resolve<IEventBus>();
                 var baseResolver = container.Resolve<IWordResolver>();
                 var cooldown = container.Resolve<IWordCooldownService>();
-                var spellResolver = container.Resolve<SpellWordResolver>();
+                var spellResolver = container.Resolve<EnemyWordResolver>();
                 return (ISpellService)new SpellService(eventBus, baseResolver, cooldown, spellResolver);
             }, typeof(ISpellService));
         }

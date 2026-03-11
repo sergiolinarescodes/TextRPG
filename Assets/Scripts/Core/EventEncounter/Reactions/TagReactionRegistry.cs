@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.EventEncounter.Reactions.Tags;
+using TextRPG.Core.Services;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
 
 namespace TextRPG.Core.EventEncounter.Reactions
 {
-    internal sealed class TagReactionRegistry
+    internal sealed class TagReactionRegistry : IAutoScanRegistry<ITagDefinition>
     {
         private readonly Dictionary<string, ITagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly TagStateStore _stateStore = new();
@@ -14,6 +15,8 @@ namespace TextRPG.Core.EventEncounter.Reactions
         {
             _tags[tag.TagId] = tag;
         }
+
+        public void RegisterScanned(ITagDefinition item) => Register(item);
 
         public bool TryGet(string tagId, out ITagDefinition tag) => _tags.TryGetValue(tagId, out tag);
 

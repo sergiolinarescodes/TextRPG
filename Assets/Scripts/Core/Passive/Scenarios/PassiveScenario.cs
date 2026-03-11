@@ -58,7 +58,7 @@ namespace TextRPG.Core.Passive.Scenarios
             _turnService = new TurnService(_eventBus);
 
             var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
-            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
+            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry(null);
             var targetResolver = new PassiveTargetResolver();
             var context = new PassiveContext(_entityStats, _slotService, _eventBus, null);
             _passiveService = new PassiveService(_eventBus, triggerRegistry, effectRegistry, targetResolver, context);

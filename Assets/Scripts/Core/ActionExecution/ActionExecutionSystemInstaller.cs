@@ -38,7 +38,7 @@ namespace TextRPG.Core.ActionExecution
                     container.Resolve<IWeaponService>(),
                     unitRegistry: unitRegistry);
 
-                var registry = ActionHandlerRegistryFactory.CreateDefault(handlerContext);
+                var registry = ActionHandlerFactory.CreateDefault(handlerContext);
                 return (IActionHandlerRegistry)registry;
             }, typeof(IActionHandlerRegistry));
 

@@ -1,11 +1,14 @@
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Equipment;
+using TextRPG.Core.Services;
 using Unidad.Core.Inventory;
 
 namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
 {
+    [AutoScan]
     internal sealed class GiveItemOutcome : IInteractionOutcome
     {
+        public const string RandomFruit = "random_fruit";
         private static readonly string[] FruitPool = { "apple", "pear", "grape", "orange", "banana" };
         private readonly System.Random _rng = new();
 
@@ -22,7 +25,7 @@ namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
             if (string.IsNullOrEmpty(itemWord)) return;
 
             // Handle random fruit pool
-            if (itemWord == "random_fruit")
+            if (itemWord == RandomFruit)
                 itemWord = FruitPool[_rng.Next(FruitPool.Length)];
 
             if (!itemRegistry.TryGet(itemWord, out var itemDef)) return;

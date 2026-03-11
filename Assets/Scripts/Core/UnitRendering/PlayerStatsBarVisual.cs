@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter.Reactions.Tags;
 using TextRPG.Core.StatusEffect;
+using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
 using Unidad.Core.Resource;
 using Unidad.Core.UI.Components;
@@ -32,6 +34,7 @@ namespace TextRPG.Core.UnitRendering
         private VisualElement _statusRow;
         private VisualElement _statusEffectsContainer;
         private Label _goldLabel;
+        private bool _isPreviewingManaCost;
 
         public VisualElement Root { get; private set; }
         public UnidadProgressBar HpBar { get; private set; }
@@ -62,13 +65,12 @@ namespace TextRPG.Core.UnitRendering
             Root.style.justifyContent = Justify.Center;
             Root.style.paddingLeft = 10;
             Root.style.paddingRight = 10;
-            Root.style.paddingTop = 8;
-            Root.style.paddingBottom = 8;
+            Root.style.paddingTop = 4;
+            Root.style.paddingBottom = 4;
 
             BuildHpBar();
             BuildManaBar();
-            BuildStatsGrid();
-            BuildStatusEffects();
+            BuildStatsAndStatusRow();
             BuildGoldDisplay();
             SubscribeToEvents();
 
@@ -93,6 +95,61 @@ namespace TextRPG.Core.UnitRendering
             ManaLabel.text = $"{mana}/{maxMana}";
         }
 
+        public void ShowManaCostPreview(IWordResolver wordResolver, string word)
+        {
+            if (ManaBar == null || ManaLabel == null || ManaCostOverlay == null) return;
+
+            if (!WordPrefixHelper.TryStripGivePrefix(ref word) && word.Length == 0) { ClearManaCostPreview(); return; }
+
+            var meta = wordResolver.GetStats(word);
+            int cost = meta.Cost;
+            if (cost <= 0) { ClearManaCostPreview(); return; }
+
+            _isPreviewingManaCost = true;
+            int currentMana = _entityStats.GetCurrentMana(_playerId);
+            int maxMana = _entityStats.GetStat(_playerId, StatType.MaxMana);
+            if (maxMana <= 0) return;
+
+            float currentRatio = (float)currentMana / maxMana;
+            int previewMana = currentMana - cost;
+            float previewRatio = (float)previewMana / maxMana;
+
+            ManaBar.Value = Mathf.Clamp01(previewRatio);
+
+            float overlayLeft = Mathf.Max(0f, previewRatio);
+            float overlayWidth = currentRatio - overlayLeft;
+            ManaCostOverlay.style.left = Length.Percent(overlayLeft * 100f);
+            ManaCostOverlay.style.width = Length.Percent(overlayWidth * 100f);
+            ManaCostOverlay.style.display = DisplayStyle.Flex;
+
+            bool canAfford = previewMana >= 0;
+            ManaCostOverlay.style.backgroundColor = canAfford
+                ? new Color(1f, 0.6f, 0f, 0.5f)
+                : new Color(1f, 0f, 0f, 0.5f);
+
+            ManaLabel.text = $"{previewMana}/{maxMana} (-{cost})";
+            ManaLabel.style.color = canAfford ? Color.white : Color.red;
+        }
+
+        public void ClearManaCostPreview()
+        {
+            if (!_isPreviewingManaCost) return;
+            _isPreviewingManaCost = false;
+            if (ManaCostOverlay != null)
+                ManaCostOverlay.style.display = DisplayStyle.None;
+            UpdateManaBar();
+            if (ManaLabel != null)
+                ManaLabel.style.color = Color.white;
+        }
+
+        public bool IsPreviewingManaCost => _isPreviewingManaCost;
+
+        public void FlashManaDanger()
+        {
+            ManaBar?.SetVariant(ProgressVariant.Danger);
+            ManaBar?.schedule.Execute(() => ManaBar?.SetVariant(ProgressVariant.Info)).ExecuteLater(500);
+        }
+
         public void Dispose()
         {
             foreach (var sub in _subscriptions) sub.Dispose();
@@ -113,8 +170,8 @@ namespace TextRPG.Core.UnitRendering
         {
             var hpBarWrapper = new VisualElement();
             hpBarWrapper.style.width = Length.Percent(100);
-            hpBarWrapper.style.height = 48;
-            hpBarWrapper.style.marginBottom = 8;
+            hpBarWrapper.style.height = 32;
+            hpBarWrapper.style.marginBottom = 4;
             hpBarWrapper.style.justifyContent = Justify.Center;
 
             HpBar = new UnidadProgressBar(1f);
@@ -131,7 +188,7 @@ namespace TextRPG.Core.UnitRendering
             HpLabel.style.left = 0;
             HpLabel.style.right = 0;
             HpLabel.style.bottom = 0;
-            HpLabel.style.fontSize = 36;
+            HpLabel.style.fontSize = 24;
             HpLabel.style.color = Color.white;
             HpLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             HpLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -144,8 +201,8 @@ namespace TextRPG.Core.UnitRendering
         {
             var manaBarWrapper = new VisualElement();
             manaBarWrapper.style.width = Length.Percent(100);
-            manaBarWrapper.style.height = 48;
-            manaBarWrapper.style.marginBottom = 8;
+            manaBarWrapper.style.height = 32;
+            manaBarWrapper.style.marginBottom = 4;
             manaBarWrapper.style.justifyContent = Justify.Center;
 
             ManaBar = new UnidadProgressBar(0.5f);
@@ -170,7 +227,7 @@ namespace TextRPG.Core.UnitRendering
             ManaLabel.style.left = 0;
             ManaLabel.style.right = 0;
             ManaLabel.style.bottom = 0;
-            ManaLabel.style.fontSize = 36;
+            ManaLabel.style.fontSize = 24;
             ManaLabel.style.color = Color.white;
             ManaLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             ManaLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -179,19 +236,23 @@ namespace TextRPG.Core.UnitRendering
             Root.Add(manaBarWrapper);
         }
 
-        private void BuildStatsGrid()
-        {
-            var statsRow = new VisualElement();
-            statsRow.style.flexDirection = FlexDirection.Row;
-            statsRow.style.alignItems = Align.Center;
-            Root.Add(statsRow);
+        private VisualElement _statsAndStatusRow;
 
+        private void BuildStatsAndStatusRow()
+        {
+            _statsAndStatusRow = new VisualElement();
+            _statsAndStatusRow.style.flexDirection = FlexDirection.Row;
+            _statsAndStatusRow.style.alignItems = Align.Center;
+            Root.Add(_statsAndStatusRow);
+            var row = _statsAndStatusRow;
+
+            // Stats (left)
             var statsHeader = new Label("STATS:");
             statsHeader.style.color = Color.white;
             statsHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
-            statsHeader.style.fontSize = 27;
+            statsHeader.style.fontSize = 22;
             statsHeader.style.marginRight = 12;
-            statsRow.Add(statsHeader);
+            row.Add(statsHeader);
 
             _statLabels.Clear();
             int colCount = 4;
@@ -201,37 +262,35 @@ namespace TextRPG.Core.UnitRendering
                 var column = new VisualElement();
                 column.style.flexDirection = FlexDirection.Column;
                 column.style.marginRight = 20;
-                statsRow.Add(column);
+                row.Add(column);
 
-                for (int row = 0; row < perCol; row++)
+                for (int r = 0; r < perCol; r++)
                 {
-                    int idx = col * perCol + row;
+                    int idx = col * perCol + r;
                     if (idx >= DisplayStats.Length) break;
                     var (statType, abbrev) = DisplayStats[idx];
                     int val = _entityStats.GetStat(_playerId, statType);
                     var label = new Label($"{abbrev}: {val}");
                     label.style.color = Color.white;
                     label.style.unityFontStyleAndWeight = FontStyle.Bold;
-                    label.style.fontSize = 27;
+                    label.style.fontSize = 22;
                     column.Add(label);
                     _statLabels[statType] = label;
                 }
             }
-        }
 
-        private void BuildStatusEffects()
-        {
+            // Status effects (right, same row)
             _statusRow = new VisualElement();
             _statusRow.style.flexDirection = FlexDirection.Row;
             _statusRow.style.alignItems = Align.Center;
-            _statusRow.style.marginTop = 4;
+            _statusRow.style.marginLeft = 20;
             _statusRow.style.display = DisplayStyle.None;
-            Root.Add(_statusRow);
+            row.Add(_statusRow);
 
             var statusHeader = new Label("STATUS:");
             statusHeader.style.color = Color.white;
             statusHeader.style.unityFontStyleAndWeight = FontStyle.Bold;
-            statusHeader.style.fontSize = 27;
+            statusHeader.style.fontSize = 22;
             statusHeader.style.marginRight = 12;
             _statusRow.Add(statusHeader);
 
@@ -244,21 +303,16 @@ namespace TextRPG.Core.UnitRendering
         private void BuildGoldDisplay()
         {
             if (_resourceService == null || !_resourceService.Has(ResourceIds.Gold)) return;
-
-            var goldRow = new VisualElement();
-            goldRow.style.flexDirection = FlexDirection.Row;
-            goldRow.style.justifyContent = Justify.FlexEnd;
-            goldRow.style.alignItems = Align.Center;
-            goldRow.style.marginTop = 4;
-            Root.Add(goldRow);
+            if (_statsAndStatusRow == null) return;
 
             int gold = (int)_resourceService.Get(ResourceIds.Gold);
             _goldLabel = new Label($"\U0001FA99 {gold}");
             _goldLabel.style.color = new Color(1f, 0.85f, 0.2f);
             _goldLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _goldLabel.style.fontSize = 30;
+            _goldLabel.style.fontSize = 22;
             _goldLabel.style.unityTextAlign = TextAnchor.MiddleRight;
-            goldRow.Add(_goldLabel);
+            _goldLabel.style.marginLeft = new StyleLength(StyleKeyword.Auto);
+            _statsAndStatusRow.Add(_goldLabel);
         }
 
         private void SubscribeToEvents()
@@ -273,7 +327,11 @@ namespace TextRPG.Core.UnitRendering
             }));
             _subscriptions.Add(_eventBus.Subscribe<ManaChangedEvent>(evt =>
             {
-                if (evt.EntityId.Equals(_playerId)) UpdateManaBar();
+                if (!evt.EntityId.Equals(_playerId)) return;
+                if (_isPreviewingManaCost)
+                    ClearManaCostPreview();
+                else
+                    UpdateManaBar();
             }));
             _subscriptions.Add(_eventBus.Subscribe<StatModifierAddedEvent>(evt =>
             {
@@ -346,7 +404,7 @@ namespace TextRPG.Core.UnitRendering
                 var def = StatusEffectDefinitions.Get(eff.Type);
                 string text = eff.StackCount > 1 ? $"{def.DisplayName}({eff.StackCount})" : def.DisplayName;
                 var label = new Label(text);
-                label.style.fontSize = 27;
+                label.style.fontSize = 22;
                 label.style.unityFontStyleAndWeight = FontStyle.Bold;
                 label.style.color = def.DisplayColor;
                 col.Add(label);

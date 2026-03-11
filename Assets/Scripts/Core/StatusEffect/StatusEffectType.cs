@@ -20,6 +20,11 @@ namespace TextRPG.Core.StatusEffect
         Thorns,
         Reflecting,
         Hardening,
-        Drunk
+        Drunk,
+        Frostbitten,
+        Energetic,
+        Tired,
+        Sleep,
+        Anxiety
     }
 }

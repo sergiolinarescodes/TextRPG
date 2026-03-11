@@ -44,7 +44,7 @@ namespace TextRPG.Core.ActionExecution
             combatContext ??= new CombatContext();
             var ctx = new ActionHandlerContext(entityStats, eventBus, combatContext,
                 statusEffects, turnService);
-            return ActionHandlerRegistryFactory.CreateDefault(ctx);
+            return ActionHandlerFactory.CreateDefault(ctx);
         }
     }
 }

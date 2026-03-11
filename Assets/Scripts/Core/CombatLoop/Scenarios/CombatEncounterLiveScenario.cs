@@ -1,15 +1,20 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.CombatAI;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
+using TextRPG.Core.StatusEffect;
 using TextRPG.Core.UnitRendering;
 using TextRPG.Core.WordAction;
-using TextRPG.Core.WordInput;
-using TextRPG.Core.WordInput.Scenarios;
+using Unidad.Core.Abstractions;
+using Unidad.Core.EventBus;
 using Unidad.Core.Testing;
+using Unidad.Core.UI.TextAnimation.ElementAnimation;
+using Unidad.Core.UI.Tooltip;
 using UnityEngine;
 using UnityEngine.UIElements;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
@@ -24,11 +29,21 @@ namespace TextRPG.Core.CombatLoop.Scenarios
         private static readonly ScenarioParameter FontScaleFactorParam = new(
             "fontScaleFactor", "Font Scale Factor", typeof(float), 1.0f, 0.5f, 1f);
 
-        private LiveScenarioServices _svc;
-        private LiveScenarioLayout _layout;
+        private RunSession _session;
         private EncounterService _encounterService;
         private ICombatLoopService _combatLoop;
         private ICombatAIService _combatAI;
+
+        private WordInputController _wordInput;
+        private EquipmentVisualController _equipment;
+        private LootOverlayController _loot;
+        private CombatVisualController _combat;
+        private GameMessageController _messages;
+        private PlayerStatsBarVisual _playerStatsBar;
+        private CombatSlotVisual _slotVisual;
+        private EntityTooltipService _tooltipService;
+        private ITooltipService _frameworkTooltipService;
+
         private readonly List<IDisposable> _subscriptions = new();
 
         public CombatEncounterLiveScenario() : base(new TestScenarioDefinition(
@@ -45,145 +60,206 @@ namespace TextRPG.Core.CombatLoop.Scenarios
             var fontScaleFactor = ResolveParam<float>(overrides, "fontScaleFactor");
 
             var playerId = new EntityId("player");
+            _session = RunSessionFactory.Create(playerId, SceneRoot, new LiveAnimationResolver());
+            var s = _session;
 
-            // Core services
-            _svc = LiveScenarioHelper.CreateCoreServices(playerId, SceneRoot);
-
-            // Load unit definitions from DB
-            var allUnits = UnitDatabaseLoader.LoadAll();
-
-            // Real EncounterService
-            var enemyResolver = new EnemyWordResolver();
+            // Real EncounterService (uses its own enemy spawning)
+            var enemyResolver = s.EnemyResolver as EnemyWordResolver;
             _encounterService = new EncounterService(
-                _svc.EventBus, _svc.EntityStats, _svc.TurnService, _svc.SlotService,
-                _svc.CombatContext, enemyResolver);
-            _svc.EncounterAdapter = _encounterService;
-            _svc.EnemyResolver = enemyResolver;
+                s.EventBus, s.EntityStats, s.TurnService, s.SlotService,
+                s.CombatContext, enemyResolver);
 
-            // Subscribe to EnemySpawnedEvent — register UnitDefinitions + enemy words
-            _subscriptions.Add(_svc.EventBus.Subscribe<EnemySpawnedEvent>(evt =>
+            // Register units from EnemySpawnedEvent
+            _subscriptions.Add(s.EventBus.Subscribe<EnemySpawnedEvent>(evt =>
             {
                 var unitKey = evt.EnemyName.ToLowerInvariant();
                 var uid = new UnitId(evt.EntityId.Value);
-                if (allUnits.TryGetValue(unitKey, out var unitDef))
+                if (s.AllUnits.TryGetValue(unitKey, out var unitDef))
                 {
-                    _svc.UnitService.Register(uid,
+                    s.UnitService.Register(uid,
                         new UnitDefinition(uid, unitDef.Name,
                             unitDef.MaxHealth, unitDef.Strength, unitDef.PhysicalDefense, unitDef.Luck, unitDef.Color));
                     UnitDatabaseLoader.RegisterUnitWords(enemyResolver, unitKey);
                 }
                 else
                 {
-                    _svc.UnitService.Register(uid,
+                    s.UnitService.Register(uid,
                         new UnitDefinition(uid, evt.EnemyName.ToUpperInvariant(),
-                            _svc.EntityStats.GetStat(evt.EntityId, StatType.MaxHealth), 0, 0, 0, Color.red));
+                            s.EntityStats.GetStat(evt.EntityId, StatType.MaxHealth), 0, 0, 0, Color.red));
                 }
             }));
 
-            // Build encounter definition
-            var encounterDef = BuildEncounterDefinition(allUnits);
-
-            // Start encounter — handles entity registration, slot assignment, turn order
+            // Build encounter and start
+            var encounterDef = BuildEncounterDefinition(s.AllUnits);
             _encounterService.StartEncounter(encounterDef, playerId);
-
-            // Composite word resolver (player words + enemy words)
-            var compositeResolver = new CompositeWordResolver(_svc.WordResolver, enemyResolver);
-
-            // Action execution
-            LiveScenarioHelper.CreateActionExecution(_svc, compositeResolver);
-
-            // Passive system
-            LiveScenarioHelper.CreatePassiveService(_svc, _encounterService, allUnits);
 
             // Register passives for spawned enemies
             foreach (var enemyId in _encounterService.EnemyEntities)
             {
                 var unitKey = enemyId.Value;
-                // Try to match by stripping the "enemy_" prefix and index suffix
-                foreach (var (key, unitDef) in allUnits)
+                foreach (var (key, unitDef) in s.AllUnits)
                 {
                     if (unitKey.StartsWith($"enemy_{key.ToLowerInvariant()}_") && unitDef.Passives != null)
                     {
-                        _svc.PassiveService.RegisterPassives(enemyId, unitDef.Passives);
+                        s.PassiveService.RegisterPassives(enemyId, unitDef.Passives);
                         break;
                     }
                 }
             }
 
-            // Equipment & loot
-            LiveScenarioHelper.CreateEquipmentAndLoot(_svc);
-
-            // Scorer registry for AI
-            var scorers = CombatAISystemInstaller.CreateScorerRegistry(_svc.StatusEffects);
-
-            // CombatAI service
-            _combatAI = new CombatAIService(_svc.EventBus, _encounterService, _svc.EntityStats,
-                _svc.TurnService, _svc.SlotService, _svc.CombatContext, _svc.ActionExecution,
-                scorers, enemyResolver, allUnits, _svc.PassiveService);
+            // CombatAI
+            var scorers = CombatAISystemInstaller.CreateScorerRegistry(s.StatusEffects);
+            _combatAI = new CombatAIService(s.EventBus, _encounterService, s.EntityStats,
+                s.TurnService, s.SlotService, s.CombatContext, s.ActionExecution,
+                scorers, enemyResolver, s.AllUnits, s.PassiveService);
 
             // CombatLoop
             _combatLoop = new CombatLoopService(
-                _svc.EventBus, _svc.TurnService, _svc.EntityStats, _svc.WordResolver,
-                _svc.WeaponService, playerId, _svc.ConsumableService);
+                s.EventBus, s.TurnService, s.EntityStats, s.WordResolver,
+                s.WeaponService, playerId, s.ConsumableService);
             _combatLoop.Start();
 
-            // Build UI
-            _layout = LiveScenarioHelper.BuildLayout(RootVisualElement, _svc, vibrationAmplitude, fontScaleFactor);
+            // --- Build UI ---
+            var root = RootVisualElement;
+            root.style.flexDirection = FlexDirection.Column;
+            root.style.width = Length.Percent(100);
+            root.style.height = Length.Percent(100);
 
-            // Common event subscriptions
-            LiveScenarioHelper.SubscribeCommonEvents(_svc, _layout, _subscriptions,
-                () => _combatLoop.IsPlayerTurn, allUnits);
+            // Enemy row
+            var enemyRow = new VisualElement();
+            enemyRow.style.flexDirection = FlexDirection.Row;
+            enemyRow.style.justifyContent = Justify.Center;
+            enemyRow.style.alignItems = Align.Center;
+            enemyRow.style.height = Length.Percent(20);
+            enemyRow.style.backgroundColor = Color.black;
+            root.Add(enemyRow);
+
+            _slotVisual = new CombatSlotVisual(s.UnitService, s.EntityStats, s.SlotService);
+            _slotVisual.BuildEnemyRow(enemyRow);
+
+            // Middle area
+            var middleArea = new VisualElement();
+            middleArea.style.flexDirection = FlexDirection.Row;
+            middleArea.style.flexGrow = 1;
+
+            _playerStatsBar = new PlayerStatsBarVisual(s.EventBus, s.EntityStats, s.StatusEffects, playerId);
+
+            _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
+                s.InventoryService, s.ItemRegistry, s.WeaponService, s.ConsumableService,
+                s.PlayerInventoryId, playerId, root,
+                () => _encounterService?.IsEncounterActive == true);
+            _equipment.BuildBars(middleArea);
+
+            _wordInput = new WordInputController(s.EventBus, s.WordInputService, s.DrunkLetterService,
+                s.WordMatchService, s.AmmoMatchService, s.WordResolver, s.CombatContext,
+                s.PreviewService, s.AmmoPreviewService, s.WeaponService, s.ConsumableService,
+                _playerStatsBar, _slotVisual, playerId, fontScaleFactor);
+
+            var mainTextPanel = _wordInput.BuildInputArea(vibrationAmplitude);
+            middleArea.Insert(1, mainTextPanel);
+
+            _equipment.FireWeaponAction = () => _wordInput.FireWeapon();
+            _equipment.UseConsumableAction = () => _wordInput.UseConsumable();
+            _wordInput.SetCombatLoop(_combatLoop);
+
+            // Ally row
+            var allyRow = new VisualElement();
+            allyRow.pickingMode = PickingMode.Ignore;
+            allyRow.style.position = Position.Absolute;
+            allyRow.style.bottom = 10;
+            allyRow.style.left = 0;
+            allyRow.style.right = 0;
+            allyRow.style.flexDirection = FlexDirection.Row;
+            allyRow.style.justifyContent = Justify.Center;
+            allyRow.style.alignItems = Align.Center;
+            allyRow.style.height = 100;
+            allyRow.style.paddingTop = 4;
+            allyRow.style.paddingBottom = 4;
+            mainTextPanel.Add(allyRow);
+            _slotVisual.BuildAllyRow(allyRow);
+
+            root.Add(middleArea);
+            root.Add(_playerStatsBar.Build());
+
+            // Projectile overlay
+            var projectileOverlay = ProjectilePool.CreateOverlay();
+            root.Add(projectileOverlay);
+
+            Func<EntityId, Vector3> positionProvider = entityId =>
+            {
+                if (entityId.Equals(playerId))
+                {
+                    var hpCenter = _playerStatsBar.HpBar.worldBound.center;
+                    return new Vector3(hpCenter.x, hpCenter.y, 0f);
+                }
+                var element = _slotVisual.GetSlotElement(entityId);
+                if (element != null)
+                {
+                    var center = element.worldBound.center;
+                    return new Vector3(center.x, center.y, 0f);
+                }
+                return Vector3.zero;
+            };
+            s.AnimationService.Initialize(positionProvider, projectileOverlay);
+
+            var statusTextOverlay = StatusEffectFloatingTextPool.CreateOverlay();
+            root.Add(statusTextOverlay);
+            s.StatusVisualService.Initialize(positionProvider, statusTextOverlay, _slotVisual);
+
+            _messages = new GameMessageController(s.EventBus, positionProvider, playerId);
+            root.Add(_messages.CreateOverlay());
+
+            _combat = new CombatVisualController(s.EventBus, s.EntityStats, s.UnitService,
+                _slotVisual, s.AllUnits, playerId);
+
+            // Tooltip layer
+            var tooltipLayer = new VisualElement { name = "tooltip-layer" };
+            tooltipLayer.style.position = Position.Absolute;
+            tooltipLayer.style.left = 0;
+            tooltipLayer.style.top = 0;
+            tooltipLayer.style.right = 0;
+            tooltipLayer.style.bottom = 0;
+            tooltipLayer.pickingMode = PickingMode.Ignore;
+            root.Add(tooltipLayer);
+
+            var elementAnimator = new ElementAnimator();
+            _frameworkTooltipService = new TooltipService(s.EventBus, elementAnimator);
+            _frameworkTooltipService.SetTooltipLayer(tooltipLayer);
+
+            _tooltipService = new EntityTooltipService(s.EventBus);
+            _tooltipService.Initialize(
+                _slotVisual.GetAllSlotElements(),
+                _equipment.RightBar.GetAllSlotElements(),
+                _equipment.LeftBar.GetAllSlotElements(),
+                _frameworkTooltipService,
+                s.SlotService, s.StatusEffects, s.UnitService, s.PassiveService,
+                _encounterService, s.ActionRegistry, s.HandlerRegistry, s.EnemyResolver,
+                s.AmmoResolver, s.WeaponService, s.ConsumableService, s.EquipmentService,
+                s.ItemRegistry, s.EntityStats, s.InventoryService, s.PlayerInventoryId, playerId);
+
+            _loot = new LootOverlayController(s.EventBus, s.LootRewardService,
+                _equipment.RightBar, root, enabled => _wordInput.SetInputEnabled(enabled));
 
             // Combat-specific subscriptions
-            _subscriptions.Add(_svc.EventBus.Subscribe<PlayerTurnStartedEvent>(evt =>
+            _subscriptions.Add(s.EventBus.Subscribe<GameOverEvent>(_ =>
             {
-                LiveScenarioHelper.SetInputEnabled(_layout, true);
-                Debug.Log($"[Turn] === Player's turn (Turn #{evt.TurnNumber}, Round #{evt.RoundNumber}) ===");
-            }));
-            _subscriptions.Add(_svc.EventBus.Subscribe<PlayerTurnEndedEvent>(_ =>
-            {
-                LiveScenarioHelper.SetInputEnabled(_layout, false);
-                Debug.Log("[Turn] Player's turn ended");
-            }));
-            _subscriptions.Add(_svc.EventBus.Subscribe<GameOverEvent>(_ =>
-            {
-                LiveScenarioHelper.SetInputEnabled(_layout, false);
-                _layout.HpLabel.text = "DEAD";
-                _layout.HpLabel.style.color = Color.red;
+                _wordInput.SetInputEnabled(false);
+                _playerStatsBar.HpLabel.text = "DEAD";
+                _playerStatsBar.HpLabel.style.color = Color.red;
                 Debug.Log("[Turn] GAME OVER — Player died!");
             }));
-            _subscriptions.Add(_svc.EventBus.Subscribe<EncounterStartedEvent>(evt =>
+            _subscriptions.Add(s.EventBus.Subscribe<EncounterStartedEvent>(evt =>
                 Debug.Log($"[Encounter] Started: {evt.EncounterId} ({evt.EnemyCount} enemies)")));
-            _subscriptions.Add(_svc.EventBus.Subscribe<EncounterEndedEvent>(evt =>
+            _subscriptions.Add(s.EventBus.Subscribe<EncounterEndedEvent>(evt =>
             {
                 Debug.Log($"[Encounter] Ended: {evt.EncounterId} (victory={evt.Victory})");
-                if (evt.Victory)
-                    ShowVictoryOverlay();
+                if (evt.Victory) ShowVictoryOverlay();
             }));
-
-            // Handle EntityDied for encounter service tracking
-            _subscriptions.Add(_svc.EventBus.Subscribe<EntityDiedEvent>(evt =>
+            _subscriptions.Add(s.EventBus.Subscribe<EntityDiedEvent>(evt =>
             {
                 if (_encounterService.IsEnemy(evt.EntityId))
                     Debug.Log($"[Encounter] Enemy died: {evt.EntityId.Value}");
             }));
-
-            // Input handling
-            LiveScenarioHelper.SetupInputHandling(_layout, _svc,
-                submitFunc: word => _combatLoop.SubmitWord(word),
-                canFireWeapon: () =>
-                {
-                    if (!_combatLoop.FireWeapon()) return false;
-                    return true;
-                },
-                canUseConsumable: () =>
-                {
-                    if (!_combatLoop.UseConsumable()) return false;
-                    return true;
-                },
-                isEncounterActive: () => _encounterService.IsEncounterActive,
-                fontScaleFactor: fontScaleFactor,
-                subs: _subscriptions);
 
             Debug.Log($"[CombatEncounterLiveScenario] Started — {encounterDef.DisplayName}");
         }
@@ -200,7 +276,6 @@ namespace TextRPG.Core.CombatLoop.Scenarios
 
             if (enemies.Count == 0)
             {
-                // Fallback if no units in DB
                 enemies.Add(new EntityDefinition("Goblin", 30, 5, 3, 2, 1, 1, Color.green,
                     new[] { "SCRATCH", "BITE" }));
                 enemies.Add(new EntityDefinition("Skeleton", 25, 4, 2, 1, 1, 1, Color.white,
@@ -239,8 +314,8 @@ namespace TextRPG.Core.CombatLoop.Scenarios
             {
                 new("Scene root created", SceneRoot != null,
                     SceneRoot != null ? null : "No scene root"),
-                new("AnimatedCodeField exists", _layout?.CodeField != null,
-                    _layout?.CodeField != null ? null : "Code field is null"),
+                new("AnimatedCodeField exists", _wordInput?.CodeField != null,
+                    _wordInput?.CodeField != null ? null : "Code field is null"),
                 new("CombatLoopService created", _combatLoop != null,
                     _combatLoop != null ? null : "CombatLoopService is null"),
                 new("Not game over at start", !(_combatLoop?.IsGameOver ?? true),
@@ -251,16 +326,43 @@ namespace TextRPG.Core.CombatLoop.Scenarios
 
         protected override void OnCleanup()
         {
+            foreach (var sub in _subscriptions) sub.Dispose();
+            _subscriptions.Clear();
+
+            _tooltipService?.Dispose();
+            _tooltipService = null;
+            (_frameworkTooltipService as IDisposable)?.Dispose();
+            _frameworkTooltipService = null;
+
+            _loot?.Dispose();
+            _loot = null;
+            _messages?.Dispose();
+            _messages = null;
+            _combat?.Dispose();
+            _combat = null;
+            _equipment?.Dispose();
+            _equipment = null;
+            _wordInput?.Dispose();
+            _wordInput = null;
+            _playerStatsBar?.Dispose();
+            _playerStatsBar = null;
+
             (_combatLoop as IDisposable)?.Dispose();
             (_combatAI as IDisposable)?.Dispose();
             (_encounterService as IDisposable)?.Dispose();
-            LiveScenarioHelper.CleanupServices(_svc, _layout, _subscriptions);
-
             _combatLoop = null;
             _combatAI = null;
             _encounterService = null;
-            _svc = null;
-            _layout = null;
+
+            _session?.Dispose();
+            _session = null;
+            _slotVisual = null;
+        }
+
+        private sealed class LiveAnimationResolver : IAnimationResolver
+        {
+            public bool IsInstant => false;
+            public void Play(string animationId, Action onComplete = null) => onComplete?.Invoke();
         }
     }
 }

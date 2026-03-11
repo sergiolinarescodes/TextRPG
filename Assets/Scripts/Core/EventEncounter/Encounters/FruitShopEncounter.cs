@@ -1,3 +1,4 @@
+using TextRPG.Core.EventEncounter.Reactions.Outcomes;
 using UnityEngine;
 
 namespace TextRPG.Core.EventEncounter.Encounters
@@ -15,7 +16,7 @@ namespace TextRPG.Core.EventEncounter.Encounters
                     new[]
                     {
                         new InteractionReaction("Talk", "message", "Fresh fruit! Pay what you will.", 0),
-                        new InteractionReaction("Pay", "give_item", "random_fruit", 0), // any payment
+                        new InteractionReaction("Pay", "give_item", GiveItemOutcome.RandomFruit, 0),
                     },
                     Description: "A cheerful fruit vendor. Any gold gets you a random fruit.")
             });

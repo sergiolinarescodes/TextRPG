@@ -1,8 +1,11 @@
 using System;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
+
 
 namespace TextRPG.Core.StatusEffect.Handlers
 {
+    [AutoScan]
     internal sealed class BurningHandler : BaseStatusEffectHandler
     {
         public override StatusEffectType EffectType => StatusEffectType.Burning;

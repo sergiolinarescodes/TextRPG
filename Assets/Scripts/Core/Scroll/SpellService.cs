@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Linq;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.WordAction;
 using TextRPG.Core.WordCooldown;
 using Unidad.Core.EventBus;
@@ -11,19 +11,19 @@ namespace TextRPG.Core.Scroll
     {
         private readonly IWordResolver _baseResolver;
         private readonly IWordCooldownService _cooldownService;
-        private readonly SpellWordResolver _spellResolver;
+        private readonly EnemyWordResolver _spellResolver;
         private readonly IWordTagResolver _tagResolver;
         private readonly HashSet<string> _learnedSpells = new();
         private readonly HashSet<string> _offeredOriginals = new();
 
-        public IReadOnlyList<string> LearnedSpells => _learnedSpells.ToList();
-        public HashSet<string> OfferedOriginals => _offeredOriginals;
+        public IReadOnlyCollection<string> LearnedSpells => _learnedSpells;
+        public IReadOnlyCollection<string> OfferedOriginals => _offeredOriginals;
 
         public SpellService(
             IEventBus eventBus,
             IWordResolver baseResolver,
             IWordCooldownService cooldownService,
-            SpellWordResolver spellResolver,
+            EnemyWordResolver spellResolver,
             IWordTagResolver tagResolver = null) : base(eventBus)
         {
             _baseResolver = baseResolver;

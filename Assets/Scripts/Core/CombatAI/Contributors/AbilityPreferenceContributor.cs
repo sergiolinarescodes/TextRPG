@@ -12,11 +12,13 @@ namespace TextRPG.Core.CombatAI.Contributors
 
         public float Evaluate(AIDecisionContext context)
         {
-            // Add random variety to ability selection.
-            // Mana abilities get a small bonus so they're preferred ~60-65% of the time,
-            // but basic attacks still happen regularly for natural combat feel.
-            var random = (float)Rng.NextDouble();
-            return context.ManaCost > 0 ? random + 0.15f : random;
+            // Enemies always prefer real abilities over scratch.
+            // Scratch is only used as a mana-starved fallback.
+            if (context.AbilityWord == "scratch")
+                return -1f;
+
+            // Small random for variety when choosing between multiple real abilities.
+            return 2f + (float)Rng.NextDouble() * 0.5f;
         }
     }
 }

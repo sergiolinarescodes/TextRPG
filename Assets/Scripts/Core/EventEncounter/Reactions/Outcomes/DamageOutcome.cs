@@ -1,5 +1,8 @@
+using TextRPG.Core.Services;
+
 namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
 {
+    [AutoScan]
     internal sealed class DamageOutcome : IInteractionOutcome
     {
         public string OutcomeId => "damage";

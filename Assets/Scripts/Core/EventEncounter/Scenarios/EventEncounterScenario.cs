@@ -58,7 +58,7 @@ namespace TextRPG.Core.EventEncounter.Scenarios
                 _eventBus, _entityStats, turnService, effectHandlerRegistry, handlerContext);
             ((StatusEffectHandlerContext)handlerContext).StatusEffects = (IStatusEffectService)statusEffects;
 
-            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry();
+            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry(null);
             var tagReactions = EventEncounterSystemInstaller.CreateTagReactionRegistry();
             var encounterContext = new EventEncounterContext(
                 _entityStats, slotService, _eventBus, statusEffects);

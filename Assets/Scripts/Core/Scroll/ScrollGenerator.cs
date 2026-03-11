@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TextRPG.Core.ActionExecution;
 using TextRPG.Core.WordAction;
 using UnityEngine;
 
@@ -15,7 +16,7 @@ namespace TextRPG.Core.Scroll
                 .Where(w =>
                 {
                     var actions = resolver.Resolve(w);
-                    return actions.Any(a => a.ActionId == "MagicDamage");
+                    return actions.Any(a => string.Equals(a.ActionId, ActionNames.MagicDamage, StringComparison.OrdinalIgnoreCase));
                 })
                 .ToList();
 

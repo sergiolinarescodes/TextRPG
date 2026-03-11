@@ -111,6 +111,11 @@ namespace TextRPG.Core.UnitRendering
             RegisterHoverCallbacks();
         }
 
+        public void SetEncounterService(IEncounterService service)
+        {
+            _encounterService = service;
+        }
+
         public void SetEventEncounterService(IEventEncounterService service)
         {
             _eventEncounterService = service;

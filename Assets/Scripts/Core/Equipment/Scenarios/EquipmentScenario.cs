@@ -56,7 +56,7 @@ namespace TextRPG.Core.Equipment.Scenarios
             slotService.Initialize();
 
             var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
-            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
+            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry(null);
             var targetResolver = new PassiveTargetResolver();
             var passiveContext = new PassiveContext(_entityStats, slotService, _eventBus, null);
             _passiveService = new PassiveService(_eventBus, triggerRegistry, effectRegistry, targetResolver, passiveContext);

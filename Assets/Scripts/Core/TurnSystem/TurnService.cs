@@ -98,5 +98,19 @@ namespace TextRPG.Core.TurnSystem
             _extraTurns.Enqueue(entityId);
             Publish(new ExtraTurnGrantedEvent(entityId));
         }
+
+        public void MoveToLastInRound(EntityId entityId)
+        {
+            var idx = _turnOrder.IndexOf(entityId);
+            if (idx < 0) return;
+
+            _turnOrder.RemoveAt(idx);
+            _turnOrder.Add(entityId);
+
+            if (idx < _currentIndex)
+                _currentIndex--;
+            else if (idx == _currentIndex)
+                _currentIndex = Math.Min(_currentIndex, _turnOrder.Count - 1);
+        }
     }
 }

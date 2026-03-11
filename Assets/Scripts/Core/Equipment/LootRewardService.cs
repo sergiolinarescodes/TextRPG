@@ -64,7 +64,7 @@ namespace TextRPG.Core.Equipment
             ScrollDefinition scroll = null;
             if (_spellService != null && _baseResolver != null && _rng.Next(3) == 0)
             {
-                var excludes = (_spellService as SpellService)?.OfferedOriginals ?? new HashSet<string>();
+                var excludes = _spellService.OfferedOriginals as HashSet<string> ?? new HashSet<string>(_spellService.OfferedOriginals);
                 scroll = ScrollGenerator.Generate(_baseResolver, excludes, _rng);
             }
 

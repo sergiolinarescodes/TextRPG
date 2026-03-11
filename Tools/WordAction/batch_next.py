@@ -22,7 +22,7 @@ DB_PATH = os.path.join(
 
 def main():
     parser = argparse.ArgumentParser(description="Output next unclassified words as JSON")
-    parser.add_argument("--count", type=int, default=150, help="Number of words to output")
+    parser.add_argument("--count", type=int, default=100, help="Number of words to output")
     args = parser.parse_args()
 
     if not os.path.exists(DB_PATH):

@@ -1,7 +1,10 @@
 using System;
+using TextRPG.Core.Services;
+
 
 namespace TextRPG.Core.EventEncounter.Reactions.Tags.Definitions
 {
+    [AutoScan]
     internal sealed class FlammableTagDefinition : ITagDefinition
     {
         public string TagId => "flammable";

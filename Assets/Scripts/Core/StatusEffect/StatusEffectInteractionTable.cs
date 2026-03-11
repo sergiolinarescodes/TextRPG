@@ -11,6 +11,9 @@ namespace TextRPG.Core.StatusEffect
         public StatusEffectInteractionTable()
         {
             AddRemoval(StatusEffectType.Burning, StatusEffectType.Frozen);
+            AddRemoval(StatusEffectType.Burning, StatusEffectType.Frostbitten);
+            AddRemoval(StatusEffectType.Frostbitten, StatusEffectType.Burning);
+            AddRemoval(StatusEffectType.Frozen, StatusEffectType.Burning);
             AddDamageMultiplier("Shock", StatusEffectType.Wet, 2f);
         }
 
@@ -32,7 +35,17 @@ namespace TextRPG.Core.StatusEffect
 
         private void AddRemoval(StatusEffectType applied, StatusEffectType removes)
         {
-            _removals[applied] = new[] { removes };
+            if (_removals.TryGetValue(applied, out var existing))
+            {
+                var expanded = new StatusEffectType[existing.Length + 1];
+                existing.CopyTo(expanded, 0);
+                expanded[existing.Length] = removes;
+                _removals[applied] = expanded;
+            }
+            else
+            {
+                _removals[applied] = new[] { removes };
+            }
         }
 
         private void AddDamageMultiplier(string actionId, StatusEffectType requiredEffect, float multiplier)

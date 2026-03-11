@@ -7,4 +7,5 @@ namespace TextRPG.Core.StatusEffect
     public readonly record struct StatusEffectTickedEvent(EntityId Target, StatusEffectType Type, int RemainingDuration);
     public readonly record struct StatusEffectExpiredEvent(EntityId Target, StatusEffectType Type);
     public readonly record struct StatusEffectDamageEvent(EntityId Target, StatusEffectType Type, int Damage);
+    public readonly record struct AnxietyTriggeredEvent(EntityId Target, string Word);
 }

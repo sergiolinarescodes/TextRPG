@@ -1,7 +1,9 @@
 using System;
+using TextRPG.Core.Services;
 
 namespace TextRPG.Core.EventEncounter.Reactions.Tags.Definitions
 {
+    [AutoScan]
     internal sealed class MeltableTagDefinition : ITagDefinition
     {
         public string TagId => "meltable";

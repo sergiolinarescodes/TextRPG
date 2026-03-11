@@ -50,7 +50,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             var slotService = new CombatSlotService(_eventBus);
             var combatContext = new CombatContext();
 
-            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry();
+            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry(null);
             var tagReactions = EventEncounterSystemInstaller.CreateTagReactionRegistry();
             var encounterContext = new EventEncounterContext(_entityStats, slotService, _eventBus, null);
             var reactionService = new ReactionService(_eventBus, outcomeRegistry, encounterContext, tagReactions);

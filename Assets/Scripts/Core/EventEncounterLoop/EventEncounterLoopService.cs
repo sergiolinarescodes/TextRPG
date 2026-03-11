@@ -71,14 +71,8 @@ namespace TextRPG.Core.EventEncounterLoop
             word = word?.Trim()?.ToLowerInvariant() ?? "";
             if (word.Length == 0) return WordSubmitResult.InvalidWord;
 
-            bool isGive = WordPrefixHelper.TryStripGivePrefix(ref word);
-            if (isGive && word.Length == 0) return WordSubmitResult.InvalidWord;
-
-            if (isGive && _giveValidator != null && _giveValidator.RequiresItemForGive(word))
-            {
-                if (!_giveValidator.TryConsumeForGive(word))
-                    return WordSubmitResult.NoItemToGive;
-            }
+            var giveRejection = WordPrefixHelper.PreprocessGive(ref word, _giveValidator, out bool isGive);
+            if (giveRejection.HasValue) return giveRejection.Value;
 
             if (_reservedWordHandler?.TryHandleReservedWord(word) == true)
                 return WordSubmitResult.ReservedWord;

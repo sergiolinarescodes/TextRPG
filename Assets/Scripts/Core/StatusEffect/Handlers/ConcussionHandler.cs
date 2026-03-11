@@ -1,8 +1,11 @@
 using System;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
+
 
 namespace TextRPG.Core.StatusEffect.Handlers
 {
+    [AutoScan]
     internal sealed class ConcussionHandler : BaseStatusEffectHandler
     {
         private static readonly Random Rng = new();

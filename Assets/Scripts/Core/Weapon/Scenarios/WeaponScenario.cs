@@ -86,7 +86,7 @@ namespace TextRPG.Core.Weapon.Scenarios
             var actionHandlerCtx = new ActionHandlerContext(_entityStats, _eventBus, _combatContext,
                 weaponService: _weaponService);
             var handlerRegistry = new ActionHandlerRegistry();
-            handlerRegistry.Register("Damage", new DamageActionHandler(actionHandlerCtx));
+            handlerRegistry.Register("Damage", new ScaledDamageHandler("Damage", actionHandlerCtx, StatType.Strength, StatType.PhysicalDefense));
             handlerRegistry.Register("Weapon", new WeaponActionHandler(actionHandlerCtx));
 
             _weaponExecutor = new WeaponActionExecutor(

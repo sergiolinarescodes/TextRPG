@@ -75,7 +75,7 @@ namespace TextRPG.Core.ActionAnimation.Scenarios
             // Word data + action handler registry
             var wordData = WordActionTestFactory.CreateTestData();
             var actionHandlerCtx = new ActionHandlerContext(_entityStats, _eventBus, combatContext, statusEffects, turnService);
-            var handlerRegistry = ActionHandlerRegistryFactory.CreateDefault(actionHandlerCtx);
+            var handlerRegistry = ActionHandlerFactory.CreateDefault(actionHandlerCtx);
 
             // --- Entities ---
             _player = new EntityId("player");

@@ -20,9 +20,23 @@ Classify NLTK dictionary words into the game's action system via SQLite database
 
 ### Step 1: Get next batch
 ```bash
-python Tools/WordAction/batch_next.py --count 150
+python Tools/WordAction/batch_next.py --count 100
 ```
 If output is `COMPLETE`, all words are done — stop.
+
+### Step 1.5: Analyze current state
+```bash
+python Tools/WordAction/stats.py
+python Tools/WordAction/audit.py
+```
+Review the output before classifying. Understand:
+- **Action distribution**: which actions are overused/underused?
+- **Tag coverage**: which tags need more words?
+- **Unit diversity**: are summons clustered around the same passive archetypes?
+- **Item coverage**: which equipment slots are underrepresented?
+- **Duplicate profiles**: which action+value+target combos already have too many words?
+
+Use this context to guide classification decisions for the current batch.
 
 ### Step 2: Classify the words
 For each word in the batch, decide:
@@ -120,7 +134,7 @@ python Tools/WordAction/stats.py
 | `Shock` | Lightning damage + bonus to Wet targets |
 | `Fear` | Apply Fear debuff (Value = duration) |
 | `Stun` | Apply Stun (Value = duration) |
-| `Freeze` | Apply Frozen — immune but can't act (Value = duration) |
+| `Freeze` | Apply Frostbitten — attacks last, cumulative MagicPower loss per tick (Value = stacks). Removes Burning on apply (applies Wet). |
 | `Concussion` | Apply Concussion stacking debuff (Value = stacks) |
 | `Concentrate` | Restore mana + apply Concentrated buff (Value = mana amount) |
 | `Bleed` | Apply Bleeding DoT — grows if untreated, heals reduce (Value = ignored, uses 999 duration) |
@@ -153,6 +167,10 @@ python Tools/WordAction/stats.py
 | `Melt` | Melts or softens materials through intense heat — differs from Burn (combustion of flammable materials). Melt works on metal, ice, wax. In combat, debuffs physical defense (Value = amount). |
 | `Smash` | Powerful physical impact that deals heavy damage and can break objects (Value = damage amount). Works on breakable targets in events. |
 | `Pay` | Spend currency/valuables — used for bribery, trading, recruitment. Target is Self (payment comes from the payer). Value = gold amount paid. Used with "give" prefix to target NPCs (e.g. "give money" pays an NPC). |
+| `Energize` | Apply Energetic to self — next word's actions fire 2x at half value (rounded up), then applies Tired(1). Value = duration. |
+| `Relax` | Noop action — tag-driven. RELAX-tagged words remove 1 Anxiety stack from source. Value ignored. |
+| `Sleep` | Apply Sleep to self — skip turns, wake on damage (resist chance = 20% per stack). Value = stacks. |
+| `RestHeal` | Heal self. Base heal from value, +5 if no enemies, +10 if DWELLING entity present. Scales with MagicPower/3. |
 | `Time` | Time manipulation (Value = intensity) |
 
 ### INTERACTION ACTIONS
@@ -241,7 +259,7 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 | `mana` | — | Restore `value` mana to targets |
 | `apply_status` | status name (e.g. `"Burning"`) | Apply status effect to targets for `value` duration |
 
-Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`
+Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`
 
 ### Available passive targets
 
@@ -267,6 +285,33 @@ Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `
 | Shield givers | structure | on_ally_hit | shield | Injured | sentinel, aegis, ward |
 | Taunt tanks | structure | taunt | — | — | sentinel, guardian, decoy |
 | Kill-reward | enemy | on_kill | heal | Self | predator, hunter, reaper |
+
+### Enemy mana balance (for units with abilities)
+
+Enemy units have a fixed mana pool: **MaxMana=10, StartingMana=5, ManaRegen=2/turn**. Abilities should be designed so mana is a meaningful resource — enemies lead with their signature ability then build up mana before using it again.
+
+| Cost | Turn 1 (5 mana) | Turn 2 (+2 regen) | Turn 3 (+2 regen) | Turn 4 (+2 regen) | Frequency |
+|------|-----------------|-------------------|-------------------|-------------------|-----------|
+| **5** | Use (5→0) | scratch (2) | scratch (4) | Use (6→1) | Every 3 turns |
+| **4** | Use (5→1) | scratch (3) | Use (5→1) | scratch (3) | Every 2 turns |
+| **3** | Use (5→2) | Use (4→1) | Use (3→0) | scratch (2) | ~2 of 3 turns |
+| **2** | Use (5→3) | Use (5→3) | Use (5→3) | Use (5→3) | Every turn |
+
+**Design rules:**
+- **Signature ability** (cost 4-5): The enemy's defining move. Strong effect (AoE fear, summon, multi-action combo). Used turn 1, then every 2-3 turns.
+- **Mid-tier filler** (cost 2-3): Secondary ability for enemies with two real moves (e.g. shaman's spark, wraith's hex). Used between signature cooldowns.
+- **Free fallback** (cost 0): Basic attacks like "mace" or "slam" — better than scratch but not special. Only for brutes/beasts whose identity is "hit things".
+- **Scratch** (cost 0, 1 dmg): Universal last resort. AI strongly avoids it — only used when completely out of mana.
+- **Never cost 1**: Cost 1 with 2 regen means the enemy uses it every turn with no tradeoff. Minimum meaningful cost is 2.
+
+**Enemy design patterns:**
+
+| Pattern | Ability 1 | Ability 2 | Example | Behavior |
+|---------|-----------|-----------|---------|----------|
+| Signature + scratch | cost 4-5 | scratch (0) | bat, goblin, skeleton | Big move turn 1, scratch until recharged |
+| Signature + free attack | cost 4-5 | basic attack (0) | orc, golem, predator | Big move turn 1, basic attack until recharged |
+| Signature + filler | cost 5 | cost 2 | shaman, wraith | Signature turn 1, filler to stay active, signature again when full |
+| All-in | cost 5 | scratch (0) | sellsword | One devastating combo, then weak until recharged |
 
 ---
 
@@ -424,7 +469,7 @@ Use `BaseType+StatusEffect` format to target enemies with a specific status. Any
 - `LowestHealthEnemy+Poisoned` — lowest-HP poisoned enemy
 - `SingleEnemy+Bleeding` — single bleeding enemy
 
-Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Buffed`, `Shielded`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`
+Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Buffed`, `Shielded`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`
 
 ---
 
@@ -436,19 +481,62 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 
 ## TAGS
 
-`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`
+`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`, `THOUGHTS`, `RELAX`, `DWELLING`
 
 ---
 
 ## DESIGN AWARENESS
 
+Every game word is a **design decision** — it permanently shapes the player's vocabulary and the game's possibility space. Treat each classification as if you're designing a card for a deckbuilder: it needs a clear identity, a reason to exist, and a role in the ecosystem.
+
 When classifying words, consider the FULL ecosystem of word relationships:
-- **Actions**: direct combat effects (Damage, Heal, Burn, etc.)
-- **Summons**: spawning units with their own abilities and composable passives
-- **Items**: equippable gear that grants stats and/or passives (5 slots: head, wear, accessory, consumable, weapon)
-- **Tags**: categories for passive triggers and thematic grouping
+- **Actions**: direct combat effects (Damage, Heal, Burn, etc.) — what makes THIS word's combo different from existing words?
+- **Summons**: spawning units with their own abilities and composable passives — what unique battlefield role does this unit fill?
+- **Items**: equippable gear that grants stats and/or passives (5 slots: head, wear, accessory, consumable, weapon) — which slot needs this item? What build does it enable?
+- **Tags**: categories for passive triggers and thematic grouping — which existing passives does this tag activate?
 
 Each word should contribute to ONE of these roles. Don't make every word a simple damage dealer.
+
+**Design principle: fewer well-designed words > many generic ones.** If a word doesn't offer something distinct, classify it as a non-game word and move on.
+
+---
+
+## QUALITY INVESTIGATION PROTOCOL
+
+Every batch must go through three phases. Do NOT skip phases or combine them.
+
+### Phase A — Triage (scan all 100 words)
+
+Quick-scan the entire batch and separate words into two buckets:
+- **Game word candidates**: words with clear combat, RPG, item, or summon meaning
+- **Non-game words**: articles, prepositions, abstract nouns, obscure terms with no RPG relevance
+
+Do NOT assign any actions during triage. Just categorize.
+
+### Phase B — Deep Investigation (each game word candidate)
+
+For each game word candidate, work through this checklist:
+
+1. **Word identity**: What RPG archetype does this word evoke? (damage spell, healing, buff, summon creature, equipment, interaction)
+2. **Uniqueness check**: Search your memory of recent batches and the DB audit — does an existing word already fill this role with a similar profile? If yes, either design a meaningfully different combo or skip the word.
+3. **Action combo design**: Choose actions that create an interesting gameplay moment, not just "Damage N". Consider:
+   - Multi-action combos that synergize (e.g. Water + Shock, Burn + Push)
+   - Status effects that set up future turns
+   - Targeting that isn't just SingleEnemy
+4. **If Summon**: Design a unique battlefield role. Vary passive triggers (don't default to `on_ally_hit`). Write a 1-sentence design rationale in your working notes. Check that no existing summon has the same trigger+effect combo.
+5. **If Item**: Run slot gap analysis — which `item_type` is underrepresented? Design stats that enable a specific build archetype (glass cannon, tank, spellcaster, etc.). Verify no existing item has the same type + stat profile.
+6. **Tag synergies**: Choose tags that activate existing `on_word_tag` passives. If the word could reasonably have multiple tags, assign them — richer tagging creates richer gameplay.
+
+### Phase C — Batch Cross-Reference (review before inserting)
+
+Before generating the final JSON, review ALL game words in the batch together:
+- **Diversity**: No two game words should have identical action+value+target profiles
+- **Tag spread**: Ensure at least 3 different tags are represented across game words
+- **Targeting variety**: Not all game words should be SingleEnemy — mix in Self, AllEnemies, positional, random, stat-based
+- **Summon/item variety**: No two summons share the same passive archetype; no two items share the same slot+stats
+- **Synergy potential**: At least one word should create a new combo with existing words (e.g. applying a status that an existing summon's passive triggers on)
+
+Revise any weak entries. It's better to downgrade a borderline game word to non-game than to insert filler.
 
 ---
 
@@ -460,7 +548,10 @@ Each word should contribute to ONE of these roles. Don't make every word a simpl
 - **Range is ignored** (slot system — everything is always in range). Use `0` for all words.
 - **Area is ignored** (slot system — no area expansion). Use `"Single"` for all words. Targeting is handled by the `target` field (e.g. `AllEnemies` for AoE).
 - **Most NLTK words are NOT game words** — articles, prepositions, obscure terms → empty actions array, they still get marked as processed
-- **~15-20% of words should have actions** — be selective, only words with clear combat/RPG meaning
+- **Quality over quantity** — there is no target percentage. Fewer well-designed words with interesting profiles are better than many generic ones. Only classify a word as a game word if you can articulate what makes it distinct.
+- **Distinctiveness requirement** — before assigning actions, verify no existing word in the DB has the same action+value+target profile. If a near-duplicate exists, redesign the word's combo or skip it.
+- **Summon design rationale** — every summon must have a 1-sentence explanation (in your working notes, not in JSON) of its unique battlefield role. If you can't explain why it's different from existing summons, don't add it.
+- **Item ecosystem fit** — before creating an item, check which equipment slots are underrepresented (via `audit.py`). Verify the item's stat profile doesn't duplicate an existing item. Items should fill gaps, not stack duplicates.
 - **Mix targeting types**: don't make every word SingleEnemy
 - **Use specific stat buffs/debuffs**: use `BuffStrength`, `DebuffPhysicalDefense`, etc. instead of generic `Buff`. Match the stat to the word's meaning (e.g. "fortify" → `BuffPhysicalDefense`, "weaken" → `DebuffStrength`)
 - **Per-action targeting**: if a word's actions target different things, add `target`/`range`/`area` to individual actions (e.g. "absorb" damages enemy + heals self)
@@ -476,7 +567,7 @@ Each word should contribute to ONE of these roles. Don't make every word a simpl
 
 ## DIVERSITY RULES
 
-Before each batch: run `stats.py` and review action distribution.
+Before each batch: run `stats.py` AND `audit.py` — review action distribution, tag coverage, unit diversity, item slot coverage, and duplicate profiles.
 
 - Don't assign the same action combination to more than ~5% of game words
 - Mix targeting types — if recent batches are >60% SingleEnemy, use more AllEnemies, RandomEnemy, etc.
@@ -499,6 +590,15 @@ Run `stats.py` and check for:
 - If a word has the same meaning as an existing word (synonym), vary the action values or add different secondary effects
 - Check recent 3 batches for patterns — if you've been assigning too much Damage, shift to other effects
 
+### Quality checkpoints
+
+Before inserting any game words, review the batch as a whole:
+- **Filler check**: Remove any game word that exists only because it vaguely relates to combat — if you can't articulate why it's interesting, it's filler
+- **Summon diversity**: No two summons in the same batch should have the same passive trigger+effect combo
+- **Item diversity**: No two items in the same batch should have the same item_type + stat profile
+- **Profile uniqueness**: For each game word, mentally compare its action+value+target against the last 3 batches — if it's a duplicate profile, redesign or skip it
+- **Synergy audit**: At least 1 game word per batch should create a NEW synergy with existing words (e.g. a word that benefits from a status no existing word applied, or a summon that triggers on an underused tag)
+
 ---
 
 ## RULES
@@ -509,7 +609,7 @@ Run `stats.py` and check for:
 - Values must be 1-10 (enforced by DB constraint)
 - Cost must be 0-10
 - Range 0 = unlimited
-- Each iteration processes one batch (~150 words)
+- Each iteration processes one batch (~100 words)
 - Summon words MUST have cost >= 1 (enforced by batch_insert.py). Summoning always costs mana.
 - Item words (equipping) have cost 0 — equipping an item is free. Use `Item` action (not `Weapon`).
 - Weapon-type items use `assoc_word` on the action to link ammo words.

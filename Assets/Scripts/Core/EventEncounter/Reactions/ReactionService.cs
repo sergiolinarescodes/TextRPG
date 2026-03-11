@@ -10,7 +10,7 @@ using EntityId = TextRPG.Core.EntityStats.EntityId;
 
 namespace TextRPG.Core.EventEncounter.Reactions
 {
-    internal sealed class ReactionService : SystemServiceBase
+    internal sealed class ReactionService : SystemServiceBase, IEntityTagProvider
     {
         private readonly Dictionary<EntityId, List<InteractionReaction>> _reactions = new();
         private readonly Dictionary<EntityId, string[]> _entityTags = new();
@@ -44,6 +44,9 @@ namespace TextRPG.Core.EventEncounter.Reactions
             if (tags != null && tags.Length > 0)
                 _entityTags[entityId] = tags;
         }
+
+        public string[] GetEntityTags(EntityId entityId)
+            => _entityTags.TryGetValue(entityId, out var tags) ? tags : null;
 
         public void ClearReactions()
         {
@@ -96,7 +99,6 @@ namespace TextRPG.Core.EventEncounter.Reactions
                             if (TryExecuteGiveReaction(reactions[i], source, target, actionId, value))
                                 break;
                         }
-                        _combatContext?.SetGiveCommand(false);
                     }
                     else
                     {

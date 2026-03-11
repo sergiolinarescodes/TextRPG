@@ -91,7 +91,7 @@ namespace TextRPG.Core.Passive.Scenarios
             ((StatusEffectHandlerContext)handlerContext).StatusEffects = (IStatusEffectService)_statusEffects;
 
             var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
-            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
+            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry(null);
             var targetResolver = new PassiveTargetResolver();
 
             var tagResolver = new WordTagResolver(new Dictionary<string, List<string>>

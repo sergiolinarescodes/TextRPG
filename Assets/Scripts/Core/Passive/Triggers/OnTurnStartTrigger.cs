@@ -1,11 +1,13 @@
 using System;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.Passive.Triggers
 {
+    [AutoScan]
     internal sealed class OnTurnStartTrigger : IPassiveTrigger
     {
         public string TriggerId => "on_turn_start";

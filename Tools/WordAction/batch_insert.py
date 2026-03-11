@@ -42,7 +42,7 @@ VALID_ACTIONS = {
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
-    "Drunk", "Smash", "Pay",
+    "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",

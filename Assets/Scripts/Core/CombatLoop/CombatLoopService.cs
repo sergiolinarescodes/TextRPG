@@ -3,6 +3,7 @@ using TextRPG.Core.ActionExecution;
 using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Run;
+using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
@@ -26,6 +27,8 @@ namespace TextRPG.Core.CombatLoop
         private readonly ICombatContext _combatContext;
         private readonly IWordCooldownService _wordCooldown;
         private readonly IGiveValidator _giveValidator;
+        private readonly IStatusEffectService _statusEffects;
+        private readonly IAnxietyService _anxietyService;
         private readonly EntityId _playerId;
 
         private bool _isPlayerTurn;
@@ -47,7 +50,9 @@ namespace TextRPG.Core.CombatLoop
             IReservedWordHandler reservedWordHandler = null,
             ICombatContext combatContext = null,
             IWordCooldownService wordCooldown = null,
-            IGiveValidator giveValidator = null) : base(eventBus)
+            IGiveValidator giveValidator = null,
+            IStatusEffectService statusEffects = null,
+            IAnxietyService anxietyService = null) : base(eventBus)
         {
             _turnService = turnService;
             _entityStats = entityStats;
@@ -58,6 +63,8 @@ namespace TextRPG.Core.CombatLoop
             _combatContext = combatContext;
             _wordCooldown = wordCooldown;
             _giveValidator = giveValidator;
+            _statusEffects = statusEffects;
+            _anxietyService = anxietyService;
             _playerId = playerId;
 
             Subscribe<ActionAnimationCompletedEvent>(_ => OnAnimationCompleted());
@@ -78,14 +85,8 @@ namespace TextRPG.Core.CombatLoop
             word = word?.Trim()?.ToLowerInvariant() ?? "";
             if (word.Length == 0) return WordSubmitResult.InvalidWord;
 
-            bool isGive = WordPrefixHelper.TryStripGivePrefix(ref word);
-            if (isGive && word.Length == 0) return WordSubmitResult.InvalidWord;
-
-            if (isGive && _giveValidator != null && _giveValidator.RequiresItemForGive(word))
-            {
-                if (!_giveValidator.TryConsumeForGive(word))
-                    return WordSubmitResult.NoItemToGive;
-            }
+            var giveRejection = WordPrefixHelper.PreprocessGive(ref word, _giveValidator, out bool isGive);
+            if (giveRejection.HasValue) return giveRejection.Value;
 
             if (_reservedWordHandler?.TryHandleReservedWord(word) == true)
                 return WordSubmitResult.ReservedWord;
@@ -198,6 +199,25 @@ namespace TextRPG.Core.CombatLoop
 
                     if (current.Equals(_playerId))
                     {
+                        // Sleep: skip player turn
+                        if (_statusEffects?.HasEffect(_playerId, StatusEffectType.Sleep) == true)
+                        {
+                            _pendingTurnAdvance = false;
+                            Publish(new ActionAnimationCompletedEvent());
+                            continue;
+                        }
+
+                        // Anxiety: auto-play a THOUGHTS word
+                        if (_anxietyService?.TryInterceptTurn(_playerId, out var anxietyWord) == true)
+                        {
+                            _isPlayerTurn = true;
+                            _pendingTurnAdvance = false;
+                            Publish(new PlayerTurnStartedEvent(_turnService.CurrentTurnNumber, _turnService.CurrentRoundNumber));
+                            Publish(new AnxietyTriggeredEvent(_playerId, anxietyWord));
+                            SubmitWord(anxietyWord);
+                            return;
+                        }
+
                         _isPlayerTurn = true;
                         _pendingTurnAdvance = false;
                         Publish(new PlayerTurnStartedEvent(_turnService.CurrentTurnNumber, _turnService.CurrentRoundNumber));

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.Services;
 
 namespace TextRPG.Core.EventEncounter.Reactions.Tags.Definitions
 {
+    [AutoScan]
     internal sealed class MercenaryTagDefinition : ITagDefinition
     {
         private const int RecruitThreshold = 10;

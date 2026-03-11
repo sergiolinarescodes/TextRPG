@@ -39,52 +39,33 @@ namespace TextRPG.Core.ActionExecution
 
         public IReadOnlyList<EntityId> GetTargets(TargetType targetType, int range = 0, StatusEffectType? statusFilter = null)
         {
+            var enemies = _enemies;
+            var allies = _allies;
+
             if (_invertTargeting)
-                targetType = InvertTargetType(targetType);
+            {
+                // Swap enemies/allies so all target type logic works naturally.
+                // Self/AllAlliesAndSelf use _sourceEntity directly, so remap them explicitly.
+                if (targetType == TargetType.Self)
+                    targetType = TargetType.SingleEnemy;
+                else if (targetType == TargetType.AllAlliesAndSelf || targetType == TargetType.AllAllies)
+                    targetType = TargetType.AllEnemies;
+                else if (targetType == TargetType.RandomAlly)
+                    targetType = TargetType.RandomEnemy;
+
+                enemies = BuildAlliesAndSelf(allies);
+                allies = _enemies;
+            }
 
             if (!_invertTargeting && IsSingleEnemyTarget(targetType))
             {
-                var taunt = FindTauntTarget(_enemies);
+                var taunt = FindTauntTarget(enemies);
                 if (taunt.HasValue) return new[] { taunt.Value };
             }
 
-            var enemies = _enemies;
-            var allies = _allies;
             if (statusFilter.HasValue)
                 enemies = FilterByStatus(enemies, statusFilter.Value);
             return ResolveTargets(targetType, enemies, allies);
-        }
-
-        private static TargetType InvertTargetType(TargetType targetType)
-        {
-            return targetType switch
-            {
-                TargetType.Self => TargetType.SingleEnemy,
-                TargetType.SingleEnemy => TargetType.Self,
-                TargetType.AllEnemies => TargetType.AllAlliesAndSelf,
-                TargetType.Area => TargetType.AllAlliesAndSelf,
-                TargetType.AllAlliesAndSelf => TargetType.AllEnemies,
-                TargetType.AllAllies => TargetType.AllEnemies,
-                TargetType.FrontEnemy => TargetType.Self,
-                TargetType.MiddleEnemy => TargetType.Self,
-                TargetType.BackEnemy => TargetType.Self,
-                TargetType.Melee => TargetType.Self,
-                TargetType.RandomEnemy => TargetType.Self,
-                TargetType.RandomAlly => TargetType.RandomEnemy,
-                TargetType.LowestHealthEnemy => TargetType.Self,
-                TargetType.HighestHealthEnemy => TargetType.Self,
-                TargetType.LowestDefenseEnemy => TargetType.Self,
-                TargetType.HighestDefenseEnemy => TargetType.Self,
-                TargetType.LowestStrengthEnemy => TargetType.Self,
-                TargetType.HighestStrengthEnemy => TargetType.Self,
-                TargetType.LowestMagicEnemy => TargetType.Self,
-                TargetType.HighestMagicEnemy => TargetType.Self,
-                TargetType.RandomLowestHealthEnemy => TargetType.Self,
-                TargetType.RandomHighestHealthEnemy => TargetType.Self,
-                TargetType.RandomEnemyWithStatus => TargetType.Self,
-                TargetType.RandomEnemyWithoutStatus => TargetType.Self,
-                _ => targetType
-            };
         }
 
         private IReadOnlyList<EntityId> ResolveTargets(TargetType targetType,

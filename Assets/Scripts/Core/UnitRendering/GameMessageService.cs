@@ -20,6 +20,7 @@ namespace TextRPG.Core.UnitRendering
         private VisualElement _overlayRoot;
         private readonly Queue<MessageEntry> _available = new();
         private readonly HashSet<MessageEntry> _active = new();
+        private readonly System.Random _rng = new();
         private int _instanceCount;
         private bool _disposed;
 
@@ -63,29 +64,14 @@ namespace TextRPG.Core.UnitRendering
             }
 
             _active.Add(entry);
-            entry.WordContainer.Clear();
 
-            var label = new Label();
-            label.style.fontSize = MessageFontSize;
-            label.style.color = color;
-            label.style.unityTextAlign = TextAnchor.MiddleCenter;
-            label.style.whiteSpace = WhiteSpace.NoWrap;
-            label.style.unityFontStyleAndWeight = FontStyle.Bold;
-            label.style.textShadow = new TextShadow
-            {
-                offset = new Vector2(1, 1),
-                blurRadius = 3,
-                color = Color.black
-            };
-            label.pickingMode = PickingMode.Ignore;
-            label.text = message;
-            entry.WordContainer.Add(label);
+            entry.Label.text = message;
+            entry.Label.style.color = color;
 
             // Land at screen center with slight random offset, stacked upward
             float centerX = _overlayRoot.resolvedStyle.width / 2;
             float centerY = _overlayRoot.resolvedStyle.height / 2;
-            var rng = new System.Random();
-            float landingX = centerX + (float)(rng.NextDouble() * LandingRangeX * 2 - LandingRangeX);
+            float landingX = centerX + (float)(_rng.NextDouble() * LandingRangeX * 2 - LandingRangeX);
             float landingY = centerY - _active.Count * MessageSpacingY;
 
             entry.Root.style.display = DisplayStyle.Flex;
@@ -160,7 +146,6 @@ namespace TextRPG.Core.UnitRendering
             _active.Remove(entry);
             StopTweens(entry);
 
-            entry.WordContainer?.Clear();
             entry.Root.style.display = DisplayStyle.None;
             entry.Root.style.left = 0;
             entry.Root.style.top = 0;
@@ -184,16 +169,23 @@ namespace TextRPG.Core.UnitRendering
             root.pickingMode = PickingMode.Ignore;
             root.style.display = DisplayStyle.None;
 
-            var container = new VisualElement();
-            container.style.flexDirection = FlexDirection.Column;
-            container.style.justifyContent = Justify.Center;
-            container.style.alignItems = Align.Center;
-            container.pickingMode = PickingMode.Ignore;
-            root.Add(container);
+            var label = new Label();
+            label.style.fontSize = MessageFontSize;
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            label.style.unityFontStyleAndWeight = FontStyle.Bold;
+            label.style.textShadow = new TextShadow
+            {
+                offset = new Vector2(1, 1),
+                blurRadius = 3,
+                color = Color.black
+            };
+            label.pickingMode = PickingMode.Ignore;
+            root.Add(label);
 
             _overlayRoot.Add(root);
 
-            return new MessageEntry { Root = root, WordContainer = container };
+            return new MessageEntry { Root = root, Label = label };
         }
 
         private static void StopTweens(MessageEntry entry)
@@ -226,7 +218,7 @@ namespace TextRPG.Core.UnitRendering
         private sealed class MessageEntry
         {
             public VisualElement Root;
-            public VisualElement WordContainer;
+            public Label Label;
             public Tween ArcTween;
             public Tween BounceTween;
             public Tween FadeTween;

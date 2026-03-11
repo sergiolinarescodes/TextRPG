@@ -76,7 +76,7 @@ namespace TextRPG.Core.ActionExecution
             var actions = _wordResolver.Resolve(word);
             for (int i = 0; i < actions.Count; i++)
             {
-                if (string.Equals(actions[i].ActionId, "Pay", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(actions[i].ActionId, ActionNames.Pay, StringComparison.OrdinalIgnoreCase))
                     return actions[i].Value;
             }
             return 0;

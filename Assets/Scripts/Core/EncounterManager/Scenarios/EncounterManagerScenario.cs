@@ -58,7 +58,7 @@ namespace TextRPG.Core.EncounterManager.Scenarios
             var combatEncounter = new EncounterService(
                 _eventBus, _entityStats, turnService, slotService, combatContext, enemyResolver);
 
-            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry();
+            var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry(null);
             var tagReactions = EventEncounterSystemInstaller.CreateTagReactionRegistry();
             var encounterContext = new EventEncounterContext(_entityStats, slotService, _eventBus, null);
             var reactionService = new ReactionService(_eventBus, outcomeRegistry, encounterContext, tagReactions);

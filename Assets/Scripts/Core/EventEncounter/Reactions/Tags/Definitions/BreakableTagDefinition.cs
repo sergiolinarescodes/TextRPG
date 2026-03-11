@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.Services;
+
 
 namespace TextRPG.Core.EventEncounter.Reactions.Tags.Definitions
 {
+    [AutoScan]
     internal sealed class BreakableTagDefinition : ITagDefinition
     {
         private static readonly HashSet<string> ReactActions =

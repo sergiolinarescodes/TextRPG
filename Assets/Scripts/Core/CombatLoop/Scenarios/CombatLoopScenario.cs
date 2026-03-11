@@ -74,7 +74,7 @@ namespace TextRPG.Core.CombatLoop.Scenarios
 
             var actionHandlerCtx = new ActionHandlerContext(_entityStats, _eventBus, combatContext,
                 statusEffects, _turnService, weaponService, slotService: slotService);
-            var handlerRegistry = ActionHandlerRegistryFactory.CreateDefault(actionHandlerCtx);
+            var handlerRegistry = ActionHandlerFactory.CreateDefault(actionHandlerCtx);
 
             var animResolver = new InstantAnimationResolver();
             var actionExecution = new ActionExecutionService(

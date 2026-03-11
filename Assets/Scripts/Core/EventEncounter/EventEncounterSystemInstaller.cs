@@ -1,9 +1,12 @@
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.CombatSlot;
+using TextRPG.Core.Effects;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter.Encounters;
 using TextRPG.Core.EventEncounter.Reactions;
-using TextRPG.Core.EventEncounter.Reactions.Outcomes;
+using TextRPG.Core.EventEncounter.Reactions.Tags;
+using TextRPG.Core.Passive;
+using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
 using Reflex.Core;
 using Unidad.Core.EventBus;
@@ -29,7 +32,7 @@ namespace TextRPG.Core.EventEncounter
                 IStatusEffectService statusEffects = null;
                 try { statusEffects = container.Resolve<IStatusEffectService>(); } catch { /* optional */ }
 
-                var outcomeRegistry = CreateOutcomeRegistry();
+                var outcomeRegistry = CreateOutcomeRegistry(null);
                 var tagReactions = CreateTagReactionRegistry();
                 var encounterContext = new EventEncounterContext(entityStats, slotService, eventBus, statusEffects);
                 var reactionService = new ReactionService(eventBus, outcomeRegistry, encounterContext, tagReactions, combatContext);
@@ -56,36 +59,26 @@ namespace TextRPG.Core.EventEncounter
             return registry;
         }
 
-        internal static InteractionOutcomeRegistry CreateOutcomeRegistry()
+        internal static InteractionOutcomeRegistry CreateOutcomeRegistry(IGameServices services)
         {
-            var registry = new InteractionOutcomeRegistry();
-            registry.Register("message", new MessageOutcome());
-            registry.Register("heal", new HealOutcome());
-            registry.Register("damage", new DamageOutcome());
-            registry.Register("damage_target", new DamageInteractableOutcome());
-            registry.Register("shield", new ShieldOutcome());
-            registry.Register("mana", new ManaOutcome());
-            registry.Register("transition", new TransitionOutcome());
-            registry.Register("consume", new ConsumeOutcome());
-            registry.Register("reward", new RewardOutcome());
-            registry.Register("apply_status", new ApplyStatusOutcome());
-            registry.Register("spawn_combat", new SpawnCombatOutcome());
-            registry.Register("recruit", new RecruitOutcome());
-            registry.Register("leave", new LeaveOutcome());
-            registry.Register("give_item", new GiveItemOutcome());
+            var registry = AssemblyScanner.BuildRegistry<InteractionOutcomeRegistry, IInteractionOutcome>();
+
+            if (services != null)
+            {
+                // Override shared effects with adapters that use IGameServices
+                var effectRegistry = PassiveSystemInstaller.CreateGameEffectRegistry();
+                foreach (var effect in effectRegistry.Values)
+                {
+                    var swap = effect.EffectId == "damage";
+                    registry.Remove(effect.EffectId);
+                    registry.Register(effect.EffectId, new OutcomeEffectAdapter(effect, services, swap));
+                }
+            }
+
             return registry;
         }
 
         internal static TagReactionRegistry CreateTagReactionRegistry()
-        {
-            var registry = new TagReactionRegistry();
-            registry.Register(new Reactions.Tags.Definitions.FlammableTagDefinition());
-            registry.Register(new Reactions.Tags.Definitions.MeltableTagDefinition());
-            registry.Register(new Reactions.Tags.Definitions.BreakableTagDefinition());
-            registry.Register(new Reactions.Tags.Definitions.ConductiveTagDefinition());
-            registry.Register(new Reactions.Tags.Definitions.SocialTagDefinition());
-            registry.Register(new Reactions.Tags.Definitions.MercenaryTagDefinition());
-            return registry;
-        }
+            => AssemblyScanner.BuildRegistry<TagReactionRegistry, ITagDefinition>();
     }
 }

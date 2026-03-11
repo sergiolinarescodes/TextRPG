@@ -13,7 +13,7 @@ namespace TextRPG.Core.Passive
             var entityStats = new EntityStats.EntityStatsService(deps.EventBus);
             var slotService = new CombatSlot.CombatSlotService(deps.EventBus);
             var triggerRegistry = PassiveSystemInstaller.CreateTriggerRegistry();
-            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry();
+            var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry(null);
             var targetResolver = new PassiveTargetResolver();
             var context = new PassiveContext(entityStats, slotService, deps.EventBus, null);
             return new PassiveService(deps.EventBus, triggerRegistry, effectRegistry, targetResolver, context);

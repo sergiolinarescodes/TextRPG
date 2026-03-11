@@ -156,9 +156,22 @@ namespace TextRPG.Core.StatusEffect
         private void OnDamageTaken(EntityStats.DamageTakenEvent e)
         {
             if (e.DamageSource == null) return;
-            if (!HasEffect(e.EntityId, StatusEffectType.Thorns)) return;
-            var stacks = GetStackCount(e.EntityId, StatusEffectType.Thorns);
-            _entityStats.ApplyDamage(e.DamageSource.Value, stacks);
+
+            // Thorns
+            if (HasEffect(e.EntityId, StatusEffectType.Thorns))
+            {
+                var thornsStacks = GetStackCount(e.EntityId, StatusEffectType.Thorns);
+                _entityStats.ApplyDamage(e.DamageSource.Value, thornsStacks);
+            }
+
+            // Sleep: wake on damage (resist chance = 20% per stack, unwakeable at 5+)
+            if (HasEffect(e.EntityId, StatusEffectType.Sleep))
+            {
+                int stacks = GetStackCount(e.EntityId, StatusEffectType.Sleep);
+                int resistChance = stacks * 20;
+                if (resistChance < 100 && UnityEngine.Random.Range(0, 100) >= resistChance)
+                    RemoveEffect(e.EntityId, StatusEffectType.Sleep);
+            }
         }
 
         private void OnHealed(EntityStats.HealedEvent e)

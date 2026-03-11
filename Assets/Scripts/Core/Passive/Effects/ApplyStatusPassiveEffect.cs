@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.StatusEffect;
+using TextRPG.Core.Services;
 
 namespace TextRPG.Core.Passive.Effects
 {
+    [AutoScan]
     internal sealed class ApplyStatusPassiveEffect : IPassiveEffect
     {
         public string EffectId => "apply_status";

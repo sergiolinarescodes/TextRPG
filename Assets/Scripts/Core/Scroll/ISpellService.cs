@@ -6,6 +6,7 @@ namespace TextRPG.Core.Scroll
     {
         void LearnSpell(ScrollDefinition scroll);
         bool IsSpell(string word);
-        IReadOnlyList<string> LearnedSpells { get; }
+        IReadOnlyCollection<string> LearnedSpells { get; }
+        IReadOnlyCollection<string> OfferedOriginals { get; }
     }
 }

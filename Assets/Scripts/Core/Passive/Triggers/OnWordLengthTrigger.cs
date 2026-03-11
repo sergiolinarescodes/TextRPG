@@ -1,11 +1,14 @@
 using System;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
+using TextRPG.Core.Services;
 
 namespace TextRPG.Core.Passive.Triggers
 {
+    [AutoScan]
     internal sealed class OnWordLengthTrigger : IPassiveTrigger
     {
         public string TriggerId => "on_word_length";

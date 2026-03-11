@@ -5,6 +5,7 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Passive;
+using TextRPG.Core.Scroll;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.WordAction;
 using UnityEngine;
@@ -130,6 +131,42 @@ namespace TextRPG.Core.UnitRendering
 
             if (item.Passives != null && item.Passives.Length > 0)
                 AddPassivesSection(root, item.Passives);
+
+            return root;
+        }
+
+        public static VisualElement BuildScrollContent(ScrollDefinition scroll)
+        {
+            var root = new VisualElement();
+            root.pickingMode = PickingMode.Ignore;
+
+            var spellLabel = new Label($"Spell: {scroll.OriginalWord}");
+            spellLabel.style.color = Color.white;
+            spellLabel.style.fontSize = 14;
+            spellLabel.style.marginTop = 4;
+            spellLabel.pickingMode = PickingMode.Ignore;
+            root.Add(spellLabel);
+
+            var costLabel = new Label($"Mana cost: {scroll.ManaCost}");
+            costLabel.style.color = new Color(0.4f, 0.7f, 1f);
+            costLabel.style.fontSize = 14;
+            costLabel.style.marginTop = 2;
+            costLabel.pickingMode = PickingMode.Ignore;
+            root.Add(costLabel);
+
+            var cdLabel = new Label("Cooldown: 2 rounds (fixed)");
+            cdLabel.style.color = new Color(1f, 0.8f, 0.4f);
+            cdLabel.style.fontSize = 14;
+            cdLabel.style.marginTop = 2;
+            cdLabel.pickingMode = PickingMode.Ignore;
+            root.Add(cdLabel);
+
+            var typeLabel = new Label("MagicDamage");
+            typeLabel.style.color = new Color(0.8f, 0.5f, 1f);
+            typeLabel.style.fontSize = 14;
+            typeLabel.style.marginTop = 2;
+            typeLabel.pickingMode = PickingMode.Ignore;
+            root.Add(typeLabel);
 
             return root;
         }

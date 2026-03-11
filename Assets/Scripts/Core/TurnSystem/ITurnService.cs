@@ -16,5 +16,6 @@ namespace TextRPG.Core.TurnSystem
         void EndTurn();
         void RemoveFromTurnOrder(EntityId entityId);
         void GrantExtraTurn(EntityId entityId);
+        void MoveToLastInRound(EntityId entityId);
     }
 }

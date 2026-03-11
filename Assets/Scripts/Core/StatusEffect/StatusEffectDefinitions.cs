@@ -112,6 +112,31 @@ namespace TextRPG.Core.StatusEffect
                 StatusEffectType.Drunk, "Drunk", StackPolicy.StackIntensity,
                 DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
                 DisplayColor: new Color(1f, 0.85f, 0.2f), Description: "Scrambles keyboard letters"),
+
+            [StatusEffectType.Frostbitten] = new StatusEffectDefinition(
+                StatusEffectType.Frostbitten, "Frostbitten", StackPolicy.StackIntensity,
+                DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
+                DisplayColor: new Color(0.5f, 0.85f, 1f), Description: "Attacks last, magic weakening"),
+
+            [StatusEffectType.Energetic] = new StatusEffectDefinition(
+                StatusEffectType.Energetic, "Energetic", StackPolicy.RefreshDuration,
+                DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
+                DisplayColor: new Color(1f, 0.6f, 0f), Description: "Next action triggers twice at half power"),
+
+            [StatusEffectType.Tired] = new StatusEffectDefinition(
+                StatusEffectType.Tired, "Tired", StackPolicy.StackIntensity,
+                DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
+                DisplayColor: new Color(0.5f, 0.5f, 0.5f), Description: "Strength and Magic reduced, may fall asleep"),
+
+            [StatusEffectType.Sleep] = new StatusEffectDefinition(
+                StatusEffectType.Sleep, "Sleep", StackPolicy.StackIntensity,
+                DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
+                DisplayColor: new Color(0.2f, 0.2f, 0.6f), Description: "Cannot act, wakes on damage"),
+
+            [StatusEffectType.Anxiety] = new StatusEffectDefinition(
+                StatusEffectType.Anxiety, "Anxiety", StackPolicy.StackIntensity,
+                DamagePerTick: null, StatModifiers: System.Array.Empty<StatModifierEntry>(), GrantsExtraTurn: false,
+                DisplayColor: new Color(0.7f, 0.3f, 0.5f), Description: "May auto-execute random thoughts"),
         };
 
         public static StatusEffectDefinition Get(StatusEffectType type) => All[type];

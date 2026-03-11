@@ -32,6 +32,11 @@ namespace TextRPG.Core.ActionExecution
         public const string Smash = "Smash";
         public const string Charm = "Charm";
         public const string Pay = "Pay";
+        public const string Freeze = "Freeze";
+        public const string Energize = "Energize";
+        public const string Relax = "Relax";
+        public const string SleepAction = "Sleep";
+        public const string RestHeal = "RestHeal";
 
         public static readonly string[] InteractionActions =
         {

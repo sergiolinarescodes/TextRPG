@@ -2,10 +2,10 @@ using System.Collections.Generic;
 using Reflex.Core;
 using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.CombatSlot;
+using TextRPG.Core.Effects;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
-using TextRPG.Core.Passive.Effects;
-using TextRPG.Core.Passive.Triggers;
+using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.WordAction;
@@ -35,7 +35,7 @@ namespace TextRPG.Core.Passive
                 try { animationService = container.Resolve<IActionAnimationService>(); } catch { /* optional */ }
 
                 var triggerRegistry = CreateTriggerRegistry();
-                var effectRegistry = CreateEffectRegistry();
+                var effectRegistry = CreateEffectRegistry(null);
                 var targetResolver = new PassiveTargetResolver();
                 var context = new PassiveContext(entityStats, slotService, eventBus, encounterService,
                     statusEffects, tagResolver, turnService, animationService);
@@ -48,32 +48,25 @@ namespace TextRPG.Core.Passive
         public ISystemTestFactory CreateTestFactory() => new PassiveTestFactory();
 
         internal static Dictionary<string, IPassiveTrigger> CreateTriggerRegistry()
+            => AssemblyScanner.FindAll<IPassiveTrigger, string>(t => t.TriggerId);
+
+        internal static Dictionary<string, IPassiveEffect> CreateEffectRegistry(IGameServices services)
         {
-            return new Dictionary<string, IPassiveTrigger>
+            var effectRegistry = CreateGameEffectRegistry();
+
+            if (services != null)
             {
-                ["on_ally_hit"] = new OnAllyHitTrigger(),
-                ["on_self_hit"] = new OnSelfHitTrigger(),
-                ["on_round_end"] = new OnRoundEndTrigger(),
-                ["on_round_start"] = new OnRoundStartTrigger(),
-                ["on_turn_start"] = new OnTurnStartTrigger(),
-                ["on_turn_end"] = new OnTurnEndTrigger(),
-                ["on_word_played"] = new OnWordPlayedTrigger(),
-                ["on_word_length"] = new OnWordLengthTrigger(),
-                ["on_word_tag"] = new OnWordTagTrigger(),
-                ["on_kill"] = new OnKillTrigger(),
-            };
+                var result = new Dictionary<string, IPassiveEffect>();
+                foreach (var effect in effectRegistry.Values)
+                    result[effect.EffectId] = new PassiveEffectAdapter(effect, services);
+                return result;
+            }
+
+            // Fallback: standalone effects (no IGameServices available)
+            return AssemblyScanner.FindAll<IPassiveEffect, string>(e => e.EffectId);
         }
 
-        internal static Dictionary<string, IPassiveEffect> CreateEffectRegistry()
-        {
-            return new Dictionary<string, IPassiveEffect>
-            {
-                ["heal"] = new HealEffect(),
-                ["damage"] = new DamageEffect(),
-                ["shield"] = new ShieldEffect(),
-                ["mana"] = new ManaEffect(),
-                ["apply_status"] = new ApplyStatusPassiveEffect(),
-            };
-        }
+        internal static GameEffectRegistry CreateGameEffectRegistry()
+            => AssemblyScanner.BuildRegistry<GameEffectRegistry, IGameEffect>();
     }
 }
