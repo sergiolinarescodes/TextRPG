@@ -43,7 +43,7 @@ namespace TextRPG.Core.WordAction
                 "Heal" => $"Heals {v}",
                 "Burn" => $"Burns for {v}",
                 "Wet" => $"Wets ({v})",
-                "Fire" => $"Fire blast {v}",
+
                 "Shock" => $"Shocks for {v}",
                 "Fear" => $"Inflicts Fear ({v})",
                 "Stun" => $"Stuns ({v})",
@@ -63,6 +63,8 @@ namespace TextRPG.Core.WordAction
                 "Sleep" => $"Sleeps ({v})",
                 "RestHeal" => $"Rest heals {v}",
                 "Melt" => $"Melts ({v})",
+                "Ignite" => $"Ignites ({v})",
+                "Combust" => $"Combusts ({v})",
                 "BuffStrength" => $"+{v} STR",
                 "BuffMagicPower" => $"+{v} MAG",
                 "BuffPhysicalDefense" => $"+{v} DEF",

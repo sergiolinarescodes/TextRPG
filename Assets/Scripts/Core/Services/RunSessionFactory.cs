@@ -7,6 +7,7 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
+using TextRPG.Core.LetterReserve;
 using TextRPG.Core.Passive;
 using TextRPG.Core.PlayerClass;
 using TextRPG.Core.EntityStats;
@@ -87,10 +88,13 @@ namespace TextRPG.Core.Services
             var reactionService = new ReactionService(eventBus, outcomeRegistry, reactionContext,
                 tagReactions, combatContext);
 
+            // Letter reserve (run-lifetime, used by Attune and future letter-based triggers)
+            var letterReserve = new LetterReserveService(eventBus);
+
             // Action handlers
             var actionHandlerCtx = new ActionHandlerContext(entityStats, eventBus, combatContext,
                 statusEffects, turnService, weaponService, slotService: slotService,
-                entityTagProvider: reactionService);
+                entityTagProvider: reactionService, letterReserve: letterReserve);
             var handlerRegistry = ActionHandlerFactory.CreateDefault(actionHandlerCtx);
 
             // Player entity (class-based stats)
@@ -185,8 +189,10 @@ namespace TextRPG.Core.Services
                 passiveService.RegisterPassives(playerId, "class", classDef.Passives);
 
             // Action execution (created after ClassService for IActionValueModifier)
+            var letterReserveModifier = new LetterReserveValueModifier(letterReserve, eventBus, playerId);
+            var compositeModifier = new CompositeActionValueModifier(classService, letterReserveModifier);
             var actionExecution = new ActionExecutionService(eventBus, compositeResolver, handlerRegistry,
-                combatContext, entityStats, statusEffects, animResolver, classService);
+                combatContext, entityStats, statusEffects, animResolver, compositeModifier);
 
             // Loot reward service
             var lootRewardService = new LootRewardService(eventBus, itemRegistry,
@@ -254,6 +260,7 @@ namespace TextRPG.Core.Services
                 AnxietyService = anxietyService,
                 ExperienceService = experienceService,
                 ClassService = classService,
+                LetterReserve = letterReserve,
             };
         }
 

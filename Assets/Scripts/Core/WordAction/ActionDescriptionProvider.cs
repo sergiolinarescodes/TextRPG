@@ -12,7 +12,7 @@ namespace TextRPG.Core.WordAction
             ["Heal"] = "Restores health points",
             ["Burn"] = "Sets the target ablaze, dealing fire damage each turn",
             ["Wet"] = "Soaks the target, increasing shock vulnerability",
-            ["Fire"] = "Blasts the target with fire magic",
+
             ["Shock"] = "Electrocutes the target with lightning",
             ["Fear"] = "Inflicts terror, may cause the target to skip a turn",
             ["Stun"] = "Stuns the target, preventing action for a duration",
@@ -41,6 +41,8 @@ namespace TextRPG.Core.WordAction
             ["Summon"] = "Summons an ally to fight alongside you",
             ["Shield"] = "Grants a protective shield that absorbs damage",
             ["Mana"] = "Restores mana points",
+            ["Ignite"] = "Scorches the target with fire, inflicting burns",
+            ["Combust"] = "Detonates burning status for massive fire damage",
         };
 
         public static string Get(string actionId) =>

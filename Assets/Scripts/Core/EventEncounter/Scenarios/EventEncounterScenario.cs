@@ -254,14 +254,14 @@ namespace TextRPG.Core.EventEncounter.Scenarios
                     _interactableCount == 3 ? null : $"Expected 3 interactables, got {_interactableCount}"),
                 new("Encounter is active", _encounterService.IsEncounterActive,
                     _encounterService.IsEncounterActive ? null : "Encounter is not active"),
-                new("Entities registered", _encounterService.InteractableEntities.Count == 3,
-                    _encounterService.InteractableEntities.Count == 3
-                        ? null : $"Expected 3 entities, got {_encounterService.InteractableEntities.Count}"),
+                new("Entities registered", _encounterService.InteractableEntities.Count == 2,
+                    _encounterService.InteractableEntities.Count == 2
+                        ? null : $"Expected 2 entities, got {_encounterService.InteractableEntities.Count}"),
                 new("Reactions fired", _eventLog.Count > 1,
                     _eventLog.Count > 1 ? null : $"Expected reactions to fire, got {_eventLog.Count} log entries"),
-                new("Heal outcome applied", _entityStats.GetCurrentHealth(_playerId) == 100,
-                    _entityStats.GetCurrentHealth(_playerId) == 100
-                        ? null : $"Player HP should be 100 (healed to cap), got {_entityStats.GetCurrentHealth(_playerId)}"),
+                new("Heal outcome applied", _entityStats.GetCurrentHealth(_playerId) == _entityStats.GetStat(_playerId, StatType.MaxHealth),
+                    _entityStats.GetCurrentHealth(_playerId) == _entityStats.GetStat(_playerId, StatType.MaxHealth)
+                        ? null : $"Player HP should be {_entityStats.GetStat(_playerId, StatType.MaxHealth)} (healed to cap), got {_entityStats.GetCurrentHealth(_playerId)}"),
             };
 
             return new ScenarioVerificationResult(checks);

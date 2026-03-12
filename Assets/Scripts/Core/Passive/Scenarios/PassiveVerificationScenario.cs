@@ -67,6 +67,9 @@ namespace TextRPG.Core.Passive.Scenarios
             RebuildAll(); RunDeadOwnerGroup();
             RebuildAll(); RunMultiplePassiveGroup();
             RebuildAll(); RunCrossFactionGroup();
+            RebuildAll(); RunStealStatEffectGroup();
+            RebuildAll(); RunOnDeathGroup();
+            RebuildAll(); RunOnDeathSiphonGroup();
 
             BuildUI();
         }
@@ -151,6 +154,7 @@ namespace TextRPG.Core.Passive.Scenarios
         private int HP(EntityId id) => _entityStats.GetCurrentHealth(id);
         private int Shield(EntityId id) => _entityStats.GetCurrentShield(id);
         private int Mana(EntityId id) => _entityStats.GetCurrentMana(id);
+        private int Stat(EntityId id, StatType stat) => _entityStats.GetStat(id, stat);
 
         private void Register(EntityId entity, string trigger, string triggerParam,
                               string effect, string effectParam, int value, string target)
@@ -812,6 +816,103 @@ namespace TextRPG.Core.Passive.Scenarios
             _entityStats.ApplyDamage(_allyA, 5);
             Check("Cross-faction: enemy on_ally_hit does NOT trigger for player-side damage",
                 triggered == 0, $"triggered={triggered}(exp 0)");
+        }
+
+        // ── Group: steal_stat effect ────────────────────────────────
+
+        private void RunStealStatEffectGroup()
+        {
+            // on_word_length(6) + steal_stat → AllEnemies: steal 1 stat from all enemies
+            Register(_allyA, "on_word_length", "6", "steal_stat", null, 1, "AllEnemies");
+
+            int allyTotalBefore = Stat(_allyA, StatType.Strength) + Stat(_allyA, StatType.MagicPower) +
+                Stat(_allyA, StatType.PhysicalDefense) + Stat(_allyA, StatType.MagicDefense) + Stat(_allyA, StatType.Luck);
+            int enemyTotalBefore = Stat(_enemyA, StatType.Strength) + Stat(_enemyA, StatType.MagicPower) +
+                Stat(_enemyA, StatType.PhysicalDefense) + Stat(_enemyA, StatType.MagicDefense) + Stat(_enemyA, StatType.Luck);
+
+            // Set current turn to allyA (same faction as owner) then play a 7-letter word
+            _turnService.BeginTurn(); // allyA is first in turn order
+            _eventBus.Publish(new ActionExecutionCompletedEvent("example")); // length 7 >= 6
+
+            int allyTotalAfter = Stat(_allyA, StatType.Strength) + Stat(_allyA, StatType.MagicPower) +
+                Stat(_allyA, StatType.PhysicalDefense) + Stat(_allyA, StatType.MagicDefense) + Stat(_allyA, StatType.Luck);
+            int enemyTotalAfter = Stat(_enemyA, StatType.Strength) + Stat(_enemyA, StatType.MagicPower) +
+                Stat(_enemyA, StatType.PhysicalDefense) + Stat(_enemyA, StatType.MagicDefense) + Stat(_enemyA, StatType.Luck);
+
+            // 2 enemies alive = 2 stat steals, all go to owner
+            Check("steal_stat: ally gains stats from all enemies",
+                allyTotalAfter > allyTotalBefore,
+                $"AllyTotal={allyTotalAfter}(was {allyTotalBefore})");
+            Check("steal_stat: enemy loses stat",
+                enemyTotalAfter < enemyTotalBefore,
+                $"EnemyTotal={enemyTotalAfter}(was {enemyTotalBefore})");
+        }
+
+        // ── Group: on_death trigger ────────────────────────────────
+
+        private void RunOnDeathGroup()
+        {
+            int triggered = 0;
+            _subscriptions.Add(_eventBus.Subscribe<PassiveTriggeredEvent>(_ => triggered++));
+
+            // on_death + heal 5 AllAllies: damage allies first, then kill owner
+            _entityStats.ApplyDamage(_allyA, 20); // 50→30
+            _entityStats.ApplyDamage(_allyB, 20); // 40→20
+            Register(_enemyA, "on_death", null, "heal", null, 5, "AllAllies");
+
+            _entityStats.ApplyDamage(_enemyA, 999); // kill enemyA
+            Check("on_death: triggers when owner dies",
+                triggered == 1, $"triggered={triggered}(exp 1)");
+
+            // Verify on_death does NOT trigger for other entity deaths
+            triggered = 0;
+            Register(_enemyB, "on_death", null, "damage", null, 1, "AllEnemies");
+            _entityStats.ApplyDamage(_allyA, 5); // not a death
+            Check("on_death: does NOT trigger for non-death damage",
+                triggered == 0, $"triggered={triggered}(exp 0)");
+        }
+
+        // ── Group: on_death + siphon accumulation ────────────────
+
+        private void RunOnDeathSiphonGroup()
+        {
+            // Register entity with on_death(siphon) passive
+            Register(_allyA, "on_death", "siphon", "heal", null, 0, "AllAllies");
+            _entityStats.ApplyDamage(_allyB, 20); // 40→20 — ally to heal
+
+            // Simulate siphon events (as if twinflower siphoned stats)
+            _eventBus.Publish(new StatSiphonedEvent(_allyA, _enemyA, 3));
+            _eventBus.Publish(new StatSiphonedEvent(_allyA, _enemyB, 2));
+
+            int triggered = 0;
+            _subscriptions.Add(_eventBus.Subscribe<PassiveTriggeredEvent>(evt =>
+            {
+                triggered++;
+                Check("on_death(siphon): value = accumulated total",
+                    evt.Value == 5, $"Value={evt.Value}(exp 5)");
+            }));
+
+            int allyBHpBefore = HP(_allyB);
+            _entityStats.ApplyDamage(_allyA, 999); // kill owner → triggers on_death
+            Check("on_death(siphon): triggers on death",
+                triggered == 1, $"triggered={triggered}(exp 1)");
+            Check("on_death(siphon): ally healed by accumulated amount",
+                HP(_allyB) == allyBHpBefore + 5, $"HP={HP(_allyB)}(exp {allyBHpBefore + 5})");
+
+            // Reset and test zero accumulation: on_death(siphon) with no siphon events
+            SoftReset();
+            triggered = 0;
+            Register(_allyA, "on_death", "siphon", "heal", null, 0, "AllAllies");
+
+            int triggered2 = 0;
+            _subscriptions.Add(_eventBus.Subscribe<PassiveTriggeredEvent>(evt =>
+            {
+                triggered2++;
+            }));
+
+            _entityStats.ApplyDamage(_allyA, 999); // kill with no siphon
+            Check("on_death(siphon): triggers even with zero accumulated",
+                triggered2 == 1, $"triggered={triggered2}(exp 1)");
         }
 
         // ── UI ──────────────────────────────────────────────────────

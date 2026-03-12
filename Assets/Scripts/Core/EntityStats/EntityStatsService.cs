@@ -162,6 +162,13 @@ namespace TextRPG.Core.EntityStats
             return removed;
         }
 
+        public void ClearAllModifiers(EntityId id)
+        {
+            var entry = GetEntry(id);
+            foreach (StatType stat in Enum.GetValues(typeof(StatType)))
+                entry.GetModifierStack(stat).Clear();
+        }
+
         private void OnTurnStarted(TurnStartedEvent e)
         {
             if (!_entities.ContainsKey(e.EntityId)) return;

@@ -14,6 +14,7 @@ namespace TextRPG.Core.Passive
             ["shield"] = Color.cyan,
             ["mana"] = new Color(0.3f, 0.5f, 1f),
             ["apply_status"] = Color.yellow,
+            ["steal_stat"] = new Color(0.6f, 0.2f, 0.8f),
         };
 
         private static readonly Dictionary<string, string> TriggerNames = new()
@@ -28,6 +29,8 @@ namespace TextRPG.Core.Passive
             ["on_word_length"] = "On long word",
             ["on_word_tag"] = "On tagged word",
             ["on_kill"] = "On kill",
+            ["on_ally_death"] = "On ally death",
+            ["on_death"] = "On death",
             [PassiveConstants.Taunt] = "Taunt",
         };
 
@@ -38,6 +41,7 @@ namespace TextRPG.Core.Passive
             ["shield"] = "shield",
             ["mana"] = "restore mana",
             ["apply_status"] = "apply status",
+            ["steal_stat"] = "steal stat",
         };
 
         private static readonly Dictionary<string, string> TargetNames = new()
@@ -64,6 +68,9 @@ namespace TextRPG.Core.Passive
                 triggerText = $"{trigger} ({entry.TriggerParam}+ letters)";
             else if (entry.TriggerId == "on_word_tag" && entry.TriggerParam != null)
                 triggerText = $"{trigger} ({entry.TriggerParam})";
+            else if (entry.TriggerId == "on_death" && entry.TriggerParam == "siphon")
+                return new PassiveDefinition("Release", "On death: release absorbed stats as healing to allies",
+                    new Color(0.6f, 0.2f, 0.8f));
 
             var effectText = entry.EffectId == "apply_status" && entry.EffectParam != null
                 ? $"apply {entry.EffectParam}"

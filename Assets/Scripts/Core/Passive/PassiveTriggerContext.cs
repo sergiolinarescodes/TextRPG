@@ -6,6 +6,7 @@ namespace TextRPG.Core.Passive
         EntityId Owner,
         EntityId? EventEntity,
         EntityId? EventSource,
-        string Word
+        string Word,
+        int? OverrideValue = null
     );
 }

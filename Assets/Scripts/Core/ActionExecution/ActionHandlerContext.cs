@@ -3,6 +3,7 @@ using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter.Reactions;
+using TextRPG.Core.LetterReserve;
 using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
@@ -24,6 +25,7 @@ namespace TextRPG.Core.ActionExecution
         public ICombatSlotService SlotService { get; }
         public IGameServices Services { get; }
         public IEntityTagProvider EntityTagProvider { get; }
+        public ILetterReserveService LetterReserve { get; }
 
         public ActionHandlerContext(
             IEntityStatsService entityStats,
@@ -35,7 +37,8 @@ namespace TextRPG.Core.ActionExecution
             StatusEffectInteractionTable interactionTable = null,
             IReadOnlyDictionary<string, EntityDefinition> unitRegistry = null,
             ICombatSlotService slotService = null,
-            IEntityTagProvider entityTagProvider = null)
+            IEntityTagProvider entityTagProvider = null,
+            ILetterReserveService letterReserve = null)
         {
             EntityStats = entityStats;
             EventBus = eventBus;
@@ -47,6 +50,7 @@ namespace TextRPG.Core.ActionExecution
             UnitRegistry = unitRegistry;
             SlotService = slotService;
             EntityTagProvider = entityTagProvider;
+            LetterReserve = letterReserve;
         }
 
         public ActionHandlerContext(IGameServices services, ICombatContext combatContext)

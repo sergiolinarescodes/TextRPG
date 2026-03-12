@@ -169,13 +169,13 @@ SEED_ACTIONS = [
     ("rain",       "Water", 1, None, None, None, "", 0),  ("rain",       "Slow", 1, None, None, None, "", 0),
 
     # Fire words
-    ("ember",      "Fire", 1, None, None, None, "", 0),   ("ember",      "Damage", 1, None, None, None, "", 0),
-    ("spark",      "Fire", 2, None, None, None, "", 0),   ("spark",      "Light", 1, None, None, None, "", 0),  ("spark",      "Damage", 1, None, None, None, "", 0),
-    ("flame",      "Fire", 3, None, None, None, "", 0),   ("flame",      "Burn", 2, None, None, None, "", 0),   ("flame",      "Damage", 2, None, None, None, "", 0),
-    ("blaze",      "Fire", 4, None, None, None, "", 0),   ("blaze",      "Burn", 3, None, None, None, "", 0),   ("blaze",      "Damage", 3, None, None, None, "", 0),
-    ("inferno",    "Fire", 5, None, None, None, "", 0),   ("inferno",    "Burn", 4, None, None, None, "", 0),   ("inferno",    "Damage", 4, None, None, None, "", 0),  ("inferno", "Light", 2, None, None, None, "", 0),
-    ("torch",      "Fire", 2, None, None, None, "", 0),   ("torch",      "Burn", 1, None, None, None, "", 0),   ("torch",      "Damage", 1, None, None, None, "", 0),
-    ("scorch",     "Fire", 3, None, None, None, "", 0),   ("scorch",     "Burn", 3, None, None, None, "", 0),   ("scorch",     "Damage", 2, None, None, None, "", 0),
+    ("ember",      "Burn", 1, None, None, None, "", 0),   ("ember",      "Damage", 1, None, None, None, "", 0),
+    ("spark",      "Burn", 1, None, None, None, "", 0),   ("spark",      "Light", 1, None, None, None, "", 0),  ("spark",      "Damage", 1, None, None, None, "", 0),
+    ("flame",      "Burn", 2, None, None, None, "", 0),   ("flame",      "Damage", 2, None, None, None, "", 0),
+    ("blaze",      "Burn", 3, None, None, None, "", 0),   ("blaze",      "Damage", 3, None, None, None, "", 0),
+    ("inferno",    "Burn", 4, None, None, None, "", 0),   ("inferno",    "Damage", 4, None, None, None, "", 0),  ("inferno", "Light", 2, None, None, None, "", 0),
+    ("torch",      "Burn", 1, None, None, None, "", 0),   ("torch",      "Damage", 1, None, None, None, "", 0),
+    ("scorch",     "Burn", 3, None, None, None, "", 0),   ("scorch",     "Damage", 2, None, None, None, "", 0),
 
     # Push / Wind words
     ("shove",      "Push", 2, None, None, None, "", 0),   ("shove",      "Damage", 1, None, None, None, "", 0),
@@ -308,9 +308,9 @@ SEED_ACTIONS = [
 
     # Melt words
     ("laser",      "Damage", 3, None, None, None, "", 0),  ("laser",      "Melt", 2, None, None, None, "", 0),   ("laser",      "Burn", 1, None, None, None, "", 0),
-    ("forge",      "Melt", 3, None, None, None, "", 0),    ("forge",      "Fire", 2, None, None, None, "", 0),
-    ("furnace",    "Melt", 4, None, None, None, "", 0),    ("furnace",    "Fire", 3, None, None, None, "", 0),
-    ("smelt",      "Melt", 3, None, None, None, "", 0),    ("smelt",      "Fire", 1, None, None, None, "", 0),
+    ("forge",      "Melt", 3, None, None, None, "", 0),    ("forge",      "Burn", 1, None, None, None, "", 0),
+    ("furnace",    "Melt", 4, None, None, None, "", 0),    ("furnace",    "Burn", 2, None, None, None, "", 0),
+    ("smelt",      "Melt", 3, None, None, None, "", 0),    ("smelt",      "Burn", 1, None, None, None, "", 0),
     ("thaw",       "Melt", 2, None, None, None, "", 0),    ("thaw",       "Heal", 1, None, None, None, "", 0),
 
     # Charm words (social interaction)
@@ -367,6 +367,53 @@ SEED_ACTIONS = [
     # Raven summon words (singular=1 unit, plural=2 units, higher cost)
     ("raven",      "Summon", 1, "Self", None, None, "", 0),
     ("ravens",     "Summon", 2, "Self", None, None, "", 0),
+
+    # Treasonist summon words
+    ("treasonist",  "Summon", 1, "Self", None, None, "", 0),
+    ("treasonists", "Summon", 2, "Self", None, None, "", 0),
+
+    # Siphon showcase (family words are pre-registered as drafts in the DB)
+    ("siphon",     "Siphon", 1, "SingleEnemy", None, None, "", 0),
+
+    # Deceive showcase (family words are pre-registered as drafts in the DB)
+    ("deceive",    "Deceive", 2, "SingleEnemy", None, None, "", 0),
+
+    # Overcharge showcase (family words are pre-registered as drafts in the DB)
+    ("thundering", "Shock", 3, "SingleEnemy", None, None, "", 0),
+    ("thundering", "Overcharge", 2, "Self", None, None, "", 1),
+
+    # Lounge summon word
+    ("lounge",     "Summon", 3, "Self", None, None, "", 0),
+    ("lounges",    "Summon", 5, "Self", None, None, "", 0),
+
+    # Lounge unit ability words (AI uses these)
+    ("recuperate", "Recuperate", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("invigorate", "BuffManaRegen", 1, "Self", None, None, "", 0),
+    ("comfort",    "Comfort", 1, "Self", None, None, "", 0),
+
+    # Twinflower summon words
+    ("twinflower",  "Summon", 1, "Self", None, None, "", 0),
+    ("twinflowers", "Summon", 2, "Self", None, None, "", 0),
+
+    # Ghost Ship summon word
+    ("ghostship",   "Summon", 5, "Self", None, None, "", 0),
+
+    # Ghost Ship unit ability words (AI uses these)
+    ("cannonade",   "Cannonade", 3, "AllEnemies", None, None, "", 0),
+    ("crewmate",    "Summon", 1, "Self", None, None, "pirate", 0),
+
+    # Pirate unit ability words (AI uses these)
+    ("plunder",     "Plunder", 2, "SingleEnemy", None, None, "", 0),
+    ("grog",        "Drunk", 2, "Self", None, None, "", 0),
+
+    # Attune showcase (family words are pre-registered as drafts in the DB)
+    ("attune",      "Attune", 1, "Self", None, None, "", 0),
+
+    # Firemaster unit words
+    ("firemaster",  "Summon", 1, "Self", None, None, "", 0),
+    ("firemasters", "Summon", 2, "Self", None, None, "", 0),
+    ("ignite",      "Ignite", 2, "SingleEnemy", None, None, "", 0),
+    ("combust",     "Combust", 2, "SingleEnemy", None, None, "", 0),
 ]
 
 # (word, target, cost, range, area)
@@ -433,6 +480,18 @@ SEED_META = [
     ("dawn",        "AllAlliesAndSelf", 4, 0, "Single"),
     ("raven",       "Self",         5, 0, "Single"),
     ("ravens",      "Self",         10, 0, "Single"),
+    ("treasonist",  "Self",         5, 0, "Single"),
+    ("treasonists", "Self",         10, 0, "Single"),
+    ("siphon",      "SingleEnemy",  1, 0, "Single"),
+    ("deceive",     "SingleEnemy",  2, 0, "Single"),
+    ("thundering",  "SingleEnemy",  3, 0, "Single"),
+    # Lounge summon meta
+    ("lounge",      "Self",         4, 0, "Single"),
+    ("lounges",     "Self",         10, 0, "Single"),
+    # Lounge unit ability meta
+    ("recuperate",  "AllAlliesAndSelf", 2, 0, "Single"),
+    ("invigorate",  "Self",         1, 0, "Single"),
+    ("comfort",     "Self",         1, 0, "Single"),
     ("slam",        "SingleEnemy",  0, 0, "Single"),
     ("pounce",      "SingleEnemy",  2, 0, "Single"),
     ("hex",         "SingleEnemy",  0, 0, "Single"),
@@ -530,6 +589,24 @@ SEED_META = [
     ("leave",       "SingleEnemy",  0, 0, "Single"),
     ("exit",        "SingleEnemy",  0, 0, "Single"),
     ("depart",      "SingleEnemy",  0, 0, "Single"),
+    # Twinflower summon meta
+    ("twinflower",  "SingleEnemy",  3, 0, "Single"),
+    ("twinflowers", "SingleEnemy",  5, 0, "Single"),
+    # Ghost Ship summon meta
+    ("ghostship",   "Self",         5, 0, "Single"),
+    # Ghost Ship ability meta
+    ("cannonade",   "AllEnemies",   2, 0, "Single"),
+    ("crewmate",    "Self",         1, 0, "Single"),
+    # Pirate ability meta
+    ("plunder",     "SingleEnemy",  1, 0, "Single"),
+    ("grog",        "Self",         0, 0, "Single"),
+    # Attune showcase meta
+    ("attune",      "Self",         2, 0, "Single"),
+    # Firemaster unit meta
+    ("firemaster",  "SingleEnemy",  4, 0, "Single"),
+    ("firemasters", "SingleEnemy",  7, 0, "Single"),
+    ("ignite",      "SingleEnemy",  1, 0, "Single"),
+    ("combust",     "SingleEnemy",  2, 0, "Single"),
 ]
 
 # (word, tag)
@@ -544,13 +621,13 @@ SEED_TAGS = [
     ("flood", "ELEMENTAL"), ("flood", "NATURE"), ("flood", "OFFENSIVE"),
     ("deluge", "ELEMENTAL"), ("deluge", "NATURE"), ("deluge", "OFFENSIVE"),
     ("rain", "ELEMENTAL"), ("rain", "NATURE"),
-    ("ember", "ELEMENTAL"), ("ember", "OFFENSIVE"),
-    ("spark", "ELEMENTAL"), ("spark", "OFFENSIVE"),
-    ("flame", "ELEMENTAL"), ("flame", "OFFENSIVE"),
-    ("blaze", "ELEMENTAL"), ("blaze", "OFFENSIVE"),
-    ("inferno", "ELEMENTAL"), ("inferno", "OFFENSIVE"),
-    ("torch", "ELEMENTAL"), ("torch", "OFFENSIVE"),
-    ("scorch", "ELEMENTAL"), ("scorch", "OFFENSIVE"),
+    ("ember", "ELEMENTAL"), ("ember", "OFFENSIVE"), ("ember", "FIRE"),
+    ("spark", "ELEMENTAL"), ("spark", "OFFENSIVE"), ("spark", "FIRE"),
+    ("flame", "ELEMENTAL"), ("flame", "OFFENSIVE"), ("flame", "FIRE"),
+    ("blaze", "ELEMENTAL"), ("blaze", "OFFENSIVE"), ("blaze", "FIRE"),
+    ("inferno", "ELEMENTAL"), ("inferno", "OFFENSIVE"), ("inferno", "FIRE"),
+    ("torch", "ELEMENTAL"), ("torch", "OFFENSIVE"), ("torch", "FIRE"),
+    ("scorch", "ELEMENTAL"), ("scorch", "OFFENSIVE"), ("scorch", "FIRE"),
     ("shove", "PHYSICAL"), ("shove", "OFFENSIVE"), ("shove", "MELEE"),
     ("thrust", "PHYSICAL"), ("thrust", "OFFENSIVE"), ("thrust", "MELEE"),
     ("gust", "ELEMENTAL"), ("gust", "NATURE"),
@@ -624,9 +701,9 @@ SEED_TAGS = [
     ("beer", "RESTORATION"), ("sip", "RESTORATION"),
     # Melt tags
     ("laser", "ELEMENTAL"), ("laser", "OFFENSIVE"),
-    ("forge", "ELEMENTAL"), ("forge", "OFFENSIVE"),
-    ("furnace", "ELEMENTAL"), ("furnace", "OFFENSIVE"),
-    ("smelt", "ELEMENTAL"), ("smelt", "OFFENSIVE"),
+    ("forge", "ELEMENTAL"), ("forge", "OFFENSIVE"), ("forge", "FIRE"),
+    ("furnace", "ELEMENTAL"), ("furnace", "OFFENSIVE"), ("furnace", "FIRE"),
+    ("smelt", "ELEMENTAL"), ("smelt", "OFFENSIVE"), ("smelt", "FIRE"),
     ("thaw", "ELEMENTAL"), ("thaw", "RESTORATION"),
     # Interaction tags
     ("enter", "SUPPORT"), ("go", "SUPPORT"), ("visit", "SUPPORT"),
@@ -656,6 +733,41 @@ SEED_TAGS = [
     # Raven tags
     ("raven", "SHADOW"), ("raven", "NATURE"), ("raven", "MELEE"), ("raven", "BEAST"), ("raven", "FLYING"),
     ("ravens", "SHADOW"), ("ravens", "NATURE"), ("ravens", "MELEE"), ("ravens", "BEAST"), ("ravens", "FLYING"),
+    # Treasonist tags
+    ("treasonist", "SHADOW"), ("treasonist", "PSYCHIC"), ("treasonist", "OFFENSIVE"), ("treasonist", "SOCIAL"), ("treasonist", "DEBUFF"), ("treasonist", "STEALTH"),
+    ("treasonists", "SHADOW"), ("treasonists", "PSYCHIC"), ("treasonists", "OFFENSIVE"), ("treasonists", "SOCIAL"), ("treasonists", "DEBUFF"), ("treasonists", "STEALTH"),
+    # Siphon/Deceive showcase tags
+    ("siphon", "PSYCHIC"), ("siphon", "DEBUFF"), ("siphon", "STEALTH"),
+    ("deceive", "PSYCHIC"), ("deceive", "SHADOW"), ("deceive", "DEBUFF"),
+    # Thundering/Overcharge showcase tags
+    ("thundering", "ELEMENTAL"), ("thundering", "OFFENSIVE"), ("thundering", "SPELL"), ("thundering", "LIGHTNING"), ("thundering", "WEATHER"),
+    # Lounge tags
+    ("lounge", "SUPPORT"), ("lounge", "RESTORATION"), ("lounge", "RELAX"),
+    ("lounges", "SUPPORT"), ("lounges", "RESTORATION"), ("lounges", "RELAX"),
+    # Lounge ability word tags
+    ("recuperate", "RESTORATION"), ("recuperate", "SUPPORT"), ("recuperate", "CLEANSING"),
+    ("invigorate", "SUPPORT"),
+    ("comfort", "SUPPORT"), ("comfort", "SOCIAL"),
+    # Twinflower tags
+    ("twinflower", "NATURE"), ("twinflower", "SUPPORT"), ("twinflower", "SHADOW"),
+    ("twinflower", "BOTANICAL"), ("twinflower", "DRAIN"),
+    ("twinflowers", "NATURE"), ("twinflowers", "SUPPORT"), ("twinflowers", "SHADOW"),
+    ("twinflowers", "BOTANICAL"), ("twinflowers", "DRAIN"),
+    # Ghost Ship tags
+    ("ghostship", "SHADOW"), ("ghostship", "OFFENSIVE"), ("ghostship", "UNDEAD"),
+    ("ghostship", "NAVAL"), ("ghostship", "ELEMENTAL"),
+    # Ghost Ship ability tags
+    ("cannonade", "OFFENSIVE"), ("cannonade", "NAVAL"),
+    ("crewmate", "SHADOW"), ("crewmate", "NAVAL"),
+    ("plunder", "OFFENSIVE"), ("plunder", "SHADOW"), ("plunder", "MELEE"),
+    ("grog", "SOCIAL"),
+    # Attune showcase tags
+    ("attune", "ARCANE"), ("attune", "SPELL"), ("attune", "SUPPORT"),
+    # Firemaster tags
+    ("firemaster",  "ELEMENTAL"), ("firemaster",  "OFFENSIVE"), ("firemaster",  "SPELL"), ("firemaster",  "FIRE"),
+    ("firemasters", "ELEMENTAL"), ("firemasters", "OFFENSIVE"), ("firemasters", "SPELL"), ("firemasters", "FIRE"),
+    ("ignite",      "ELEMENTAL"), ("ignite",      "OFFENSIVE"), ("ignite",      "FIRE"),
+    ("combust",     "ELEMENTAL"), ("combust",     "OFFENSIVE"), ("combust",     "FIRE"),
 ]
 
 # (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b, tier, dexterity, constitution)
@@ -681,6 +793,18 @@ SEED_UNITS = [
     ("grove",    "GROVE",    "structure", 12, 0, 3, 1, 2, 0, 0, 0.2, 0.7, 0.2, 0, 0, 0),
     ("sentinel", "SENTINEL", "structure", 15, 0, 0, 5, 3, 0, 4, 0.3, 0.3, 0.5, 0, 0, 0),
     ("pyre",     "PYRE",     "structure", 8,  0, 5, 1, 1, 0, 0, 0.9, 0.3, 0.1, 0, 0, 0),
+    # Summons (tier 0) — treasonist
+    ("treasonist", "TREASONIST", "enemy", 10, 2, 5, 1, 3, 4, 0, 0.4, 0.2, 0.5, 1, 0, 0),
+    # Structures (tier 0) — lounge
+    ("lounge",   "LOUNGE",   "structure", 15, 0, 3, 2, 2, 0, 0, 0.8, 0.6, 0.4, 0, 0, 0),
+    # Structures (tier 0) — twinflower
+    ("twinflower", "TWINFLOWER", "structure", 6, 0, 0, 0, 0, 0, 0, 0.6, 0.85, 0.5, 0, 0, 0),
+    # Structures (tier 0) — ghost ship
+    ("ghostship", "GHOST SHIP", "structure", 18, 3, 0, 3, 4, 0, 0, 0.3, 0.4, 0.5, 0, 0, 0),
+    # Summons (tier 0) — pirate (summoned by ghost ship)
+    ("pirate",   "PIRATE",     "enemy",     8,  5, 0, 1, 1, 2, 0, 0.6, 0.4, 0.2, 0, 3, 0),
+    # Summons (tier 0) — firemaster
+    ("firemaster", "FIREMASTER", "enemy",   14, 0, 7, 1, 4, 1, 0, 0.9, 0.4, 0.1, 0, 0, 0),
 ]
 
 # (unit_id, word)
@@ -691,6 +815,7 @@ SEED_UNIT_ABILITIES = [
     ("orc", "mace"), ("orc", "shout"),
     ("skeleton", "scratch"), ("skeleton", "raise"),
     ("raven", "peck"), ("raven", "screech"),
+    ("treasonist", "siphon"), ("treasonist", "deceive"),
     # Tier 2
     ("golem", "slam"), ("golem", "smash"),
     ("predator", "scratch"), ("predator", "pounce"),
@@ -698,6 +823,11 @@ SEED_UNIT_ABILITIES = [
     ("shaman", "spark"), ("shaman", "plague"),
     # Structures
     ("turret", "hit"),
+    ("lounge", "recuperate"), ("lounge", "invigorate"), ("lounge", "comfort"),
+    ("twinflower", "siphon"),
+    ("ghostship", "cannonade"), ("ghostship", "crewmate"),
+    ("pirate", "plunder"), ("pirate", "grog"),
+    ("firemaster", "ignite"), ("firemaster", "combust"),
 ]
 
 # (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
@@ -712,7 +842,12 @@ SEED_UNIT_PASSIVES = [
     ("sentinel", "taunt",        None, "",              None,      0, "Self",        1),
     ("pyre",     "on_round_start", None, "apply_status", "Burning", 2, "AllEnemies", 0),
     ("predator", "on_kill",      None, "heal",          None,      5, "Self",        0),
-    ("raven",    "on_ally_hit",  None, "damage",        None,      1, "Attacker",    0),
+    ("raven",      "on_ally_hit",  None, "damage",        None,      1, "Attacker",    0),
+    ("treasonist", "on_word_length", "6", "steal_stat",   None,      1, "AllEnemies",   0),
+    ("twinflower", "on_death",       "siphon", "heal",       None,      0, "AllAllies",    0),
+    ("ghostship",  "on_ally_death", None, "shield",        None,      2, "Self",          0),
+    ("pirate",     "on_turn_end",  None, "damage",        None,      1, "AllEnemies",    0),
+    ("firemaster", "on_word_tag",  "FIRE", "apply_status", "Burning", 2, "AllEnemies",    0),
 ]
 
 # (unit_id, tag) — material/property tags for tag-based reactions
@@ -723,6 +858,14 @@ SEED_UNIT_TAGS = [
     ("turret", "conductive"),
     ("pyre", "flammable"),
     ("grove", "flammable"),
+    # Humanoid tags (used for Lounge targeting restriction)
+    ("goblin", "humanoid"),
+    ("orc", "humanoid"),
+    ("skeleton", "humanoid"),
+    ("shaman", "humanoid"),
+    ("treasonist", "humanoid"),
+    ("twinflower", "flammable"),
+    ("firemaster", "flammable"),
 ]
 
 # (item_id, display_name, item_type, durability, strength, magic_power, phys_defense, magic_defense, luck, max_health, max_mana, color_r, color_g, color_b)

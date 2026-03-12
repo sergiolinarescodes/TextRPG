@@ -157,7 +157,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _wordInput = new WordInputController(s.EventBus, s.WordInputService, s.DrunkLetterService,
                 s.WordMatchService, s.AmmoMatchService, s.WordResolver, s.CombatContext,
                 s.PreviewService, s.AmmoPreviewService, s.WeaponService, s.ConsumableService,
-                _playerStatsBar, _slotVisual, playerId, fontScaleFactor);
+                s.LetterReserve, _playerStatsBar, _slotVisual, playerId, fontScaleFactor);
 
             var mainTextPanel = _wordInput.BuildInputArea(vibrationAmplitude);
             middleArea.Insert(1, mainTextPanel);

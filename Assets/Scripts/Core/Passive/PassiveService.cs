@@ -76,29 +76,32 @@ namespace TextRPG.Core.Passive
                         {
                             var targets = _targetResolver.Resolve(capturedEntry.Target, triggerCtx, entityId, _context);
 
+                            var effectiveValue = triggerCtx.OverrideValue ?? capturedEntry.Value;
+
                             if (_context.AnimationService?.IsAnimating == true)
                             {
                                 UnityEngine.Debug.Log($"[Passive] DEFERRED {capturedEntry.TriggerId}→{capturedEntry.EffectId} owner={entityId} targets={targets.Count} animSvc={_context.AnimationService != null}");
                                 var targetsCopy = new List<EntityId>(targets);
+                                var capturedValue = effectiveValue;
                                 _context.AnimationService.EnqueuePassiveAnimation(
-                                    entityId, capturedEntry.EffectId, capturedEntry.Value, targetsCopy, () =>
+                                    entityId, capturedEntry.EffectId, capturedValue, targetsCopy, () =>
                                     {
                                         UnityEngine.Debug.Log($"[Passive] ARRIVAL {capturedEntry.EffectId} owner={entityId} targets={targetsCopy.Count}");
-                                        capturedEffect.Execute(entityId, capturedEntry.Value, capturedEntry.EffectParam, targetsCopy, _context);
+                                        capturedEffect.Execute(entityId, capturedValue, capturedEntry.EffectParam, targetsCopy, _context);
                                         var a = targetsCopy.Count > 0 ? targetsCopy[0] : (EntityId?)null;
                                         _context.EventBus.Publish(new PassiveTriggeredEvent(
                                             entityId, capturedEntry.TriggerId, capturedEntry.EffectId,
-                                            capturedEntry.Value, a));
+                                            capturedValue, a));
                                     });
                             }
                             else
                             {
                                 UnityEngine.Debug.Log($"[Passive] SYNC {capturedEntry.TriggerId}→{capturedEntry.EffectId} owner={entityId} targets={targets.Count} animSvc={_context.AnimationService != null} isAnimating={_context.AnimationService?.IsAnimating}");
-                                capturedEffect.Execute(entityId, capturedEntry.Value, capturedEntry.EffectParam, targets, _context);
+                                capturedEffect.Execute(entityId, effectiveValue, capturedEntry.EffectParam, targets, _context);
                                 var affected = targets.Count > 0 ? targets[0] : (EntityId?)null;
                                 _context.EventBus.Publish(new PassiveTriggeredEvent(
                                     entityId, capturedEntry.TriggerId, capturedEntry.EffectId,
-                                    capturedEntry.Value, affected));
+                                    effectiveValue, affected));
                             }
                         }
                         finally
@@ -171,7 +174,11 @@ namespace TextRPG.Core.Passive
             return false;
         }
 
-        private void OnEntityDied(EntityDiedEvent e) => RemovePassives(e.EntityId);
+        private void OnEntityDied(EntityDiedEvent e)
+        {
+            EventBus.Publish(new PassiveDeathTriggerEvent(e.EntityId));
+            RemovePassives(e.EntityId);
+        }
 
         private void OnUnitSummoned(UnitSummonedEvent e)
         {

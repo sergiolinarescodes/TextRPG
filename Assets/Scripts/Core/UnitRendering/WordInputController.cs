@@ -5,6 +5,7 @@ using TextRPG.Core.CombatLoop;
 using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounterLoop;
+using TextRPG.Core.LetterReserve;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
@@ -30,6 +31,7 @@ namespace TextRPG.Core.UnitRendering
         private readonly ITargetingPreviewService _ammoPreviewService;
         private readonly IWeaponService _weaponService;
         private readonly IConsumableService _consumableService;
+        private readonly ILetterReserveService _letterReserveService;
         private readonly PlayerStatsBarVisual _statsBar;
         private readonly CombatSlotVisual _slotVisual;
         private readonly EntityId _playerId;
@@ -41,6 +43,7 @@ namespace TextRPG.Core.UnitRendering
         private string _lastMatchedWord = "";
         private bool _givePrefixDetected;
         private IVisualElementScheduledItem _drunkWobbleSchedule;
+        private IVisualElementScheduledItem _attunePulseSchedule;
 
         public AnimatedCodeField CodeField { get; private set; }
         public VisualElement MainTextPanel { get; private set; }
@@ -51,7 +54,8 @@ namespace TextRPG.Core.UnitRendering
             IWordMatchService ammoMatchService, IWordResolver wordResolver,
             ICombatContext combatContext, ITargetingPreviewService previewService,
             ITargetingPreviewService ammoPreviewService, IWeaponService weaponService,
-            IConsumableService consumableService, PlayerStatsBarVisual statsBar,
+            IConsumableService consumableService, ILetterReserveService letterReserveService,
+            PlayerStatsBarVisual statsBar,
             CombatSlotVisual slotVisual, EntityId playerId, float fontScaleFactor)
         {
             _eventBus = eventBus;
@@ -65,6 +69,7 @@ namespace TextRPG.Core.UnitRendering
             _ammoPreviewService = ammoPreviewService;
             _weaponService = weaponService;
             _consumableService = consumableService;
+            _letterReserveService = letterReserveService;
             _statsBar = statsBar;
             _slotVisual = slotVisual;
             _playerId = playerId;
@@ -73,6 +78,7 @@ namespace TextRPG.Core.UnitRendering
             _subscriptions.Add(_eventBus.Subscribe<PlayerTurnStartedEvent>(_ => SetInputEnabled(true)));
             _subscriptions.Add(_eventBus.Subscribe<PlayerTurnEndedEvent>(_ => SetInputEnabled(false)));
             _subscriptions.Add(_eventBus.Subscribe<DrunkLettersChangedEvent>(_ => RefreshDrunkVisuals()));
+            _subscriptions.Add(_eventBus.Subscribe<LetterReserveChangedEvent>(_ => RefreshAttuneVisuals()));
         }
 
         public void SetCombatLoop(ICombatLoopService combatLoop) => _combatLoop = combatLoop;
@@ -231,7 +237,40 @@ namespace TextRPG.Core.UnitRendering
                 _statsBar.ClearManaCostPreview();
             }
 
-            // Apply drunk visual override
+            // Apply attuned letter visual overlay (cyan + pulse)
+            if (_letterReserveService != null)
+            {
+                var attuneLabels = CodeField.CharLabels;
+                var reserved = _letterReserveService.GetReservedLetters();
+                if (reserved.Count > 0)
+                {
+                    // Track which reserved letters are already matched (for duplicates)
+                    var available = new List<char>(reserved);
+                    for (int i = 0; i < attuneLabels.Count && i < displayText.Length; i++)
+                    {
+                        var lower = char.ToLowerInvariant(displayText[i]);
+                        int idx = available.IndexOf(lower);
+                        if (idx >= 0)
+                        {
+                            attuneLabels[i].style.color = new Color(0.3f, 0.85f, 1.0f);
+                            attuneLabels[i].AddToClassList("attuned-letter");
+                            available.RemoveAt(idx);
+                        }
+                        else
+                        {
+                            attuneLabels[i].RemoveFromClassList("attuned-letter");
+                        }
+                    }
+                    UpdateAttunePulse();
+                }
+                else
+                {
+                    for (int i = 0; i < attuneLabels.Count; i++)
+                        attuneLabels[i].RemoveFromClassList("attuned-letter");
+                }
+            }
+
+            // Apply drunk visual override (last — overrides everything)
             if (_drunkLetterService != null && _drunkLetterService.IsActive)
             {
                 var drunkLabels = CodeField.CharLabels;
@@ -427,12 +466,82 @@ namespace TextRPG.Core.UnitRendering
             }).Every(16);
         }
 
+        private void RefreshAttuneVisuals()
+        {
+            if (CodeField == null || _letterReserveService == null) return;
+            var labels = CodeField.CharLabels;
+            if (labels.Count == 0) return;
+
+            var displayText = _wordInputService.CurrentWord ?? "";
+            var reserved = _letterReserveService.GetReservedLetters();
+            var available = new List<char>(reserved);
+
+            for (int i = 0; i < labels.Count && i < displayText.Length; i++)
+            {
+                var lower = char.ToLowerInvariant(displayText[i]);
+                int idx = available.IndexOf(lower);
+                if (idx >= 0)
+                {
+                    labels[i].style.color = new Color(0.3f, 0.85f, 1.0f);
+                    labels[i].AddToClassList("attuned-letter");
+                    available.RemoveAt(idx);
+                }
+                else
+                {
+                    labels[i].RemoveFromClassList("attuned-letter");
+                }
+            }
+
+            if (reserved.Count > 0)
+                UpdateAttunePulse();
+            else
+            {
+                _attunePulseSchedule?.Pause();
+                _attunePulseSchedule = null;
+                for (int i = 0; i < labels.Count; i++)
+                {
+                    labels[i].RemoveFromClassList("attuned-letter");
+                    if (!labels[i].ClassListContains("drunk-letter"))
+                        labels[i].style.translate = new Translate(0, 0);
+                }
+            }
+        }
+
+        private void UpdateAttunePulse()
+        {
+            if (_letterReserveService == null || _letterReserveService.GetReservedLetters().Count == 0)
+            {
+                _attunePulseSchedule?.Pause();
+                _attunePulseSchedule = null;
+                return;
+            }
+
+            if (_attunePulseSchedule != null) return;
+
+            _attunePulseSchedule = CodeField.schedule.Execute(() =>
+            {
+                if (CodeField == null || _letterReserveService == null) return;
+                var labels = CodeField.CharLabels;
+                var text = _wordInputService.CurrentWord ?? "";
+                float time = Time.time;
+                for (int i = 0; i < labels.Count && i < text.Length; i++)
+                {
+                    if (!labels[i].ClassListContains("attuned-letter")) continue;
+                    // Gentle heartbeat pulse (different from drunk wobble)
+                    float pulse = Mathf.Sin(time * 4 + i * 0.3f) * 1.5f;
+                    labels[i].style.translate = new Translate(0, pulse);
+                }
+            }).Every(32);
+        }
+
         public void Dispose()
         {
             foreach (var sub in _subscriptions) sub.Dispose();
             _subscriptions.Clear();
             _drunkWobbleSchedule?.Pause();
             _drunkWobbleSchedule = null;
+            _attunePulseSchedule?.Pause();
+            _attunePulseSchedule = null;
             _combatLoop = null;
             _eventLoop = null;
             CodeField = null;

@@ -129,7 +129,6 @@ python Tools/WordAction/stats.py
 | `Heal` | Restore health (Value = amount) |
 | `Burn` | Apply Burning DoT (Value = duration) |
 | `Water` | Apply Wet status (Value = duration) |
-| `Fire` | Fire elemental (Value = intensity) |
 | `Push` | Push targets away (Value = tiles) |
 | `Shock` | Lightning damage + bonus to Wet targets |
 | `Fear` | Apply Fear debuff (Value = duration) |
@@ -177,6 +176,16 @@ python Tools/WordAction/stats.py
 | `Screech` | Apply Fear + Concussion to targets in one action. Value = Fear duration (Concussion is always 1 stack). A terrifying shriek that disorients. Use for loud, disruptive creature abilities. Always pair with `BEAST` tag. |
 | `Purify` | Remove up to Value negative statuses from targets (prioritizes Stun > Fear > Sleep > Frostbitten > Burning > Poisoned > Bleeding > others). Use for cleansing, curing, washing away debuffs. Target should be Self or AllAlliesAndSelf. Always pair with `CLEANSING` or `HOLY` tag. |
 | `Awaken` | Remove Sleep, Stun, and Frostbitten from targets, then apply Awakened status (+1 all stats for 1 turn). Use for rousing, reviving, energizing allies from crowd control. Value is ignored. Always pair with `LIGHT` or `HOLY` tag. |
+| `Siphon` | Steal a random stat (Str/Mgc/PDef/MDef/Luck) from target and give it to caster. Value = amount stolen per stat. Use for draining, leeching, stealing power. Pair with `DEBUFF`, `STEALTH`, or `PSYCHIC` tag. |
+| `Deceive` | Apply Fear (duration = value) + Concussion (permanent) to target. Use for tricking, confusing, misleading enemies. Pair with `PSYCHIC`, `SHADOW`, or `DEBUFF` tag. |
+| `Recuperate` | Heal target (MagicPower-scaled) AND remove 1 random negative status. Combines healing + cleansing. Use for recovery, convalescence, restoring. Target should be AllAlliesAndSelf or Self. Pair with `RESTORATION`, `CLEANSING`, or `SUPPORT` tag. |
+| `Comfort` | Apply Energetic status to target (not self). Grants extra turn next round. Use for encouraging, reassuring, inspiring allies. Pair with `SUPPORT` or `SOCIAL` tag. |
+| `Overcharge` | Buff self MagicPower by Value + apply Energetic status. A power-up combo: use before Shock/MagicDamage for amplified hits. Value = buff amount AND Energetic duration. Pair with `ELEMENTAL`, `LIGHTNING`, or `SPELL` tag. |
+| `Cannonade` | Multi-hit attack — fires Value shots at random enemies, each dealing 1 base damage (Str-scaled). Can hit same enemy multiple times. Use for artillery, volleys, barrages, bombardment. Pair with `NAVAL`, `OFFENSIVE` tag. |
+| `Plunder` | Physical damage (Str vs PDef) + steal 1 random stat from target. Combines attack with theft. Use for pirate/raider/bandit words. Pair with `OFFENSIVE`, `SHADOW`, or `MELEE` tag. |
+| `Attune` | Save the word's letters as "attuned" charges for the rest of the encounter. Future words that contain attuned letters get +20% power per attuned letter consumed (one-time per letter). No damage/status — pure utility. Value is ignored. Target should be `Self`. Pair with `ARCANE`, `SPELL`, or `SUPPORT` tag. Best on long words with common letters (e, t, a, n, s) to maximize future value. |
+| `Ignite` | Magic damage (MagicPower vs MagicDefense) + apply Burning (duration = Value). Fire version of Peck. Use for fire/heat attack words. Pair with FIRE or ELEMENTAL tag. |
+| `Combust` | Detonate Burning on target: if Burning, remove it and deal bonus MagicDamage (value + remaining stacks, MagicPower vs MagicDefense). If not Burning, deal base MagicDamage only. Pair with FIRE or ELEMENTAL tag. |
 
 ### INTERACTION ACTIONS
 
@@ -252,6 +261,7 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 | `on_word_length` | min length (e.g. `"6"`) | When a played word has >= N letters |
 | `on_word_tag` | tag (e.g. `"NATURE"`) | When a played word has the specified tag |
 | `on_kill` | — | When any enemy is killed |
+| `on_death` | optional (`"siphon"`) | When this unit dies. If triggerParam=`"siphon"`, accumulated siphon total is used as heal value |
 | `taunt` | — | Marker: forces enemies to target this unit (no effect/target needed) |
 
 ### Available effects
@@ -263,6 +273,7 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 | `shield` | — | Grant `value` shield to targets |
 | `mana` | — | Restore `value` mana to targets |
 | `apply_status` | status name (e.g. `"Burning"`) | Apply status effect to targets for `value` duration |
+| `steal_stat` | — | Steal `value` points of a random stat (Str/Mgc/PDef/MDef/Luck) from targets and give to owner |
 
 Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`, `Awakened`
 
@@ -287,6 +298,7 @@ Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `
 | Nature synergy | structure | on_word_tag NATURE | heal | AllAllies | grove, garden, glade |
 | Aura emitters | structure | on_round_start | apply_status | AllEnemies | pyre, beacon, brazier |
 | Mana sources | structure | on_word_played | mana | Self | fountain, nexus, leyline |
+| Death release | structure | on_death (siphon) | heal | AllAllies | twinflower — siphons stats, heals allies on death |
 | Shield givers | structure | on_ally_hit | shield | Injured | sentinel, aegis, ward |
 | Taunt tanks | structure | taunt | — | — | sentinel, guardian, decoy |
 | Kill-reward | enemy | on_kill | heal | Self | predator, hunter, reaper |
@@ -486,7 +498,7 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 
 ## TAGS
 
-`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`, `THOUGHTS`, `RELAX`, `DWELLING`, `MELEE`, `SOCIAL`, `BEAST`, `FLYING`, `LIGHT`, `CLEANSING`
+`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`, `THOUGHTS`, `RELAX`, `DWELLING`, `MELEE`, `SOCIAL`, `BEAST`, `FLYING`, `LIGHT`, `CLEANSING`, `DEBUFF`, `STEALTH`, `LIGHTNING`, `WEATHER`, `BOTANICAL`, `DRAIN`, `UNDEAD`, `NAVAL`, `FIRE`
 
 - `MELEE`: Close-combat physical attacks (shove, thrust, hit, strike, smash, crush, charge, slam, pounce, etc.). Triggers Warrior's "Brute Force" passive (+50% damage).
 - `SOCIAL`: Social interaction words (talk, speak, greet, trade, barter, charm, flatter, persuade). Triggers Merchant's "Charming Presence" passive (grants Shield).
@@ -494,6 +506,13 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 - `FLYING`: Airborne creatures and wind-related effects (hawk, eagle, bat, owl, raven, fairy, moth, etc.).
 - `LIGHT`: Light, radiance, dawn, sun. Distinct from HOLY (not religious). Use for: glow, shine, flash, beam, sunrise, aurora, luminous, bright.
 - `CLEANSING`: Purification, removal, washing away. Use for: purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure.
+- `DEBUFF`: Weakening, draining, sabotaging. Use for: weaken, corrode, rust, wither, decay, sap, drain, curse, hex, blight, cripple, enfeeble, diminish, erode.
+- `STEALTH`: Sneaky, covert, hidden. Use for: spy, assassin, thief, rogue, ninja, ghost, phantom, lurk, skulk, ambush, sneak, prowl, vanish.
+- `LIGHTNING`: Electrical, shock, voltage. Use for: lightning, thunder, bolt, spark, shock, jolt, zap, surge, voltage, static, electrify, galvanize.
+- `WEATHER`: Atmospheric phenomena, storms, climate. Use for: storm, rain, hail, blizzard, tornado, cyclone, gale, fog, thunder, hurricane, monsoon, tempest.
+- `BOTANICAL`: Plants, flowers, herbs, vegetation. Use for: rose, vine, bloom, sprout, petal, moss, fern, orchid, lily, tulip, twinflower, blossom, seedling, root, ivy.
+- `DRAIN`: Life-draining, parasitic, energy-sapping. Use for: leech, drain, absorb, siphon, sap, parasite, devour, consume, extract, deplete, wither, vampire.
+- `FIRE`: Fire, flame, heat, combustion. Use for: fire, flame, blaze, inferno, scorch, ember, torch, pyre, ash, cinder, combustion, magma, lava, volcano, kindle, ignite, combust.
 
 ---
 
@@ -507,7 +526,22 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 | `Screech` | screech, shriek, shrikes, howl, howls, wail, wails, roar, roars, bellow, bellows, screams, cry, cries (creature variant) |
 | `Purify` | purify, cleanse, cure, remedy, antidote, baptize, absolve, wash, rinse, disinfect, sanitize, sterilize, detox, detoxify, exorcise, dispel |
 | `Awaken` | awaken, rouse, wake, stir, revive, arouse, invigorate, resuscitate, animate, enliven, vivify, rally, rejuvenate |
+| `Siphon` | siphon, drain, leech, absorb, steal, pilfer, extract, devour, vampiric, parasitic, latch, suck, tap |
+| `Deceive` | deceive, trick, mislead, confuse, bewilder, bamboozle, dupe, hoodwink, bluff, feint, distract, misdirect, beguile |
 | `Summon` (raven unit) | raven, ravens, crow, crows, jackdaw, magpie, corvid |
+| `Summon` (treasonist unit) | treasonist, treasonists, spy, spies, traitor, traitors, saboteur, saboteurs, infiltrator, mole |
+| `Summon` (lounge unit) | lounge, lounges, sofa, couch, settee, hammock, recliner, divan |
+| `Summon` (twinflower unit) | twinflower, twinflowers |
+| `Recuperate` | recuperate, recover, unwind, convalesce, nurse, rehabilitate, convalescent, restful, revitalize, renew |
+| `Comfort` | comfort, encourage, reassure, inspire, uplift, embolden, motivate, hearten, bolster, rally |
+| `Overcharge` | overcharge, surge, jolt, electrify, galvanize, supercharge, amplify, boost, energize (power-up variant), charge (electrical variant) |
+| `Summon` (ghostship unit) | ghostship, ghost ship, phantom ship, spectral vessel, galleon |
+| `Cannonade` | cannonade, volley, barrage, bombardment, salvo, broadside, fusillade, battery, shelling |
+| `Plunder` | plunder, pillage, loot, raid, maraud, ransack, rob, pirate, buccaneer, brigand, corsair |
+| `Attune` | attune, harmonize, resonate, synchronize, calibrate, align, tune, chord, frequency, attunement, resound, reverberate |
+| `Ignite` | kindle, inflame, scald, sear, char, singe, cauterize, incinerate |
+| `Combust` | detonate, explode, erupt, rupture, burst, implode |
+| `Summon` (firemaster unit) | firemaster, firemasters |
 
 | Tag | Pre-classified words (apply this tag when you encounter them) |
 |-----|--------------------------------------------------------------|
@@ -515,6 +549,16 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 | `FLYING` | hawk, hawks, eagle, eagles, falcon, falcons, owl, owls, bat, bats, moth, moths, butterfly, dragonfly, fairy, sprite, phoenix, griffin, pegasus, wyvern |
 | `LIGHT` | glow, shine, flash, beam, ray, sunrise, aurora, luminous, bright, radiant, brilliant, gleam, shimmer, sparkle, dazzle, illuminate, lantern, torch, candle, lighthouse |
 | `CLEANSING` | purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure, remedy, sanitize, sterilize, detox, soap, lather, bathe, shower, launder |
+| `DEBUFF` | weaken, corrode, rust, wither, decay, sap, drain, curse, hex, blight, cripple, enfeeble, diminish, erode, siphon, leech, undermine, sabotage, impair |
+| `STEALTH` | spy, assassin, thief, rogue, ninja, ghost, phantom, lurk, skulk, ambush, sneak, prowl, shadow, vanish, cloak, disguise, infiltrate, camouflage |
+| `LIGHTNING` | lightning, thunder, bolt, spark, shock, jolt, zap, surge, voltage, static, electrify, galvanize, thunderbolt, thunderclap, electrode |
+| `WEATHER` | storm, rain, hail, blizzard, tornado, cyclone, gale, fog, thunder, hurricane, monsoon, tempest, drought, frost, sleet, typhoon, squall |
+| `RELAX` | lounge, relax, unwind, chill, rest, nap, doze, laze, idle, meditate, recline, slouch, snooze, siesta |
+| `BOTANICAL` | rose, vine, bloom, sprout, petal, moss, fern, orchid, lily, tulip, blossom, seedling, root, ivy, herb, flora |
+| `DRAIN` | leech, drain, absorb, siphon, sap, parasite, devour, consume, extract, deplete, wither, vampire |
+| `UNDEAD` | ghost, phantom, specter, wraith, skeleton, zombie, lich, vampire, revenant, banshee, necromancer, corpse, ghoul, mummy, apparition |
+| `NAVAL` | ship, anchor, cannon, sail, hull, mast, keel, stern, bow, fleet, armada, corsair, pirate, buccaneer, galleon, frigate, captain, sailor |
+| `FIRE` | fire, flame, blaze, inferno, scorch, ember, torch, pyre, ash, cinder, combustion, magma, lava, volcano, kindle, ignite, combust, furnace, forge, smelt |
 
 ---
 

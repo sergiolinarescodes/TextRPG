@@ -46,7 +46,8 @@
       "Bash(pip install:*)",
       "Bash(pip run:*)",
       "Bash(cd \"C:\\\\Users\\\\kelns\\\\repos\\\\TextRPG\" && sqlite3 \"./Assets/StreamingAssets/wordactions.db\" \"SELECT * FROM units WHERE unit_id = 'sellsword';\" 2>&1 | head -20)",
-      "Read(//c/Users/kelns/repos/TextRPG/$HOME/.claude/plugins/cache/claude-plugins-official/ralph-loop/bd041495bd2a/**)"
+      "Read(//c/Users/kelns/repos/TextRPG/$HOME/.claude/plugins/cache/claude-plugins-official/ralph-loop/bd041495bd2a/**)",
+      "Bash(git grep:*)"
     ]
   }
 }

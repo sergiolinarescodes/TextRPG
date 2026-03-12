@@ -20,7 +20,6 @@ namespace TextRPG.Core.ActionExecution
             // Utility
             new(Pay, "noop"),
             new(Push, "push"),
-            new(Fire, "fire"),
 
             // Status effects (applied to targets)
             new(Burn, "apply_status", "Burning", "FromValue"),
@@ -39,6 +38,9 @@ namespace TextRPG.Core.ActionExecution
             new(Freeze, "apply_status", "Frostbitten", "StackByValue"),
             new(Energize, "apply_status", "Energetic", "FromValue", ApplySelf: true),
             new(SleepAction, "apply_status", "Sleep", "StackByValue", ApplySelf: true),
+
+            // Status effects (applied to target — non-self)
+            new(Comfort, "apply_status", "Energetic", "FromValue"),
 
             // Noop (tag-driven)
             new(Relax, "noop"),

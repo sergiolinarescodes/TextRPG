@@ -12,6 +12,7 @@ using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.EventEncounterLoop;
+using TextRPG.Core.LetterReserve;
 using TextRPG.Core.Passive;
 using TextRPG.Core.PlayerClass;
 using TextRPG.Core.EntityStats;
@@ -90,6 +91,9 @@ namespace TextRPG.Core.Services
         // Class
         public IClassService ClassService { get; init; }
 
+        // Letter Reserve
+        public ILetterReserveService LetterReserve { get; init; }
+
         // Run/Resource/Experience
         public IRunService RunService { get; init; }
         public Unidad.Core.Resource.IResourceService ResourceService { get; init; }
@@ -137,6 +141,7 @@ namespace TextRPG.Core.Services
             ((CombatContext)CombatContext).SetEnemies(Array.Empty<EntityId>());
             ((CombatContext)CombatContext).SetAllies(Array.Empty<EntityId>());
             WordCooldown?.Reset();
+            LetterReserve?.Clear();
             ExperienceService?.SetEncounterService(null);
         }
 
@@ -159,6 +164,7 @@ namespace TextRPG.Core.Services
             (LootRewardService as IDisposable)?.Dispose();
             (ExperienceService as IDisposable)?.Dispose();
             (ClassService as IDisposable)?.Dispose();
+            (LetterReserve as IDisposable)?.Dispose();
             (SpellService as IDisposable)?.Dispose();
             (EquipmentService as IDisposable)?.Dispose();
             (InventoryService as IDisposable)?.Dispose();

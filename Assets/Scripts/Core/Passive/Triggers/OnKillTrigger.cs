@@ -2,7 +2,6 @@ using System;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Services;
 using Unidad.Core.EventBus;
-using TextRPG.Core.Services;
 
 namespace TextRPG.Core.Passive.Triggers
 {
@@ -14,13 +13,14 @@ namespace TextRPG.Core.Passive.Triggers
         public IDisposable Subscribe(EntityId owner, string triggerParam, IPassiveContext ctx,
                                       Action<PassiveTriggerContext> onTriggered)
         {
-            return ctx.EventBus.Subscribe<EntityDiedEvent>(evt =>
+            return ctx.EventBus.Subscribe<DamageTakenEvent>(evt =>
             {
+                if (evt.RemainingHealth != 0) return;
                 if (!ctx.EntityStats.HasEntity(owner) || ctx.EntityStats.GetCurrentHealth(owner) <= 0) return;
                 if (evt.EntityId.Equals(owner)) return;
                 if (PassiveTargetResolver.IsSameFaction(owner, evt.EntityId, ctx)) return;
 
-                onTriggered(new PassiveTriggerContext(owner, evt.EntityId, null, null));
+                onTriggered(new PassiveTriggerContext(owner, evt.EntityId, evt.DamageSource, null));
             });
         }
     }

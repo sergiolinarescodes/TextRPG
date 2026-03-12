@@ -152,9 +152,10 @@ namespace TextRPG.Core.PlayerClass.Scenarios
                         : $"Expected {selectedClass}, got {_classService?.SelectedClass}"),
                 new("Player entity registered", _entityStats?.HasEntity(_playerId) == true,
                     _entityStats?.HasEntity(_playerId) == true ? null : "Player not registered"),
-                new("MaxHealth matches class", _entityStats?.GetStat(_playerId, StatType.MaxHealth) == def.MaxHealth,
-                    _entityStats?.GetStat(_playerId, StatType.MaxHealth) == def.MaxHealth ? null
-                        : $"Expected {def.MaxHealth}, got {_entityStats?.GetStat(_playerId, StatType.MaxHealth)}"),
+                new("MaxHealth matches class",
+                    _entityStats?.GetStat(_playerId, StatType.MaxHealth) == def.MaxHealth + (def.Constitution > 0 ? def.Constitution * (def.Constitution + 1) / 2 + 2 : 0),
+                    _entityStats?.GetStat(_playerId, StatType.MaxHealth) == def.MaxHealth + (def.Constitution > 0 ? def.Constitution * (def.Constitution + 1) / 2 + 2 : 0) ? null
+                        : $"Expected {def.MaxHealth + (def.Constitution > 0 ? def.Constitution * (def.Constitution + 1) / 2 + 2 : 0)}, got {_entityStats?.GetStat(_playerId, StatType.MaxHealth)}"),
                 new("Strength matches class", _entityStats?.GetStat(_playerId, StatType.Strength) == def.Strength,
                     _entityStats?.GetStat(_playerId, StatType.Strength) == def.Strength ? null
                         : $"Expected {def.Strength}, got {_entityStats?.GetStat(_playerId, StatType.Strength)}"),

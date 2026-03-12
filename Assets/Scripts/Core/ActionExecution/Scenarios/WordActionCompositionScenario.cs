@@ -40,7 +40,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private readonly List<DamageTakenEvent> _damageEvents = new();
         private readonly List<HealedEvent> _healEvents = new();
         private readonly List<StatusEffectAppliedEvent> _statusApplied = new();
-        private readonly List<FireGridStatusEvent> _fireEvents = new();
         private readonly List<PushActionEvent> _pushEvents = new();
         private bool _summonDetected;
         private readonly List<IDisposable> _subscriptions = new();
@@ -77,7 +76,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _damageEvents.Clear();
             _healEvents.Clear();
             _statusApplied.Clear();
-            _fireEvents.Clear();
             _pushEvents.Clear();
             _summonDetected = false;
         }
@@ -181,9 +179,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Fear", 3), new("Damage", 1) },
                 new WordMeta("RandomEnemy", 0, 0, AreaShape.Single));
 
-            // 7. ignite — Fire(3)+Burn(2), AreaEnemies, Diamond2
+            // 7. ignite — Burn(3), AreaEnemies, Diamond2
             resolver.RegisterWord("ignite",
-                new List<WordActionMapping> { new("Fire", 3), new("Burn", 2) },
+                new List<WordActionMapping> { new("Burn", 3) },
                 new WordMeta("AreaEnemies", 0, 0, AreaShape.Diamond2));
 
             // 8. zap — Shock(4), SingleEnemy, Single
@@ -253,12 +251,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 Debug.Log($"[CompositionScenario] Status: {e.Type} on {e.Target.Value} {(e.Duration < 0 ? "permanently" : $"for {e.Duration} turns")}");
             }));
 
-            _subscriptions.Add(_eventBus.Subscribe<FireGridStatusEvent>(e =>
-            {
-                _fireEvents.Add(e);
-                Debug.Log($"[CompositionScenario] Fire grid from {e.Source.Value} for {e.Duration} turns");
-            }));
-
             _subscriptions.Add(_eventBus.Subscribe<PushActionEvent>(e =>
             {
                 _pushEvents.Add(e);
@@ -315,7 +307,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             AddInfoRow(root, "Damage Events", _damageEvents.Count.ToString(), new Color(1f, 0.3f, 0.3f));
             AddInfoRow(root, "Heal Events", _healEvents.Count.ToString(), new Color(0.2f, 0.8f, 0.2f));
             AddInfoRow(root, "Status Applied", _statusApplied.Count.ToString(), new Color(0.8f, 0.6f, 0.2f));
-            AddInfoRow(root, "Fire Events", _fireEvents.Count.ToString(), new Color(1f, 0.5f, 0f));
             AddInfoRow(root, "Push Events", _pushEvents.Count.ToString(), new Color(0.5f, 0.7f, 1f));
         }
 
@@ -387,8 +378,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                     HasHandler("Burn") ? null : "Burn handler not invoked"),
                 new("Water handler invoked", HasHandler("Water"),
                     HasHandler("Water") ? null : "Water handler not invoked"),
-                new("Fire handler invoked", HasHandler("Fire"),
-                    HasHandler("Fire") ? null : "Fire handler not invoked"),
                 new("Push handler invoked", HasHandler("Push"),
                     HasHandler("Push") ? null : "Push handler not invoked"),
                 new("Shock handler invoked", HasHandler("Shock"),
@@ -400,9 +389,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new("Summon handler invoked", HasHandler("Summon"),
                     HasHandler("Summon") ? null : "Summon handler not invoked"),
 
-                // 14. All 10 action handlers used
-                new("All 10 action handlers used", _handlerCounts.Count >= 10,
-                    _handlerCounts.Count >= 10 ? null : $"Only {_handlerCounts.Count}/10 handlers used"),
+                // 14. All 9 action handlers used
+                new("All 9 action handlers used", _handlerCounts.Count >= 9,
+                    _handlerCounts.Count >= 9 ? null : $"Only {_handlerCounts.Count}/9 handlers used"),
 
                 // 15. Damage events
                 new("Damage events fired", _damageEvents.Count > 0,
@@ -416,11 +405,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new("Status effects applied", _statusApplied.Count > 0,
                     _statusApplied.Count > 0 ? null : "No status effects applied"),
 
-                // 18. Fire grid events
-                new("Fire grid events published", _fireEvents.Count > 0,
-                    _fireEvents.Count > 0 ? null : "No fire grid events"),
-
-                // 19. Push events
+                // 18. Push events
                 new("Push events published", _pushEvents.Count > 0,
                     _pushEvents.Count > 0 ? null : "No push events"),
 

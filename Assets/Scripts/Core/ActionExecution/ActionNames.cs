@@ -9,7 +9,6 @@ namespace TextRPG.Core.ActionExecution
         public const string Shield = "Shield";
         public const string Shock = "Shock";
         public const string Push = "Push";
-        public const string Fire = "Fire";
         public const string Burn = "Burn";
         public const string Water = "Water";
         public const string Fear = "Fear";
@@ -42,6 +41,16 @@ namespace TextRPG.Core.ActionExecution
         public const string Screech = "Screech";
         public const string Purify = "Purify";
         public const string Awaken = "Awaken";
+        public const string Siphon = "Siphon";
+        public const string Deceive = "Deceive";
+        public const string Recuperate = "Recuperate";
+        public const string Comfort = "Comfort";
+        public const string Overcharge = "Overcharge";
+        public const string Attune = "Attune";
+        public const string Ignite = "Ignite";
+        public const string Combust = "Combust";
+        public const string Cannonade = "Cannonade";
+        public const string Plunder = "Plunder";
 
         public static readonly string[] InteractionActions =
         {

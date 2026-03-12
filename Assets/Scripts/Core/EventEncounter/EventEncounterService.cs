@@ -94,6 +94,13 @@ namespace TextRPG.Core.EventEncounter
 
             var id = _activeEncounterId;
             _activeEncounterId = null;
+
+            foreach (var entityId in _interactableEntities)
+            {
+                if (_entityStats.HasEntity(entityId))
+                    _entityStats.RemoveEntity(entityId);
+            }
+
             _interactableEntities.Clear();
             _definitions.Clear();
             _entityDefinitions.Clear();

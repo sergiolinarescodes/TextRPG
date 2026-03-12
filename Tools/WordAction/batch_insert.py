@@ -38,12 +38,13 @@ DB_PATH = os.path.join(
 )
 
 VALID_ACTIONS = {
-    "Water", "Fire", "Earth", "Wind", "Push", "Damage", "MagicDamage", "Slow", "Burn",
+    "Water", "Earth", "Wind", "Push", "Damage", "MagicDamage", "Slow", "Burn",
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
-    "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal", "Scramble",
-    "Peck", "Screech", "Purify", "Awaken",
+    "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal", "Scramble", "Melt",
+    "Peck", "Screech", "Purify", "Awaken", "Siphon", "Deceive", "Recuperate", "Comfort", "Overcharge",
+    "Cannonade", "Plunder", "Attune", "Ignite", "Combust",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",
@@ -93,15 +94,17 @@ VALID_TAGS = {
     "NATURE", "ELEMENTAL", "OFFENSIVE", "RESTORATION", "SHADOW",
     "PHYSICAL", "DEFENSIVE", "ARCANE", "HOLY", "SUPPORT", "PSYCHIC",
     "SPELL", "MELEE", "SOCIAL", "BEAST", "FLYING", "LIGHT", "CLEANSING",
+    "DEBUFF", "STEALTH", "RELAX", "THOUGHTS", "DWELLING", "LIGHTNING", "WEATHER",
+    "BOTANICAL", "DRAIN", "UNDEAD", "NAVAL", "FIRE",
 }
 
 VALID_TRIGGERS = {
     "on_ally_hit", "on_self_hit", "on_round_end", "on_round_start",
     "on_turn_start", "on_turn_end", "on_word_played", "on_word_length",
-    "on_word_tag", "on_kill", "taunt",
+    "on_word_tag", "on_kill", "on_ally_death", "on_death", "taunt",
 }
 
-VALID_EFFECTS = {"heal", "damage", "shield", "mana", "apply_status"}
+VALID_EFFECTS = {"heal", "damage", "shield", "mana", "apply_status", "steal_stat"}
 
 VALID_PASSIVE_TARGETS = {"Self", "AllAllies", "AllEnemies", "Injured", "Attacker"}
 

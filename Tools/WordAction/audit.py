@@ -23,7 +23,7 @@ DB_PATH = os.path.join(
 
 # Expected action set for completeness check
 ALL_ACTIONS = {
-    "Water", "Fire", "Earth", "Wind", "Push", "Damage", "Slow", "Burn",
+    "Water", "Earth", "Wind", "Push", "Damage", "Slow", "Burn",
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",

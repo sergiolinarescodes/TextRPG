@@ -105,8 +105,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 Debug.Log($"[ActionExecutionScenario] {e.EntityId.Value} took {e.Amount} damage, HP={e.RemainingHealth}")));
             _subscriptions.Add(_eventBus.Subscribe<StatusEffectAppliedEvent>(e =>
                 Debug.Log($"[ActionExecutionScenario] {e.Type} applied to {e.Target.Value}")));
-            _subscriptions.Add(_eventBus.Subscribe<FireGridStatusEvent>(e =>
-                Debug.Log($"[ActionExecutionScenario] Fire grid status from {e.Source.Value} for {e.Duration} turns")));
             _subscriptions.Add(_eventBus.Subscribe<PushActionEvent>(e =>
                 Debug.Log($"[ActionExecutionScenario] Push: {e.Source.Value} → {e.Target.Value} (force={e.Value})")));
 

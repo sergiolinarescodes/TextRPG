@@ -84,12 +84,21 @@ Same format. Propose 3 different options for a second ability. Complement the fi
 - 3 options (mix of NEW and existing, different from step 1 choices)
 
 #### Step 3 — Passive
-Propose 3 passive compositions (trigger + effect + target). At least one should use a NEW trigger or effect that doesn't exist yet. Include "No passive" as an option if the unit doesn't need one.
+**The passive is the unit's identity** — it should be the most memorable, defining trait. Propose 3-4 creative passive compositions that make this unit feel unique.
+
+**Prioritize word-mechanic-tied passives** that interact with the player's typing:
+- `on_word_length` — triggers based on word length (short words = quick/weak, long words = powerful)
+- `on_word_tag` — triggers when words of a certain tag are played
+- `on_word_played` — triggers on every word played
+- **NEW triggers** — propose triggers that don't exist yet, like reacting to specific letters, repeated words, consonant/vowel ratios, etc.
+
+At least 2 options should use NEW triggers or effects. At least 1 should tie into typing/word mechanics. Include "No passive" only if genuinely appropriate.
 
 `AskUserQuestion`: "What passive should this unit have?"
-- Option 1: a passive using a NEW effect/trigger (label it "NEW: effect_name") + existing counterpart
-- Option 2: a different passive combo (can be all existing pieces)
-- Option 3: another combo or "No passive"
+- Option 1: a NEW trigger/effect that ties into word mechanics (label "NEW: trigger_name")
+- Option 2: a different NEW trigger/effect, creative and defining
+- Option 3: an existing combo that's thematic but uses underused triggers
+- Option 4 (optional): "No passive" only if the unit's abilities are strong enough alone
 
 #### Step 4 — Tags (existing)
 Use `AskUserQuestion` with `multiSelect: true` to pick from existing tags.
@@ -232,20 +241,7 @@ All of the above, plus:
 
 **MANDATORY** for every new action/tag created:
 
-1. **Pre-register related words as DRAFTS directly into the DB** (NOT in seed_db.py):
-
-   When brainstorming word families (e.g., "Purify is reusable by: cleanse, cure, remedy..."), build a JSON array of 5-10 related words with preliminary classifications and pipe them through `batch_insert.py --draft`:
-
-   ```bash
-   echo '[
-     {"word": "cleanse", "target": "AllAlliesAndSelf", "cost": 2, "range": 0, "area": "Single", "tags": ["HOLY", "RESTORATION", "CLEANSING"], "actions": [{"action": "Purify", "value": 2}]},
-     {"word": "cure", "target": "Self", "cost": 1, "range": 0, "area": "Single", "tags": ["RESTORATION", "CLEANSING"], "actions": [{"action": "Purify", "value": 1}]}
-   ]' | py Tools/WordAction/batch_insert.py --draft
-   ```
-
-   This inserts them with `status='draft'` in `word_meta` — immediately playable but flagged for refinement. When ralph-loop encounters a draft word, its `INSERT OR REPLACE` automatically overwrites the draft entry with `status=NULL` (refined).
-
-   **ALSO** add the same entries to `preregister_families.py` FAMILIES list so they survive DB regeneration via `seed_db.py`.
+1. **Add related words to `preregister_families.py`** (NOT seed_db.py): When brainstorming word families (e.g., "Purify is reusable by: cleanse, cure, remedy..."), add 5-10 related words to the `FAMILIES` list in `Tools/WordAction/preregister_families.py` with preliminary classifications. These are inserted into the DB with `status='draft'` — immediately playable but flagged for refinement. When ralph-loop encounters a draft word, its `INSERT OR REPLACE` automatically overwrites the draft entry with `status=NULL` (refined).
 
 2. **Update WORD FAMILIES table in `ralph-prompt.md`**: Add a row listing 10-20 words that map to the new action/tag. This helps ralph-loop classify words it encounters that weren't pre-registered.
 
@@ -261,7 +257,12 @@ Must compile with 0 errors.
 ```bash
 py Tools/WordAction/seed_db.py
 ```
-Regenerate DB with new showcase entries + draft word families.
+Regenerate DB with seeds + draft word families. This runs `preregister_families.py` automatically at the end, inserting all draft words into the DB.
+
+Verify the DB was updated:
+```bash
+py -c "import sqlite3; conn=sqlite3.connect('Assets/StreamingAssets/wordactions.db'); print(f'Words: {conn.execute(\"SELECT COUNT(DISTINCT word) FROM word_actions\").fetchone()[0]}, Drafts: {conn.execute(\"SELECT COUNT(*) FROM word_meta WHERE status=\\\"draft\\\"\").fetchone()[0]}'); conn.close()"
+```
 
 ---
 
@@ -293,7 +294,7 @@ If no → show summary of all mechanics created this session:
 
 ## Existing Mechanics Catalog
 
-### Actions (41 total)
+### Actions (43 total)
 
 **Scaled Damage (4):** Damage (Str/PDef), MagicDamage (Mgc/MDef), WeaponDamage (Dex/PDef), Smash (Str/PDef)
 
@@ -313,7 +314,7 @@ If no → show summary of all mechanics created this session:
 
 **Special (1):** Melt (PhysicalDefense debuff, stat_modifier template)
 
-**Custom Handlers (6):** Shock (lightning+wet bonus), Concentrate (mana+Concentrated), Summon (spawn unit), RestHeal (conditional heal), Scramble (swap slot positions), Item (equip to inventory)
+**Custom Handlers (8):** Shock (lightning+wet bonus), Concentrate (mana+Concentrated), Summon (spawn unit), RestHeal (conditional heal), Scramble (swap slot positions), Item (equip to inventory), Siphon (steal random stat from target, buff self), Deceive (Fear + Concussion)
 
 **Interaction (11):** Enter, Talk, Steal, Search, Pray, Rest, Open, Trade, Recruit, Leave, Charm
 
@@ -325,17 +326,17 @@ Burning, Wet, Poisoned, Frozen, Slowed, Cursed, Buffed, Shielded, ExtraTurn, Stu
 
 on_ally_hit, on_self_hit, on_round_end, on_round_start, on_turn_start, on_turn_end, on_word_played, on_word_length, on_word_tag, on_kill, taunt
 
-### Passive Effects (5)
+### Passive Effects (6)
 
-heal, damage, shield, mana, apply_status
+heal, damage, shield, mana, apply_status, steal_stat
 
 ### Passive Targets (5)
 
 Self, AllAllies, AllEnemies, Injured, Attacker
 
-### Tags (16)
+### Tags (20)
 
-NATURE, ELEMENTAL, OFFENSIVE, RESTORATION, SHADOW, PHYSICAL, DEFENSIVE, ARCANE, HOLY, SUPPORT, PSYCHIC, SPELL, MELEE, SOCIAL, THOUGHTS, RELAX, DWELLING
+NATURE, ELEMENTAL, OFFENSIVE, RESTORATION, SHADOW, PHYSICAL, DEFENSIVE, ARCANE, HOLY, SUPPORT, PSYCHIC, SPELL, MELEE, SOCIAL, THOUGHTS, RELAX, DWELLING, BEAST, FLYING, LIGHT, CLEANSING, DEBUFF, STEALTH
 
 ### Action Templates
 

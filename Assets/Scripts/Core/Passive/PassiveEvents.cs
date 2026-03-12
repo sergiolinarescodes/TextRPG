@@ -5,4 +5,6 @@ namespace TextRPG.Core.Passive
     public readonly record struct PassiveTriggeredEvent(
         EntityId SourceEntity, string TriggerId, string EffectId,
         int Value, EntityId? AffectedEntity);
+
+    public readonly record struct PassiveDeathTriggerEvent(EntityId EntityId);
 }

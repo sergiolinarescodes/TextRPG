@@ -28,5 +28,6 @@ namespace TextRPG.Core.EntityStats
 
         void AddModifier(EntityId id, StatType stat, IModifier<int> modifier);
         bool RemoveModifier(EntityId id, StatType stat, string modifierId);
+        void ClearAllModifiers(EntityId id);
     }
 }

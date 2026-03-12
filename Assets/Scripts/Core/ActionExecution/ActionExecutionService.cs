@@ -126,11 +126,19 @@ namespace TextRPG.Core.ActionExecution
                     _statusEffects.DecrementStack(reflectTarget, StatusEffectType.Reflecting);
                 }
 
-                if (_handlerRegistry.TryGet(mapping.ActionId, out _))
+                if (_handlerRegistry.TryGet(mapping.ActionId, out var handler))
                 {
                     var value = mapping.Value;
                     if (_valueModifier != null)
                         value = _valueModifier.ModifyValue(mapping.ActionId, value, word, _combatContext.SourceEntity);
+
+                    // Attune: execute immediately so letters are available before animation.
+                    // Handler is idempotent — animation's second call is a no-op.
+                    if (mapping.ActionId == ActionNames.Attune)
+                    {
+                        var ctx = new ActionContext(_combatContext.SourceEntity, targets, value, word, mapping.AssocWord);
+                        handler.Execute(ctx);
+                    }
 
                     resolved.Add(new ResolvedAction(
                         mapping.ActionId, value,
