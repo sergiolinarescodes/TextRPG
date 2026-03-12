@@ -10,6 +10,7 @@ namespace TextRPG.Core.ActionExecution
             new(Damage, "scaled_damage", "Strength", "PhysicalDefense"),
             new(Smash, "scaled_damage", "Strength", "PhysicalDefense"),
             new(MagicDamage, "scaled_damage", "MagicPower", "MagicDefense"),
+            new(Cataclysm, "scaled_damage", "MagicPower", "MagicDefense"),
             new(WeaponDamage, "scaled_damage", "Dexterity", "PhysicalDefense"),
 
             // Support
@@ -64,6 +65,10 @@ namespace TextRPG.Core.ActionExecution
             new("DebuffMaxMana", "stat_modifier", "MaxMana", "debuff"),
             new("DebuffManaRegen", "stat_modifier", "ManaRegen", "debuff"),
             new(Melt, "stat_modifier", "PhysicalDefense", "debuff"),
+
+            // CriticalDamage modifiers
+            new("BuffCriticalDamage", "stat_modifier", "CriticalDamage", "buff"),
+            new("DebuffCriticalDamage", "stat_modifier", "CriticalDamage", "debuff"),
         };
     }
 }

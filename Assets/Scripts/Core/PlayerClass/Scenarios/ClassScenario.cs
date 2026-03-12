@@ -13,7 +13,7 @@ namespace TextRPG.Core.PlayerClass.Scenarios
     internal sealed class ClassScenario : DataDrivenScenario
     {
         private static readonly ScenarioParameter ClassParam = new(
-            "playerClass", "Player Class (0=Mage, 1=Warrior, 2=Merchant)", typeof(int), 0, 0, 2);
+            "playerClass", "Player Class (0=Mage, 1=Warrior, 2=Merchant, 3=Rogue)", typeof(int), 0, 0, 3);
 
         private IEventBus _eventBus;
         private IEntityStatsService _entityStats;
@@ -84,6 +84,7 @@ namespace TextRPG.Core.PlayerClass.Scenarios
             AddStatRow(root, "Luck", def.Luck, new Color(1f, 0.85f, 0.2f));
             AddStatRow(root, "Max Mana", def.MaxMana, new Color(0.3f, 0.6f, 1f));
             AddStatRow(root, "Mana Regen", def.ManaRegen, new Color(0.3f, 0.6f, 1f));
+            AddStatRow(root, "Dexterity", def.Dexterity, new Color(0.5f, 0.85f, 0.5f));
             AddStatRow(root, "Constitution", def.Constitution, new Color(0.9f, 0.6f, 0.3f));
 
             if (def.PassiveDescriptions is { Length: > 0 })

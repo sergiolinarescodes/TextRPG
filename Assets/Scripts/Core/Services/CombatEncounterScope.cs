@@ -7,6 +7,7 @@ using TextRPG.Core.CombatLoop;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.Run;
 using TextRPG.Core.StatusEffect;
@@ -25,6 +26,7 @@ namespace TextRPG.Core.Services
 
         private IDisposable _recruitSubscription;
         private IDisposable _deathSubscription;
+        private IEquipmentService _equipmentService;
 
         internal static CombatEncounterScope Create(RunSession session, EncounterDefinition encounter)
         {
@@ -80,6 +82,9 @@ namespace TextRPG.Core.Services
                 statusEffects: s.StatusEffects, anxietyService: s.AnxietyService);
             ((CombatLoopService)scope.CombatLoop).Start();
 
+            scope._equipmentService = s.EquipmentService;
+            s.EquipmentService.EnterBattle();
+
             s.ExperienceService?.SetEncounterService(encounterAdapter);
 
             // Register passives and tags for enemies
@@ -110,6 +115,8 @@ namespace TextRPG.Core.Services
 
         public void Dispose()
         {
+            _equipmentService?.ExitBattle();
+            _equipmentService = null;
             _deathSubscription?.Dispose();
             _deathSubscription = null;
             _recruitSubscription?.Dispose();

@@ -81,6 +81,7 @@ namespace TextRPG.Core.ActionAnimation
             entry.Root.style.display = DisplayStyle.None;
             entry.Root.style.left = 0;
             entry.Root.style.top = 0;
+            entry.Root.style.scale = new Scale(Vector3.one);
 
             if (_available.Count >= MaxPoolSize)
             {

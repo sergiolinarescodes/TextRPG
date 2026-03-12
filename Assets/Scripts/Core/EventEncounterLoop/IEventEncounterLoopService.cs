@@ -6,6 +6,7 @@ namespace TextRPG.Core.EventEncounterLoop
     {
         void Start();
         WordSubmitResult SubmitWord(string word);
+        bool UseConsumable();
         bool IsActive { get; }
     }
 }

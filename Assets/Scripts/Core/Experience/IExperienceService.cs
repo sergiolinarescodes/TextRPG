@@ -6,5 +6,6 @@ namespace TextRPG.Core.Experience
         int CurrentXp { get; }
         int XpForNextLevel { get; }
         float XpProgress { get; }
+        void GrantBonusXp(int amount);
     }
 }

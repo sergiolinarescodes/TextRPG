@@ -1,5 +1,6 @@
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
 
@@ -12,6 +13,7 @@ namespace TextRPG.Core.StatusEffect.Handlers
         public IStatusEffectService StatusEffects { get; set; }
         public IEventBus EventBus { get; }
         public IEncounterService EncounterService { get; set; }
+        public ILuckService LuckService { get; set; }
 
         public StatusEffectHandlerContext(IEntityStatsService entityStats, ITurnService turnService, IEventBus eventBus)
         {

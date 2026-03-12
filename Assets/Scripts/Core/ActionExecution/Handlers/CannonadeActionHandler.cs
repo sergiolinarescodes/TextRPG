@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
+using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.ActionExecution.Handlers
 {
@@ -8,6 +10,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEntityStatsService _entityStats;
         private readonly ICombatContext _combatContext;
+        private readonly ILuckService _luckService;
+        private readonly IEventBus _eventBus;
 
         public string ActionId => ActionNames.Cannonade;
 
@@ -15,6 +19,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
         {
             _entityStats = ctx.EntityStats;
             _combatContext = ctx.CombatContext;
+            _luckService = ctx.LuckService;
+            _eventBus = ctx.EventBus;
         }
 
         public void Execute(ActionContext context)
@@ -31,6 +37,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
                 int damage = StatScaling.OffensiveScale(1, sourceStr,
                     _entityStats.GetStat(target, StatType.PhysicalDefense));
+
+                damage = StatScaling.ApplyCritical(damage, context, _luckService, _eventBus, target);
                 _entityStats.ApplyDamage(target, damage);
             }
         }

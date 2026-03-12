@@ -14,7 +14,7 @@ namespace TextRPG.Core.EventEncounter.Encounters
                 new InteractionReaction("Search", "message", "You see scorch marks around the lock...", 0),
             },
             "A heavy iron vault",
-            Tags: new[] { "meltable", "conductive" },
+            Tags: new[] { "meltable", "conductive", "chest" },
             DeathReward: "random",
             DeathRewardValue: 3),
         });

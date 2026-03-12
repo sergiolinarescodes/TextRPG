@@ -186,6 +186,9 @@ python Tools/WordAction/stats.py
 | `Attune` | Save the word's letters as "attuned" charges for the rest of the encounter. Future words that contain attuned letters get +20% power per attuned letter consumed (one-time per letter). No damage/status — pure utility. Value is ignored. Target should be `Self`. Pair with `ARCANE`, `SPELL`, or `SUPPORT` tag. Best on long words with common letters (e, t, a, n, s) to maximize future value. |
 | `Ignite` | Magic damage (MagicPower vs MagicDefense) + apply Burning (duration = Value). Fire version of Peck. Use for fire/heat attack words. Pair with FIRE or ELEMENTAL tag. |
 | `Combust` | Detonate Burning on target: if Burning, remove it and deal bonus MagicDamage (value + remaining stacks, MagicPower vs MagicDefense). If not Burning, deal base MagicDamage only. Pair with FIRE or ELEMENTAL tag. |
+| `Cataclysm` | Massive magic damage (MagicPower vs MagicDefense) that hits ALL entities — enemies AND allies. High risk, high reward AoE nuke. Target should be `All`. Pair with `COSMIC`, `DESTRUCTION`, `FIRE`, or `ARCANE` tag. |
+| `Cleave` | Physical damage (Str vs PDef) to primary target + half damage to one other random enemy. A sweeping melee strike with splash damage. Use for bladed/slashing weapon words. Pair with `BLADE`, `MELEE`, or `PHYSICAL` tag. |
+| `Lockpick` | Attempt to pick a lock on a lockpickable target. Triggers a multi-step sequence with progress messages, success chance based on Dexterity + Luck. On success, opens the target (fires Open reaction chain). High mana cost (~8) when typed as a word. Use for lock-related, thief, and tool words. Pair with `TOOL` or `STEALTH` tag. |
 
 ### INTERACTION ACTIONS
 
@@ -262,6 +265,8 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 | `on_word_tag` | tag (e.g. `"NATURE"`) | When a played word has the specified tag |
 | `on_kill` | — | When any enemy is killed |
 | `on_death` | optional (`"siphon"`) | When this unit dies. If triggerParam=`"siphon"`, accumulated siphon total is used as heal value |
+| `on_damage_dealt` | — | When this unit deals damage to any target |
+| `on_letter_in_word` | `vowel`, `consonant`, `any`, `fixed:X` | When typed word contains a randomly selected letter (re-selected each turn) |
 | `taunt` | — | Marker: forces enemies to target this unit (no effect/target needed) |
 
 ### Available effects
@@ -274,6 +279,8 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 | `mana` | — | Restore `value` mana to targets |
 | `apply_status` | status name (e.g. `"Burning"`) | Apply status effect to targets for `value` duration |
 | `steal_stat` | — | Steal `value` points of a random stat (Str/Mgc/PDef/MDef/Luck) from targets and give to owner |
+| `gold` | — | Add `value` gold to the player's gold resource |
+| `buff_stat` | stat name (e.g. `"Luck"`, `"Strength"`) | Permanently buff target's stat by `value` for the rest of combat (cumulative) |
 
 Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`, `Awakened`
 
@@ -542,11 +549,17 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 | `Ignite` | kindle, inflame, scald, sear, char, singe, cauterize, incinerate |
 | `Combust` | detonate, explode, erupt, rupture, burst, implode |
 | `Summon` (firemaster unit) | firemaster, firemasters |
+| `Summon` (mercenary unit) | mercenary, mercenaries, soldier, sellsword, bodyguard, gladiator, enforcer, warden, conscript, knight |
+| `Cataclysm` | supernova, supernovas, apocalypse, armageddon, cataclysm, annihilation, obliteration, doomsday, ragnarok, catastrophe, holocaust, extinction, devastation, calamity |
+| `Cleave` | machete, machetes, axe, hatchet, cleaver, scythe, saber, katana, broadsword, falchion, glaive, halberd, slash, hack, chop, carve, sever, bisect, rend |
+| `Item` (telescope accessory) | telescope, telescopes, spyglass, binoculars, lens, scope, monocle, periscope, prism, spectacles, microscope, beacon |
+| `Lockpick` | lockpick, jimmy, picklock, skeleton_key, crowbar, jemmy, shiv, probe, tumbler, bypass, latch, keyhole, pin |
 
 | Tag | Pre-classified words (apply this tag when you encounter them) |
 |-----|--------------------------------------------------------------|
 | `BEAST` | wolf, wolves, hawk, hawks, serpent, serpents, bear, bears, spider, spiders, eagle, eagles, falcon, falcons, vulture, vultures, hyena, hyenas, jackal, jackals, panther, panthers, tiger, tigers, lion, lions, shark, sharks |
 | `FLYING` | hawk, hawks, eagle, eagles, falcon, falcons, owl, owls, bat, bats, moth, moths, butterfly, dragonfly, fairy, sprite, phoenix, griffin, pegasus, wyvern |
+| `SIGHT` | telescope, telescopes, spyglass, binoculars, lens, scope, monocle, periscope, prism, spectacles, microscope, beacon, lantern, spotlight, observatory, lookout, watchtower |
 | `LIGHT` | glow, shine, flash, beam, ray, sunrise, aurora, luminous, bright, radiant, brilliant, gleam, shimmer, sparkle, dazzle, illuminate, lantern, torch, candle, lighthouse |
 | `CLEANSING` | purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure, remedy, sanitize, sterilize, detox, soap, lather, bathe, shower, launder |
 | `DEBUFF` | weaken, corrode, rust, wither, decay, sap, drain, curse, hex, blight, cripple, enfeeble, diminish, erode, siphon, leech, undermine, sabotage, impair |
@@ -559,6 +572,11 @@ Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cur
 | `UNDEAD` | ghost, phantom, specter, wraith, skeleton, zombie, lich, vampire, revenant, banshee, necromancer, corpse, ghoul, mummy, apparition |
 | `NAVAL` | ship, anchor, cannon, sail, hull, mast, keel, stern, bow, fleet, armada, corsair, pirate, buccaneer, galleon, frigate, captain, sailor |
 | `FIRE` | fire, flame, blaze, inferno, scorch, ember, torch, pyre, ash, cinder, combustion, magma, lava, volcano, kindle, ignite, combust, furnace, forge, smelt |
+| `COSMIC` | supernova, comet, meteor, asteroid, nebula, galaxy, star, pulsar, quasar, cosmos, celestial, stellar, astral, eclipse, void, singularity, orbit |
+| `DESTRUCTION` | supernova, apocalypse, armageddon, cataclysm, annihilation, obliteration, demolish, devastation, ruin, havoc, wreckage, carnage, rampage, ravage |
+| `BLADE` | machete, axe, sword, dagger, knife, scythe, saber, katana, rapier, cutlass, cleaver, hatchet, scimitar, broadsword, falchion, glaive, halberd, stiletto, dirk |
+| `JUNGLE` | machete, vine, python, piranha, jaguar, mosquito, canopy, swamp, tropical, bamboo, parrot, monkey, toucan, anaconda, orchid, fern, humidity, rainforest |
+| `TOOL` | lockpick, jimmy, picklock, skeleton_key, crowbar, jemmy, shiv, probe, tumbler, bypass, latch, keyhole, pin, wrench, pliers, hammer, chisel, screwdriver |
 
 ---
 
@@ -575,6 +593,28 @@ When classifying words, consider the FULL ecosystem of word relationships:
 Each word should contribute to ONE of these roles. Don't make every word a simple damage dealer.
 
 **Design principle: fewer well-designed words > many generic ones.** If a word doesn't offer something distinct, classify it as a non-game word and move on.
+
+### MANA COST CALIBRATION
+
+When setting a word's `cost`, **always check the DB for words with the same primary action** and calibrate proportionally. The cost should reflect the word's power relative to its peers.
+
+| Cost | Profile | Reference Examples |
+|------|---------|-------------------|
+| 0 | Weak single action (value 1), common word | drip → Water:1, scratch → Damage:1 |
+| 1 | Single action (value 2-3) or weak combo | flame → Burn:2 + Damage:2, axe → Cleave:2 |
+| 2 | Strong single action (value 3-4) or standard combo | machete → Cleave:3 + Bleed:1, saber → Cleave:3 |
+| 3 | Multi-action combo or AoE | tornado → Damage:3 + Scramble:1, machetes → Cleave:3 + Bleed:1 (2 targets) |
+| 4 | Premium multi-action or powerful AoE | supernova → Cataclysm:4 (All), flood → Water:4 + Damage:3 |
+| 5 | Maximum power (3+ actions or devastating AoE) | tsunami → Water:5 + Damage:5 + Push:2 + Scramble:1 |
+
+**Cost modifiers:**
+- AoE targeting (AllEnemies, All): +1 cost over single-target equivalent
+- Self-only beneficial (heal, buff, shield): -1 cost
+- Combo with secondary debuff (Bleed, Burn, status): +1 cost
+- Summon words: base ability cost + 3 (singular), + 6 (plural = dual summon)
+- Items: usually cost 0 (go to inventory, not combat)
+
+**IMPORTANT**: Before assigning a cost, query the DB: `SELECT word, cost FROM word_meta WHERE word IN (SELECT word FROM word_actions WHERE action_name = 'X') ORDER BY cost`. Use the results to ensure your new word fits the existing cost curve.
 
 ---
 

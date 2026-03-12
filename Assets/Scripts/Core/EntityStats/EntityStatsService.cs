@@ -20,14 +20,14 @@ namespace TextRPG.Core.EntityStats
                                    int physicalDefense, int magicDefense, int luck,
                                    int maxMana = 10, int manaRegen = 2, int startingMana = 5,
                                    int startingShield = 0, int dexterity = 0,
-                                   int constitution = 0)
+                                   int constitution = 0, int criticalDamage = 50)
         {
             if (_entities.ContainsKey(id))
                 throw new InvalidOperationException($"Entity '{id.Value}' is already registered.");
 
             var hpBonus = CalculateConstitutionBonus(constitution);
             var effectiveMaxHealth = maxHealth + hpBonus;
-            var entry = new EntityStatEntry(effectiveMaxHealth, strength, magicPower, physicalDefense, magicDefense, luck, maxMana, manaRegen, startingMana, startingShield, dexterity, constitution);
+            var entry = new EntityStatEntry(effectiveMaxHealth, strength, magicPower, physicalDefense, magicDefense, luck, maxMana, manaRegen, startingMana, startingShield, dexterity, constitution, criticalDamage);
             _entities[id] = entry;
             Publish(new EntityRegisteredEvent(id, effectiveMaxHealth));
         }
@@ -198,7 +198,7 @@ namespace TextRPG.Core.EntityStats
 
             public EntityStatEntry(int maxHealth, int strength, int magicPower,
                                    int physicalDefense, int magicDefense, int luck,
-                                   int maxMana, int manaRegen, int startingMana, int startingShield, int dexterity, int constitution)
+                                   int maxMana, int manaRegen, int startingMana, int startingShield, int dexterity, int constitution, int criticalDamage)
             {
                 _baseStats[(int)StatType.Health] = maxHealth;
                 _baseStats[(int)StatType.MaxHealth] = maxHealth;
@@ -211,6 +211,7 @@ namespace TextRPG.Core.EntityStats
                 _baseStats[(int)StatType.ManaRegen] = manaRegen;
                 _baseStats[(int)StatType.Dexterity] = dexterity;
                 _baseStats[(int)StatType.Constitution] = constitution;
+                _baseStats[(int)StatType.CriticalDamage] = criticalDamage;
                 CurrentHealth = maxHealth;
                 CurrentMana = startingMana;
                 CurrentShield = startingShield;

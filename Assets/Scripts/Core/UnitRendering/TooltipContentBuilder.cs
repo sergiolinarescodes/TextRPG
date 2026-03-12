@@ -221,6 +221,10 @@ namespace TextRPG.Core.UnitRendering
             if (maxMana > 0)
                 AddStatChip(row, $"MP {mana}/{maxMana}", new Color(0.3f, 0.5f, 1f));
 
+            int luck = stats.GetStat(entityId, StatType.Luck);
+            if (luck > 0)
+                AddStatChip(row, $"LCK {luck}", new Color(1f, 0.85f, 0.2f));
+
             parent.Add(row);
         }
 

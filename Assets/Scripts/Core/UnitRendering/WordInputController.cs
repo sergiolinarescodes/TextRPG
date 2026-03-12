@@ -152,7 +152,9 @@ namespace TextRPG.Core.UnitRendering
 
         public void UseConsumable()
         {
-            if (_combatLoop == null || !_combatLoop.UseConsumable()) return;
+            bool used = _combatLoop?.UseConsumable() == true
+                     || _eventLoop?.UseConsumable() == true;
+            if (!used) return;
             ClearAfterSubmit();
         }
 

@@ -16,6 +16,8 @@ namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
             if (!Enum.TryParse<StatusEffectType>(context.OutcomeParam, true, out var effectType)) return;
 
             context.Ctx.StatusEffects.ApplyEffect(context.Source, effectType, context.Value, context.Source);
+            context.Ctx.EventBus.Publish(new InteractionMessageEvent(
+                $"{context.OutcomeParam} applied", context.Target));
         }
     }
 }

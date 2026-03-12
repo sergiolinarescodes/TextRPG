@@ -1,6 +1,7 @@
 using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.CombatLoop;
+using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.Run;
@@ -23,6 +24,7 @@ namespace TextRPG.Core.EventEncounterLoop
         private readonly ICombatContext _combatContext;
         private readonly IWordCooldownService _wordCooldown;
         private readonly IGiveValidator _giveValidator;
+        private readonly IConsumableService _consumableService;
         private readonly EntityId _playerId;
 
         private readonly int _maxInteractions;
@@ -43,6 +45,7 @@ namespace TextRPG.Core.EventEncounterLoop
             ICombatContext combatContext = null,
             IWordCooldownService wordCooldown = null,
             IGiveValidator giveValidator = null,
+            IConsumableService consumableService = null,
             int maxInteractions = 0) : base(eventBus)
         {
             _entityStats = entityStats;
@@ -52,6 +55,7 @@ namespace TextRPG.Core.EventEncounterLoop
             _combatContext = combatContext;
             _wordCooldown = wordCooldown;
             _giveValidator = giveValidator;
+            _consumableService = consumableService;
             _playerId = playerId;
             _maxInteractions = maxInteractions;
 
@@ -105,6 +109,19 @@ namespace TextRPG.Core.EventEncounterLoop
             _waitingForAnimation = true;
             Publish(new WordSubmittedEvent(word));
             return WordSubmitResult.Accepted;
+        }
+
+        public bool UseConsumable()
+        {
+            if (!_active || _waitingForAnimation) return false;
+            if (_consumableService == null || !_consumableService.HasConsumable(_playerId)) return false;
+            var ammoWords = _consumableService.GetAmmoWords(_playerId);
+            if (ammoWords.Count == 0) return false;
+            var ammo = ammoWords[Random.Range(0, ammoWords.Count)];
+            _waitingForAnimation = true;
+            _submitCount++;
+            Publish(new ConsumableAmmoSubmittedEvent(_playerId, ammo));
+            return true;
         }
 
         private void OnAnimationCompleted()

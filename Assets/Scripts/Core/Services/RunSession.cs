@@ -12,7 +12,10 @@ using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.EventEncounterLoop;
+using TextRPG.Core.LetterChallenge;
 using TextRPG.Core.LetterReserve;
+using TextRPG.Core.Lockpick;
+using TextRPG.Core.Luck;
 using TextRPG.Core.Passive;
 using TextRPG.Core.PlayerClass;
 using TextRPG.Core.EntityStats;
@@ -91,8 +94,12 @@ namespace TextRPG.Core.Services
         // Class
         public IClassService ClassService { get; init; }
 
-        // Letter Reserve
+        // Letter Reserve / Challenge
         public ILetterReserveService LetterReserve { get; init; }
+        public ILetterChallengeService LetterChallengeService { get; init; }
+
+        // Lockpick
+        public ILockpickService LockpickService { get; init; }
 
         // Run/Resource/Experience
         public IRunService RunService { get; init; }
@@ -108,6 +115,7 @@ namespace TextRPG.Core.Services
         public IWordResolver EnemyResolver { get; init; }
         public EnemyWordResolver SpellResolver { get; init; }
         public IAnxietyService AnxietyService { get; init; }
+        public ILuckService LuckService { get; init; }
 
         // Static data
         public Dictionary<string, EntityDefinition> AllUnits { get; init; }
@@ -134,6 +142,10 @@ namespace TextRPG.Core.Services
         {
             _currentScope?.Dispose();
             _currentScope = null;
+
+            // Clear lockpick encounter ref
+            if (LockpickService is Lockpick.LockpickService lockpick)
+                lockpick.SetEncounterService(null);
 
             ReactionService?.ClearReactions();
             SlotService.Initialize();
@@ -166,6 +178,7 @@ namespace TextRPG.Core.Services
             (ClassService as IDisposable)?.Dispose();
             (LetterReserve as IDisposable)?.Dispose();
             (SpellService as IDisposable)?.Dispose();
+            (LockpickService as IDisposable)?.Dispose();
             (EquipmentService as IDisposable)?.Dispose();
             (InventoryService as IDisposable)?.Dispose();
             EventBus?.ClearAllSubscriptions();

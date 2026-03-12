@@ -6,6 +6,7 @@ using TextRPG.Core.EntityStats;
 using Unidad.Core.EventBus;
 using Unidad.Core.Patterns.CommandQueue;
 using UnityEngine;
+using UnityEngine.UIElements;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
 
 namespace TextRPG.Core.ActionAnimation.Commands
@@ -25,6 +26,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
         private readonly IActionHandler _handler;
         private readonly IEventBus _eventBus;
         private readonly Action _onArrival;
+        private readonly bool _isCritical;
 
         private readonly List<ProjectileEntry> _activeProjectiles = new();
         private int _arrivedCount;
@@ -50,7 +52,8 @@ namespace TextRPG.Core.ActionAnimation.Commands
             IActionHandler handler = null,
             IEventBus eventBus = null,
             Action onArrival = null,
-            string assocWord = "")
+            string assocWord = "",
+            bool isCritical = false)
         {
             _actionId = actionId;
             _source = source;
@@ -65,6 +68,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
             _handler = handler;
             _eventBus = eventBus;
             _onArrival = onArrival;
+            _isCritical = isCritical;
         }
 
         public CommandStatus Execute(ICommandContext context, float deltaTime)
@@ -105,6 +109,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
 
             var sourcePos = _positionProvider(_source);
             var color = ProjectileStyle.GetColor(_actionId);
+            var displayText = _isCritical ? _actionId + "!" : _actionId;
 
             _totalCount = _targets.Count;
             _arrivedCount = 0;
@@ -113,7 +118,10 @@ namespace TextRPG.Core.ActionAnimation.Commands
             {
                 var target = _targets[i];
                 var targetPos = _positionProvider(target);
-                var entry = _pool.Acquire(_actionId, color, sourcePos);
+                var entry = _pool.Acquire(displayText, color, sourcePos);
+
+                if (_isCritical)
+                    entry.Root.style.scale = new Scale(new Vector3(2, 2, 1));
                 _activeProjectiles.Add(entry);
 
                 if (_isInstant)
@@ -220,7 +228,7 @@ namespace TextRPG.Core.ActionAnimation.Commands
 
             if (_handler != null)
             {
-                var context = new ActionContext(_source, _targets, _value, _word, _assocWord);
+                var context = new ActionContext(_source, _targets, _value, _word, _assocWord, _isCritical);
                 _handler.Execute(context);
                 _eventBus?.Publish(new ActionHandlerExecutedEvent(_actionId, _value, _source, _targets));
             }

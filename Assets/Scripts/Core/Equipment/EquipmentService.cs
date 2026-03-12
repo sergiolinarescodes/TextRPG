@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using TextRPG.Core.ActionExecution.Handlers;
+using TextRPG.Core.CombatLoop;
 using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Passive;
@@ -18,7 +19,10 @@ namespace TextRPG.Core.Equipment
         private readonly IWeaponService _weaponService;
         private readonly IConsumableService _consumableService;
         private readonly Dictionary<EntityId, Dictionary<EquipmentSlotType, EquipmentEntry>> _equipped = new();
+        private readonly HashSet<EquipmentSlotType> _lockedSlots = new();
         private int _nextModifierId;
+        private bool _inBattle;
+        private bool _setupPhase;
 
         public EquipmentService(
             IEventBus eventBus,
@@ -37,6 +41,34 @@ namespace TextRPG.Core.Equipment
             Subscribe<EntityDiedEvent>(evt => _equipped.Remove(evt.EntityId));
             Subscribe<WeaponDestroyedEvent>(evt => Unequip(evt.Entity, EquipmentSlotType.Weapon));
             Subscribe<ConsumableDestroyedEvent>(evt => Unequip(evt.Entity, EquipmentSlotType.Consumable));
+            Subscribe<PlayerTurnEndedEvent>(_ =>
+            {
+                if (_inBattle && _setupPhase)
+                    _setupPhase = false;
+            });
+        }
+
+        public bool IsInBattle => _inBattle;
+        public bool IsBattleSetupPhase => _setupPhase;
+
+        public bool CanEquipSlotInBattle(EquipmentSlotType slot)
+            => !_inBattle || _setupPhase || !_lockedSlots.Contains(slot);
+
+        public bool CanUnequipInBattle()
+            => !_inBattle || _setupPhase;
+
+        public void EnterBattle()
+        {
+            _inBattle = true;
+            _setupPhase = true;
+            _lockedSlots.Clear();
+        }
+
+        public void ExitBattle()
+        {
+            _inBattle = false;
+            _setupPhase = false;
+            _lockedSlots.Clear();
         }
 
         public bool Equip(EntityId entity, string itemWord)
@@ -58,6 +90,9 @@ namespace TextRPG.Core.Equipment
 
             if (slot == EquipmentSlotType.Consumable)
                 _consumableService?.EquipConsumable(entity, itemWord);
+
+            if (_inBattle && !_setupPhase)
+                _lockedSlots.Add(slot);
 
             Publish(new ItemEquippedEvent(entity, itemDef, slot));
             return true;
@@ -116,7 +151,12 @@ namespace TextRPG.Core.Equipment
             }
 
             inventory.TryRemove(inventoryId, new ItemId(itemWord));
-            return Equip(entity, itemWord);
+            var result = Equip(entity, itemWord);
+
+            if (result && _inBattle && !_setupPhase)
+                _lockedSlots.Add(slotType.Value);
+
+            return result;
         }
 
         public bool UnequipToInventory(EntityId entity, EquipmentSlotType slot, IInventoryService inventory, InventoryId inventoryId)

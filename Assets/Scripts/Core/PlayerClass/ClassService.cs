@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions.Tags;
 using TextRPG.Core.Experience;
 using TextRPG.Core.Scroll;
@@ -27,6 +28,7 @@ namespace TextRPG.Core.PlayerClass
         private readonly ISpellService _spellService;
         private readonly IWordResolver _wordResolver;
         private readonly IResourceService _resourceService;
+        private readonly IExperienceService _experienceService;
         private readonly Random _rng = new();
         private bool _isGrantingBonus;
 
@@ -37,7 +39,8 @@ namespace TextRPG.Core.PlayerClass
             IWordTagResolver wordTagResolver,
             ISpellService spellService = null,
             IWordResolver wordResolver = null,
-            IResourceService resourceService = null)
+            IResourceService resourceService = null,
+            IExperienceService experienceService = null)
             : base(eventBus)
         {
             _selectedClass = selectedClass;
@@ -47,12 +50,16 @@ namespace TextRPG.Core.PlayerClass
             _spellService = spellService;
             _wordResolver = wordResolver;
             _resourceService = resourceService;
+            _experienceService = experienceService;
 
             if (selectedClass == PlayerClass.Mage && _spellService != null && _wordResolver != null)
                 Subscribe<LevelUpEvent>(OnLevelUp);
 
             if (selectedClass == PlayerClass.Merchant && _resourceService != null)
                 Subscribe<ResourceChangedEvent>(OnResourceChanged);
+
+            if (selectedClass == PlayerClass.Rogue && _experienceService != null)
+                Subscribe<ChestOpenedEvent>(OnChestOpened);
         }
 
         private void OnLevelUp(LevelUpEvent evt)
@@ -76,6 +83,12 @@ namespace TextRPG.Core.PlayerClass
             if (!DamageActions.Contains(actionId)) return baseValue;
             if (!_wordTagResolver.HasTag(word, "MELEE")) return baseValue;
             return (int)(baseValue * 1.5f);
+        }
+
+        private void OnChestOpened(ChestOpenedEvent evt)
+        {
+            int bonusXp = 2 + _experienceService.CurrentLevel;
+            _experienceService.GrantBonusXp(bonusXp);
         }
 
         private void OnResourceChanged(ResourceChangedEvent evt)

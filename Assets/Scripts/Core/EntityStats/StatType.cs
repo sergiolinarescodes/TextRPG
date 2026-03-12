@@ -13,6 +13,7 @@ namespace TextRPG.Core.EntityStats
         ManaRegen,
         DamageReduction,
         Dexterity,
-        Constitution
+        Constitution,
+        CriticalDamage
     }
 }

@@ -1,6 +1,8 @@
 using System.Linq;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.StatusEffect;
+using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.ActionExecution.Handlers
 {
@@ -8,6 +10,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IEntityStatsService _entityStats;
         private readonly IStatusEffectService _statusEffects;
+        private readonly ILuckService _luckService;
+        private readonly IEventBus _eventBus;
 
         public string ActionId => ActionNames.Combust;
 
@@ -15,6 +19,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
         {
             _entityStats = ctx.EntityStats;
             _statusEffects = ctx.StatusEffects;
+            _luckService = ctx.LuckService;
+            _eventBus = ctx.EventBus;
         }
 
         public void Execute(ActionContext context)
@@ -37,6 +43,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
                 }
 
                 var damage = StatScaling.OffensiveScale(baseValue, offense, defense);
+
+                damage = StatScaling.ApplyCritical(damage, context, _luckService, _eventBus, target);
                 _entityStats.ApplyDamage(target, damage, context.Source);
             }
         }

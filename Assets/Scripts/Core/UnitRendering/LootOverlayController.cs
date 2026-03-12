@@ -101,6 +101,7 @@ namespace TextRPG.Core.UnitRendering
             _lootOverlay = null;
             HideLootTooltip();
             ClearEquipmentSlotHighlight();
+            _setInputEnabled(true);
         }
 
         private void ShowLootTooltip(LootRewardOption option, VisualElement card)

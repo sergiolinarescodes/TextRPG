@@ -100,6 +100,8 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             RebuildAll(); RunPlunderGroup();
             RebuildAll(); RunIgniteGroup();
             RebuildAll(); RunCombustGroup();
+            RebuildAll(); RunCataclysmGroup();
+            RebuildAll(); RunCleaveGroup();
 
             BuildUI();
         }
@@ -2359,6 +2361,58 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             Check("Combust (with burn): Burning removed",
                 !_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning),
                 "Burning still present after Combust");
+        }
+
+        // ── Group: Cleave ──────────────────────────────────────────
+
+        private void RunCleaveGroup()
+        {
+            // Cleave(3) → SingleEnemy: Damage(Str vs PDef) to primary + half damage to another
+            // Hero: Str=12, EnemyA: PDef=4, EnemyB: PDef=3
+            int hpBeforeA = HP(_enemyA);
+            int hpBeforeB = HP(_enemyB);
+            int hpBeforeC = HP(_enemyC);
+            int hpBeforeD = HP(_enemyD);
+            int expectedPrimary = ExpDmg(3, 12, 4);
+
+            _resolver.RegisterWord("test_cleave",
+                new List<WordActionMapping> { new("Cleave", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_cleave");
+
+            Check("Cleave: primary target takes full damage",
+                HP(_enemyA) == hpBeforeA - expectedPrimary,
+                $"HP={HP(_enemyA)}(exp {hpBeforeA - expectedPrimary})");
+
+            // At least one other enemy should have taken splash damage
+            int totalSplashTaken = (hpBeforeB - HP(_enemyB)) + (hpBeforeC - HP(_enemyC)) + (hpBeforeD - HP(_enemyD));
+            Check("Cleave: splash damage hits one other enemy",
+                totalSplashTaken > 0,
+                $"No splash damage dealt (B={HP(_enemyB)}/{hpBeforeB}, C={HP(_enemyC)}/{hpBeforeC}, D={HP(_enemyD)}/{hpBeforeD})");
+        }
+
+        // ── Group: Cataclysm ──────────────────────────────────────────
+
+        private void RunCataclysmGroup()
+        {
+            // Cataclysm(4) → All: MagicDamage(MagicPower vs MagicDefense) hits everyone including allies
+            // Hero: MagicPower=8, EnemyA: MagicDefense=3, AllyA: MagicDefense=3
+            int hpBeforeA = HP(_enemyA);
+            int hpBeforeAlly = HP(_allyA);
+            int expectedDmgA = ExpMagicDmg(4, 8, 3);
+            int expectedDmgAlly = ExpMagicDmg(4, 8, 3);
+
+            _resolver.RegisterWord("test_cataclysm",
+                new List<WordActionMapping> { new("Cataclysm", 4) },
+                new WordMeta("All", 0, 0, AreaShape.Single));
+            Exec("test_cataclysm");
+
+            Check("Cataclysm: correct magic damage to enemy",
+                HP(_enemyA) == hpBeforeA - expectedDmgA,
+                $"HP={HP(_enemyA)}(exp {hpBeforeA - expectedDmgA})");
+            Check("Cataclysm: hits allies too",
+                HP(_allyA) == hpBeforeAlly - expectedDmgAlly,
+                $"AllyHP={HP(_allyA)}(exp {hpBeforeAlly - expectedDmgAlly})");
         }
 
         // ── UI ──────────────────────────────────────────────────────

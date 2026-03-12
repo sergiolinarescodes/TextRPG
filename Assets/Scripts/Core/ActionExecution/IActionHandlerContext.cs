@@ -4,6 +4,7 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.LetterReserve;
+using TextRPG.Core.Luck;
 using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
@@ -26,5 +27,6 @@ namespace TextRPG.Core.ActionExecution
         IGameServices Services { get; }
         IEntityTagProvider EntityTagProvider { get; }
         ILetterReserveService LetterReserve { get; }
+        ILuckService LuckService { get; }
     }
 }

@@ -102,7 +102,8 @@ namespace TextRPG.Core.ActionAnimation
                     false,
                     handler,
                     EventBus,
-                    assocWord: action.AssocWord);
+                    assocWord: action.AssocWord,
+                    isCritical: action.IsCritical);
                 _commandQueue.Enqueue(command);
             }
 
@@ -123,7 +124,7 @@ namespace TextRPG.Core.ActionAnimation
                 {
                     if (_handlerRegistry.TryGet(action.ActionId, out var handler))
                     {
-                        var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word, action.AssocWord);
+                        var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word, action.AssocWord, action.IsCritical);
                         handler.Execute(context);
                         Publish(new ActionHandlerExecutedEvent(action.ActionId, action.Value, action.Source, action.Targets));
                     }

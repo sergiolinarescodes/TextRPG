@@ -5,6 +5,7 @@ using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Equipment;
+using TextRPG.Core.Luck;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
@@ -32,5 +33,6 @@ namespace TextRPG.Core.Services
         public IItemRegistry ItemRegistry { get; set; }
         public StatusEffectInteractionTable InteractionTable { get; set; }
         public IReadOnlyDictionary<string, EntityDefinition> UnitRegistry { get; set; }
+        public ILuckService LuckService { get; set; }
     }
 }

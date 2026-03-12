@@ -25,6 +25,6 @@ namespace TextRPG.Core.EntityStats
             => stats.RegisterEntity(playerId, classDef.MaxHealth, classDef.Strength, classDef.MagicPower,
                 classDef.PhysicalDefense, classDef.MagicDefense, classDef.Luck,
                 classDef.MaxMana, classDef.ManaRegen, classDef.StartingMana,
-                constitution: classDef.Constitution);
+                dexterity: classDef.Dexterity, constitution: classDef.Constitution);
     }
 }

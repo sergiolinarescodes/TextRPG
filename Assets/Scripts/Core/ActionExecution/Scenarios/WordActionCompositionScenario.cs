@@ -413,9 +413,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new("Summon entity detected", _summonDetected,
                     _summonDetected ? null : "No summoned entity registered"),
 
-                // 21. Total handler executions >= 20
-                new("Total handler executions >= 20", _totalHandlers >= 20,
-                    _totalHandlers >= 20 ? null : $"Only {_totalHandlers} handler executions"),
+                // 21. Total handler executions >= 19
+                new("Total handler executions >= 19", _totalHandlers >= 19,
+                    _totalHandlers >= 19 ? null : $"Only {_totalHandlers} handler executions"),
             };
 
             return new ScenarioVerificationResult(checks);

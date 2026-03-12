@@ -47,7 +47,11 @@
       "Bash(pip run:*)",
       "Bash(cd \"C:\\\\Users\\\\kelns\\\\repos\\\\TextRPG\" && sqlite3 \"./Assets/StreamingAssets/wordactions.db\" \"SELECT * FROM units WHERE unit_id = 'sellsword';\" 2>&1 | head -20)",
       "Read(//c/Users/kelns/repos/TextRPG/$HOME/.claude/plugins/cache/claude-plugins-official/ralph-loop/bd041495bd2a/**)",
-      "Bash(git grep:*)"
+      "Bash(git grep:*)",
+      "Bash(find \"C:/Users/kelns/repos/TextRPG/Packages\" -type f -name \"*.cs\" -print0 | xargs -0 grep -l \"AutoScanAttribute\\\\|class AutoScan\" 2>/dev/null | head -10)",
+      "Bash(find \"C:/Users/kelns/repos/TextRPG\" -name \"*.cs\" -type f -exec grep -l \"^namespace.*AutoScan\\\\|^[[:space:]]*public.*class AutoScan\\\\|^[[:space:]]*public.*attribute AutoScan\" {} \\\\; 2>/dev/null | head -5)",
+      "Bash(ls -1 /c/Users/kelns/repos/TextRPG/Assets/Scripts/Core/Passive/Triggers/*.cs | xargs -I {} basename {} .cs)",
+      "Bash(ls -1 /c/Users/kelns/repos/TextRPG/Assets/Scripts/Core/Passive/Effects/*.cs | xargs -I {} basename {} .cs)"
     ]
   }
 }

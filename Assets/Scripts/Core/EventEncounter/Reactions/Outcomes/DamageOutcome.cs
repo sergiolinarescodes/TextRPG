@@ -10,6 +10,8 @@ namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
         public void Execute(InteractionOutcomeContext context)
         {
             context.Ctx.EntityStats.ApplyDamage(context.Source, context.Value, context.Target);
+            context.Ctx.EventBus.Publish(new InteractionMessageEvent(
+                $"Took {context.Value} damage", context.Target));
         }
     }
 }

@@ -21,5 +21,12 @@ namespace TextRPG.Core.Equipment
         /// Unequip to inventory: unequips and adds item back to inventory.
         /// </summary>
         bool UnequipToInventory(EntityId entity, EquipmentSlotType slot, IInventoryService inventory, InventoryId inventoryId);
+
+        bool IsInBattle { get; }
+        bool IsBattleSetupPhase { get; }
+        bool CanEquipSlotInBattle(EquipmentSlotType slot);
+        bool CanUnequipInBattle();
+        void EnterBattle();
+        void ExitBattle();
     }
 }

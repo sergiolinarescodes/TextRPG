@@ -116,7 +116,8 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             // Event encounter loop (free-form, no turns)
             var loopService = new EventEncounterLoopService(
                 s.EventBus, s.EntityStats, s.WordResolver, _encounterService, playerId,
-                combatContext: s.CombatContext, wordCooldown: s.WordCooldown, giveValidator: s.GiveValidator);
+                combatContext: s.CombatContext, wordCooldown: s.WordCooldown, giveValidator: s.GiveValidator,
+                consumableService: s.ConsumableService);
             _loopService = loopService;
             _loopService.Start();
 
@@ -149,8 +150,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             // Equipment controller (builds left + right bars)
             _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
                 s.InventoryService, s.ItemRegistry, s.WeaponService, s.ConsumableService,
-                s.PlayerInventoryId, playerId, root,
-                () => _encounterService?.IsEncounterActive == true);
+                s.PlayerInventoryId, playerId, root);
             _equipment.BuildBars(middleArea);
 
             // Word input controller (builds main text panel)
@@ -162,9 +162,9 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             var mainTextPanel = _wordInput.BuildInputArea(vibrationAmplitude);
             middleArea.Insert(1, mainTextPanel);
 
-            // No weapon/consumable in event encounters
+            // No weapon in event encounters, but consumables work
             _equipment.FireWeaponAction = null;
-            _equipment.UseConsumableAction = null;
+            _equipment.UseConsumableAction = () => _wordInput.UseConsumable();
 
             // Ally row
             var allyRow = new VisualElement();

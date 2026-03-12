@@ -1,6 +1,7 @@
 using System;
 using TextRPG.Core.ActionExecution;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
 using Unidad.Core.Systems;
@@ -12,11 +13,13 @@ namespace TextRPG.Core.StatusEffect
     internal sealed class AnxietyService : SystemServiceBase, IAnxietyService
     {
         private readonly IWordTagResolver _tagResolver;
+        private readonly ILuckService _luckService;
         private IStatusEffectService _statusEffects;
 
-        public AnxietyService(IEventBus eventBus, IWordTagResolver tagResolver) : base(eventBus)
+        public AnxietyService(IEventBus eventBus, IWordTagResolver tagResolver, ILuckService luckService = null) : base(eventBus)
         {
             _tagResolver = tagResolver;
+            _luckService = luckService;
 
             Subscribe<ActionResolvedEvent>(OnActionResolved);
         }
@@ -34,8 +37,10 @@ namespace TextRPG.Core.StatusEffect
             int stacks = _statusEffects.GetStackCount(entityId, StatusEffectType.Anxiety);
             if (stacks <= 0) return false;
 
-            int chance = Math.Min(40, 10 + (stacks - 1) * 30 / 8);
-            if (UnityEngine.Random.Range(0, 100) >= chance) return false;
+            float chance = Math.Min(40, 10 + (stacks - 1) * 30 / 8) / 100f;
+            if (_luckService != null)
+                chance = _luckService.AdjustChance(chance, entityId, false);
+            if (UnityEngine.Random.value >= chance) return false;
 
             word = _tagResolver.GetRandomWordByTag("THOUGHTS");
             return word != null;

@@ -39,7 +39,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             "fontScaleFactor", "Font Scale Factor", typeof(float), 1.0f, 0.5f, 1f);
 
         private static readonly ScenarioParameter ClassParam = new(
-            "playerClass", "Player Class (0=Mage, 1=Warrior, 2=Merchant)", typeof(int), 0, 0, 2);
+            "playerClass", "Player Class (0=Mage, 1=Warrior, 2=Merchant, 3=Rogue)", typeof(int), 0, 0, 3);
 
         private RunSession _session;
         private CombatEncounterScope _combatScope;
@@ -54,6 +54,7 @@ namespace TextRPG.Core.WordInput.Scenarios
         private ExperienceVisualController _experience;
         private PlayerStatsBarVisual _playerStatsBar;
         private CombatSlotVisual _slotVisual;
+        private LetterChallenge.LetterChallengeVisual _letterChallenge;
 
         // Cross-cutting
         private EntityTooltipService _tooltipService;
@@ -131,8 +132,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Equipment controller (builds left + right bars)
             _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
                 s.InventoryService, s.ItemRegistry, s.WeaponService, s.ConsumableService,
-                s.PlayerInventoryId, playerId, root,
-                () => _encounterAdapter?.IsEncounterActive == true || _eventEncounterService?.IsEncounterActive == true);
+                s.PlayerInventoryId, playerId, root);
             _equipment.BuildBars(middleArea);
 
             // Word input controller (builds main text panel)
@@ -147,6 +147,9 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Wire weapon/consumable click actions
             _equipment.FireWeaponAction = () => _wordInput.FireWeapon();
             _equipment.UseConsumableAction = () => _wordInput.UseConsumable();
+
+            // Letter challenge visual (bottom-right corner)
+            _letterChallenge = new LetterChallenge.LetterChallengeVisual(s.EventBus, root, playerId);
 
             // Ally row
             var allyRow = new VisualElement();
@@ -435,6 +438,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             _messages = null;
             _combat?.Dispose();
             _combat = null;
+            _letterChallenge?.Dispose();
             _equipment?.Dispose();
             _equipment = null;
             _wordInput?.Dispose();

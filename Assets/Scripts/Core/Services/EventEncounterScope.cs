@@ -3,6 +3,7 @@ using TextRPG.Core.CombatSlot;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounterLoop;
+using TextRPG.Core.Lockpick;
 using TextRPG.Core.Run;
 using TextRPG.Core.UnitRendering;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
@@ -22,6 +23,10 @@ namespace TextRPG.Core.Services
             scope.EncounterService = new EventEncounterService(
                 s.EventBus, s.EntityStats, s.SlotService, s.CombatContext, s.ReactionService);
             s.ReactionContext.EncounterService = scope.EncounterService;
+
+            // Wire lockpick service to encounter service (circular ref)
+            if (s.LockpickService is LockpickService lockpick)
+                lockpick.SetEncounterService(scope.EncounterService);
 
             // Register interactable UnitDefinitions for rendering
             for (int i = 0; i < encounter.Interactables.Length; i++)
@@ -49,7 +54,7 @@ namespace TextRPG.Core.Services
             scope.LoopService = new EventEncounterLoopService(
                 s.EventBus, s.EntityStats, s.WordResolver, scope.EncounterService, s.PlayerId,
                 (IReservedWordHandler)s.RunService, s.CombatContext, s.WordCooldown, s.GiveValidator,
-                maxInteractions: 2);
+                consumableService: s.ConsumableService, maxInteractions: 2);
             ((EventEncounterLoopService)scope.LoopService).Start();
 
             return scope;

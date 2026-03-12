@@ -14,7 +14,7 @@ namespace TextRPG.Core.EventEncounter.Encounters
                 new InteractionReaction("Search", "message", "Steel plates riveted over thick wood. Joints look weldable.", 0),
             },
             "A steel-plated military crate",
-            Tags: new[] { "meltable", "conductive", "breakable" },
+            Tags: new[] { "meltable", "conductive", "breakable", "chest", "lockpickable" },
             DeathReward: "random",
             DeathRewardValue: 4),
         });

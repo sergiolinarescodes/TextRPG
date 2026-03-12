@@ -54,6 +54,25 @@ namespace TextRPG.Core.Experience
                 Publish(new LevelUpEvent(_currentLevel, previousLevel));
         }
 
+        public void GrantBonusXp(int amount)
+        {
+            if (amount <= 0) return;
+            _currentXp += amount;
+
+            int previousLevel = _currentLevel;
+            while (_currentXp >= XpForNextLevel)
+            {
+                _currentXp -= XpForNextLevel;
+                _currentLevel++;
+                _pendingLevelUps++;
+            }
+
+            Publish(new ExperienceGainedEvent(default, amount, _currentXp, XpForNextLevel, _currentLevel));
+
+            if (_currentLevel > previousLevel)
+                Publish(new LevelUpEvent(_currentLevel, previousLevel));
+        }
+
         private void OnLootSelected(LootRewardSelectedEvent evt)
         {
             if (_pendingLevelUps > 0)

@@ -10,6 +10,8 @@ namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
         public void Execute(InteractionOutcomeContext context)
         {
             context.Ctx.EventBus.Publish(new RewardGrantedEvent(context.OutcomeParam, context.Value));
+            context.Ctx.EventBus.Publish(new InteractionMessageEvent(
+                $"+{context.Value} {context.OutcomeParam}", context.Target));
         }
     }
 }

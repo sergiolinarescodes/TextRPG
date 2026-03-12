@@ -70,6 +70,10 @@ namespace TextRPG.Core.Passive.Scenarios
             RebuildAll(); RunStealStatEffectGroup();
             RebuildAll(); RunOnDeathGroup();
             RebuildAll(); RunOnDeathSiphonGroup();
+            RebuildAll(); RunOnDamageDealtGroup();
+            RebuildAll(); RunGoldEffectGroup();
+            RebuildAll(); RunOnLetterInWordGroup();
+            RebuildAll(); RunBuffStatEffectGroup();
 
             BuildUI();
         }
@@ -885,12 +889,13 @@ namespace TextRPG.Core.Passive.Scenarios
             _eventBus.Publish(new StatSiphonedEvent(_allyA, _enemyB, 2));
 
             int triggered = 0;
-            _subscriptions.Add(_eventBus.Subscribe<PassiveTriggeredEvent>(evt =>
+            var siphonSub = _eventBus.Subscribe<PassiveTriggeredEvent>(evt =>
             {
                 triggered++;
                 Check("on_death(siphon): value = accumulated total",
                     evt.Value == 5, $"Value={evt.Value}(exp 5)");
-            }));
+            });
+            _subscriptions.Add(siphonSub);
 
             int allyBHpBefore = HP(_allyB);
             _entityStats.ApplyDamage(_allyA, 999); // kill owner → triggers on_death
@@ -898,6 +903,9 @@ namespace TextRPG.Core.Passive.Scenarios
                 triggered == 1, $"triggered={triggered}(exp 1)");
             Check("on_death(siphon): ally healed by accumulated amount",
                 HP(_allyB) == allyBHpBefore + 5, $"HP={HP(_allyB)}(exp {allyBHpBefore + 5})");
+
+            // Dispose first subscriber before second test block
+            siphonSub.Dispose();
 
             // Reset and test zero accumulation: on_death(siphon) with no siphon events
             SoftReset();
@@ -913,6 +921,107 @@ namespace TextRPG.Core.Passive.Scenarios
             _entityStats.ApplyDamage(_allyA, 999); // kill with no siphon
             Check("on_death(siphon): triggers even with zero accumulated",
                 triggered2 == 1, $"triggered={triggered2}(exp 1)");
+        }
+
+        // ── Group: on_damage_dealt trigger ────────────────────────────
+
+        private void RunOnDamageDealtGroup()
+        {
+            int triggered = 0;
+            _subscriptions.Add(_eventBus.Subscribe<PassiveTriggeredEvent>(_ => triggered++));
+
+            // allyA has on_damage_dealt → heal self
+            Register(_allyA, "on_damage_dealt", null, "heal", null, 2, "Self");
+            _entityStats.ApplyDamage(_allyA, 10); // 50→40
+
+            // allyA damages an enemy → should trigger
+            _entityStats.ApplyDamage(_enemyA, 5, _allyA);
+            Check("on_damage_dealt: triggers when owner deals damage",
+                triggered == 1, $"triggered={triggered}(exp 1)");
+            Check("on_damage_dealt: heals self on damage dealt",
+                HP(_allyA) == 42, $"HP={HP(_allyA)}(exp 42)");
+
+            // Damage with no source → should NOT trigger
+            triggered = 0;
+            _entityStats.ApplyDamage(_enemyA, 5);
+            Check("on_damage_dealt: does NOT trigger for sourceless damage",
+                triggered == 0, $"triggered={triggered}(exp 0)");
+
+            // Different entity damages → should NOT trigger
+            triggered = 0;
+            _entityStats.ApplyDamage(_enemyA, 5, _allyB);
+            Check("on_damage_dealt: does NOT trigger when other entity deals damage",
+                triggered == 0, $"triggered={triggered}(exp 0)");
+
+            // Owner dead → does not trigger
+            SoftReset();
+            triggered = 0;
+            Register(_allyA, "on_damage_dealt", null, "heal", null, 1, "Self");
+            _entityStats.ApplyDamage(_allyA, 999); // kill
+            _entityStats.ApplyDamage(_enemyA, 5, _allyA); // dead owner deals damage
+            Check("on_damage_dealt: does NOT trigger when owner is dead",
+                triggered == 0, $"triggered={triggered}(exp 0)");
+        }
+
+        // ── Group: gold effect ────────────────────────────────────────
+
+        private void RunGoldEffectGroup()
+        {
+            // Gold effect requires IResourceService in context — scenario uses null,
+            // so we verify the effect doesn't crash when ResourceService is null.
+            Register(_allyA, "on_round_end", null, "gold", null, 1, "AllAllies");
+
+            _turnService.BeginTurn(); _turnService.EndTurn(); // allyA
+            _turnService.BeginTurn(); _turnService.EndTurn(); // allyB
+            _turnService.BeginTurn(); _turnService.EndTurn(); // enemyA
+            _turnService.BeginTurn(); _turnService.EndTurn(); // enemyB — round end
+
+            // No crash = pass (gold effect gracefully handles null ResourceService)
+            Check("gold effect: no crash with null ResourceService",
+                true, null);
+        }
+
+        private void RunOnLetterInWordGroup()
+        {
+            // on_letter_in_word requires ILetterChallengeService in context — scenario uses null,
+            // so the trigger should gracefully return an empty disposable and never fire.
+            Register(_allyA, "on_letter_in_word", "vowel", "heal", null, 1, "Self");
+
+            _turnService.BeginTurn(); // allyA turn
+            _eventBus.Publish(new ActionExecutionCompletedEvent("apple")); // contains vowels
+            _turnService.EndTurn();
+
+            var hp = _entityStats.GetCurrentHealth(_allyA);
+            // Should NOT have healed because LetterChallengeService is null
+            Check("on_letter_in_word: no effect with null service",
+                hp == 50, $"HP={hp}, expected 50");
+        }
+
+        private void RunBuffStatEffectGroup()
+        {
+            // buff_stat adds a permanent stat modifier each trigger
+            Register(_allyA, "on_round_end", null, "buff_stat", "Luck", 1, "Self");
+
+            int luckBefore = _entityStats.GetStat(_allyA, StatType.Luck);
+
+            _turnService.BeginTurn(); _turnService.EndTurn(); // allyA
+            _turnService.BeginTurn(); _turnService.EndTurn(); // allyB
+            _turnService.BeginTurn(); _turnService.EndTurn(); // enemyA
+            _turnService.BeginTurn(); _turnService.EndTurn(); // enemyB — round end
+
+            int luckAfter = _entityStats.GetStat(_allyA, StatType.Luck);
+            Check("buff_stat: Luck increased by 1 after round end",
+                luckAfter == luckBefore + 1, $"Before={luckBefore}, After={luckAfter}");
+
+            // Second round — should accumulate
+            _turnService.BeginTurn(); _turnService.EndTurn();
+            _turnService.BeginTurn(); _turnService.EndTurn();
+            _turnService.BeginTurn(); _turnService.EndTurn();
+            _turnService.BeginTurn(); _turnService.EndTurn();
+
+            int luckAfter2 = _entityStats.GetStat(_allyA, StatType.Luck);
+            Check("buff_stat: Luck accumulated +2 after two rounds",
+                luckAfter2 == luckBefore + 2, $"Before={luckBefore}, After2={luckAfter2}");
         }
 
         // ── UI ──────────────────────────────────────────────────────

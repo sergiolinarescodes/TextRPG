@@ -1,10 +1,14 @@
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
+using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.ActionExecution.Handlers
 {
     internal sealed class ScaledDamageHandler : IActionHandler
     {
         private readonly IEntityStatsService _entityStats;
+        private readonly ILuckService _luckService;
+        private readonly IEventBus _eventBus;
         private readonly StatType _offensiveStat;
         private readonly StatType _defensiveStat;
 
@@ -15,6 +19,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
         {
             ActionId = actionId;
             _entityStats = ctx.EntityStats;
+            _luckService = ctx.LuckService;
+            _eventBus = ctx.EventBus;
             _offensiveStat = offensiveStat;
             _defensiveStat = defensiveStat;
         }
@@ -28,6 +34,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
                 var target = context.Targets[i];
                 var defense = _entityStats.GetStat(target, _defensiveStat);
                 var damage = StatScaling.OffensiveScale(context.Value, offense, defense);
+
+                damage = StatScaling.ApplyCritical(damage, context, _luckService, _eventBus, target);
                 _entityStats.ApplyDamage(target, damage, context.Source);
             }
         }

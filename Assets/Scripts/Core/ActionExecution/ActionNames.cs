@@ -51,6 +51,9 @@ namespace TextRPG.Core.ActionExecution
         public const string Combust = "Combust";
         public const string Cannonade = "Cannonade";
         public const string Plunder = "Plunder";
+        public const string Cataclysm = "Cataclysm";
+        public const string Cleave = "Cleave";
+        public const string Lockpick = "Lockpick";
 
         public static readonly string[] InteractionActions =
         {

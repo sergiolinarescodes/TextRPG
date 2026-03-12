@@ -114,13 +114,50 @@ Use `AskUserQuestion` with `multiSelect: true` to pick from existing tags.
 - Option 2: "NEW: TAG_NAME" — another idea
 - Option 3: "No new tags" — stick with existing only
 
-#### Step 5 — Confirm
+#### Step 5 — Mana Cost
+**MANDATORY step.** Query the DB for similar words (same primary action or similar action combos) to show the user what existing words cost. This gives context for appropriate pricing.
+
+```bash
+py -c "
+import sqlite3
+conn = sqlite3.connect('Assets/StreamingAssets/wordactions.db')
+# Replace ACTION_NAME with the chosen primary action
+rows = conn.execute('''
+    SELECT wa.word, wm.cost, GROUP_CONCAT(wa.action_name || ':' || wa.value, ' + ')
+    FROM word_actions wa
+    JOIN word_meta wm ON wa.word = wm.word
+    WHERE wa.word IN (SELECT word FROM word_actions WHERE action_name = 'ACTION_NAME')
+    GROUP BY wa.word
+    ORDER BY wm.cost
+''').fetchall()
+for r in rows:
+    print(f'  cost {r[1]}: {r[0]:15s} → {r[2]}')
+conn.close()
+"
+```
+
+Present 3-4 cost options with reference comparisons. Each option description MUST include 2-3 existing words at that cost level with their action profiles.
+
+`AskUserQuestion`: "What mana cost for the summon word (singular)?"
+- Option 1: lowest reasonable cost — description lists similar-cost words (e.g., "Cost 3: raven → Summon:1, treasonist → Summon:1")
+- Option 2: moderate cost — description lists words
+- Option 3: higher cost — description lists premium words
+- Option 4: the highest cost if word is particularly powerful
+
+Then for plural form: cost = singular cost + 3 (standard plural summon surcharge).
+
+For the **unit's ability words**, also set costs:
+- Simple ability words (single action): cost 0-1
+- Combo ability words (2 actions): cost 1-2
+
+#### Step 6 — Confirm
 Present the full design summary in plain English:
 - Unit name, type (enemy/structure), stats
 - Ability 1: action name (NEW or existing), what it does
 - Ability 2: action name (NEW or existing), what it does
 - Passive: trigger -> effect -> target (NEW or existing pieces labeled)
 - Tags
+- **Mana costs**: singular summon cost, plural summon cost, each ability word cost
 - Full file list of everything to create/modify
 
 `AskUserQuestion`: "Implement this design?"
@@ -153,8 +190,55 @@ Propose 2-3 options for a complementary secondary action, or "No secondary."
 #### Step 3 — Tags
 Multi-select from relevant existing tags, then ALWAYS offer new tag ideas (same as unit flow Steps 4 + 4b).
 
-#### Step 4 — Confirm
-Summary + file list + implement question (same as unit flow Step 5).
+#### Step 4 — Mana Cost
+**MANDATORY step.** Query the DB for words with the same primary action to show cost comparisons.
+
+```bash
+py -c "
+import sqlite3
+conn = sqlite3.connect('Assets/StreamingAssets/wordactions.db')
+rows = conn.execute('''
+    SELECT wa.word, wm.cost, wm.target, GROUP_CONCAT(wa.action_name || ':' || wa.value, ' + ')
+    FROM word_actions wa
+    JOIN word_meta wm ON wa.word = wm.word
+    WHERE wa.word IN (SELECT word FROM word_actions WHERE action_name = 'ACTION_NAME')
+    GROUP BY wa.word
+    ORDER BY wm.cost
+''').fetchall()
+for r in rows:
+    print(f'  cost {r[1]}: {r[0]:15s} ({r[2]}) → {r[3]}')
+conn.close()
+"
+```
+
+Present 3-4 cost options with previews showing existing words at each cost level. Each option description MUST include 2-3 existing reference words with their action combos and targets.
+
+Use this **Mana Cost Reference Table** for calibration:
+
+| Cost | Profile | Example |
+|------|---------|---------|
+| 0 | Weak single action (value 1), common word | drip → Water:1 |
+| 1 | Single action (value 2-3) or weak combo | flame → Burn:2 + Damage:2 |
+| 2 | Strong single action (value 3-4) or standard combo | saber → Cleave:3 |
+| 3 | Multi-action combo or AoE | tornado → Damage:3 + Scramble:1 |
+| 4 | Premium multi-action or powerful AoE | supernova → Cataclysm:4 (All) |
+| 5 | Maximum power (3 actions or devastating AoE) | tsunami → Water:5 + Damage:5 + Push:2 + Scramble:1 |
+
+**Cost modifiers:**
+- AoE targeting (AllEnemies, All): +1 cost over single-target equivalent
+- Self-only beneficial (heal, buff, shield): -1 cost (no offensive threat)
+- Combo with secondary debuff (Bleed, status): +1 cost
+- Summon words (singular): base ability cost + 4
+- Summon words (plural/dual): singular cost + 3 (summons both ally slots)
+
+`AskUserQuestion`: "What mana cost for this word?"
+- Option descriptions MUST reference specific existing words at each cost level
+
+For **plural forms**: typically same cost or +1 if target upgrades (e.g., SingleEnemy → TwoRandomEnemies).
+For **plural summon forms**: singular cost + 3 (dual summon premium).
+
+#### Step 5 — Confirm
+Summary including **mana cost + reference justification** + file list + implement question (same as unit flow Step 6).
 
 ---
 
@@ -175,7 +259,15 @@ Propose 3 passive compositions for the item (or "No passive").
 #### Step 3 — Tags
 Multi-select from relevant existing tags, then ALWAYS offer new tag ideas (same as unit flow Steps 4 + 4b).
 
-#### Step 4 — Confirm
+#### Step 4 — Mana Cost
+**MANDATORY step.** Items typically cost 0 mana (they go to inventory, not combat). But some premium items may cost 1-2. Query DB for existing item words to compare.
+
+`AskUserQuestion`: "What mana cost for this item word?"
+- Option 1: "Cost 0 (standard)" — most items are free to acquire
+- Option 2: "Cost 1" — if item has immediate combat effect on pickup
+- Option 3: "Cost 2" — premium item with strong stats/passive
+
+#### Step 5 — Confirm
 Summary + implement question.
 
 ---
@@ -230,11 +322,44 @@ All of the above, plus:
 8. Add to `StatusEffectColors` if custom color needed
 9. Add the inspiring word to `seed_db.py`
 
+### Letter Challenge Passives (on_letter_in_word)
+
+The **Letter Challenge System** (`ILetterChallengeService`) enables passives that interact with specific letters in typed words. Use this for items/units that reward typing precision.
+
+**How it works**: Each turn, the trigger selects a random letter (based on mode). If the player's word contains that letter, the passive effect fires. A visual in the bottom-right corner shows the active letter with a dancing animation.
+
+**Available modes** (trigger_param DSL):
+| Mode | Selection | Match |
+|------|-----------|-------|
+| `vowel` | Random vowel (a,e,i,o,u) | Contains (default) |
+| `consonant` | Random consonant | Contains |
+| `any` | Random letter (a-z) | Contains |
+| `fixed:e` | Always letter 'e' | Contains |
+| `vowel:starts_with` | Random vowel | Word starts with it |
+| `consonant:ends_with` | Random consonant | Word ends with it |
+| `fixed:e:position:3` | Always 'e' | At position 3 in word |
+| `multi:aei:all` | Letters a,e,i | Word has ALL of them |
+
+**When designing items, always consider letter challenge passives** as an option alongside standard triggers. They create a unique typing-interactive experience.
+
+**Example item passives:**
+- Telescope: `on_letter_in_word(vowel) → buff_stat(Luck:1) → Self` — match vowels for +1 Luck
+- Sniper scope: `on_letter_in_word(consonant) → damage(2) → RandomEnemy` — match consonants for damage
+- Oracle eye: `on_letter_in_word(vowel:starts_with) → shield(2) → Self` — word starts with vowel for shield
+
 ### New Unit/Item Archetype
 
 1. Design unit stats + passive compositions using existing (or newly created) triggers/effects
 2. Add to `seed_db.py` (SEED_UNITS, SEED_UNIT_PASSIVES, SEED_UNIT_ABILITIES, SEED_UNIT_TAGS)
-3. Add showcase word with `Summon`/`Item` action to SEED_ACTIONS
+3. Add showcase Summon words to SEED_ACTIONS following this **MANDATORY** pattern:
+   - **Singular** (e.g., "mercenary"): 1 row — `("mercenary", "Summon", 1, "Self", None, None, "", 0)`
+   - **Plural** (e.g., "mercenaries"): 2 rows with `assoc_word` pointing to the unit_id:
+     ```python
+     ("mercenaries", "Summon", 1, "Self", None, None, "mercenary", 0),
+     ("mercenaries", "Summon", 1, "Self", None, None, "mercenary", 1),
+     ```
+   - Each Summon row = 1 handler Execute() call = 1 entity spawned. Plural needs 2 rows to fill both ally slots.
+   - `assoc_word` is how `SummonActionHandler` resolves the unit_id for stats/passives/abilities/display name. Without it, plural words won't find the unit definition.
 4. For items: add to SEED_ITEMS + SEED_ITEM_PASSIVES
 
 ### Save Word Relationships for Ralph-Loop
@@ -245,7 +370,14 @@ All of the above, plus:
 
 2. **Update WORD FAMILIES table in `ralph-prompt.md`**: Add a row listing 10-20 words that map to the new action/tag. This helps ralph-loop classify words it encounters that weren't pre-registered.
 
-3. **Balance mana costs across the family**: Single-action words cost less (1-2), combo words cost more (3-4), premium 3-action words cost the most (4-5). Summons add +3 on top.
+3. **Balance mana costs across the family using the chosen word as anchor**: The mana cost selected during design becomes the **reference cost** for the entire word family. When pre-registering related words in `preregister_families.py`, calibrate each word's cost relative to the anchor:
+   - Same action profile as anchor → same cost
+   - Fewer/weaker actions → -1 cost
+   - More/stronger actions or combo additions → +1 cost
+   - AoE targeting upgrade → +1 cost
+   - Summons: base ability cost + 4 for singular, singular cost + 3 for plural (dual summon)
+
+   This creates a consistent cost curve that ralph-loop can reference. When ralph-loop encounters a word that maps to an existing action, it should check the DB for other words with that action and match costs proportionally.
 
 ### After All Code Changes
 
@@ -288,55 +420,78 @@ If no → show summary of all mechanics created this session:
 5. **Showcase entries** — Every new mechanic gets at least one word in seed_db.py
 6. **Update the pipeline** — Every new mechanic must update batch_insert.py + ralph-prompt.md so ralph-loop can classify words into it
 7. **Use AskUserQuestion for ALL decisions** — Never ask users to type when they can click
-8. **Singular + plural** — When adding words to the DB, ALWAYS add both singular and plural forms unless they mean completely different things. For Summon words specifically: singular = Summon:1 (one ally, lower cost), plural = Summon:2 (both ally slots, higher cost). Max ally slots is 2.
+8. **Singular + plural summon pattern** — ALWAYS add both singular and plural forms. For Summon words, the DB pattern is CRITICAL:
+   - **Singular** (e.g., "mercenary"): 1 Summon row, value=1, assoc_word="" (word itself IS the unit_id), seq=0
+   - **Plural** (e.g., "mercenaries"): 2 Summon rows, each value=1, assoc_word=unit_id (e.g., "mercenary"), seq=0 and seq=1. This creates 2 separate Execute() calls so both ally slots fill.
+   - **NEVER** use value=2 on a single Summon row to mean "summon 2" — each row = 1 summon execution.
+   - **assoc_word is mandatory** when the word differs from the unit_id (all plurals, plus words like "crewmate" → "pirate").
+   - Max ally slots is 2. Max enemy slots is 3.
+9. **Mana cost is a design decision** — ALWAYS ask the user to choose mana cost with DB-sourced comparisons of similar words. The chosen cost becomes the reference anchor for all related words in preregister_families.py and ralph-prompt.md WORD FAMILIES. This is critical for ralph-loop: when it encounters a new word that maps to an existing action, it calibrates cost by looking at what similar words cost in the DB.
 
 ---
 
-## Existing Mechanics Catalog
+## Phase 1.5: Full Mechanic Scan (Mandatory)
 
-### Actions (43 total)
+After running audit.py, run this comprehensive scan before ANY design work:
 
-**Scaled Damage (4):** Damage (Str/PDef), MagicDamage (Mgc/MDef), WeaponDamage (Dex/PDef), Smash (Str/PDef)
+```bash
+py -c "
+import sqlite3, os, glob
+conn = sqlite3.connect('Assets/StreamingAssets/wordactions.db')
 
-**Support (3):** Heal (heal template), Shield (shield template), Thinking (mana_self)
+print('=== ALL ACTIONS ===')
+for r in conn.execute('SELECT DISTINCT action_name FROM word_actions ORDER BY action_name'):
+    print(f'  {r[0]}')
 
-**Utility (3):** Pay (noop), Push (push), Fire (fire)
+print('\n=== ALL WORD TAGS ===')
+for r in conn.execute('SELECT DISTINCT tag FROM word_tags ORDER BY tag'):
+    print(f'  {r[0]}')
 
-**Status -> Target (6):** Burn->Burning, Water->Wet, Fear->Fear, Stun->Stun, Poison->Poisoned, Bleed->Bleeding
+print('\n=== ALL UNIT TAGS ===')
+for r in conn.execute('SELECT DISTINCT tag FROM unit_tags ORDER BY tag'):
+    print(f'  {r[0]}')
 
-**Status -> Self (8):** Grow->Growing, Thorns->Thorns, Reflect->Reflecting, Hardening->Hardening, Drunk->Drunk, Freeze->Frostbitten, Energize->Energetic, Sleep->Sleep
+print('\n=== ALL UNITS ===')
+for r in conn.execute('SELECT unit_id, unit_type FROM units ORDER BY unit_id'):
+    print(f'  {r[0]:20s} {r[1]}')
 
-**Tag-Driven (1):** Relax (noop, RELAX tag removes Anxiety)
+print('\n=== ALL ITEMS ===')
+for r in conn.execute('SELECT item_id, item_type FROM items ORDER BY item_id'):
+    print(f'  {r[0]:20s} {r[1]}')
 
-**Stat Buffs (7):** BuffStrength, BuffMagicPower, BuffPhysicalDefense, BuffMagicDefense, BuffLuck, BuffMaxMana, BuffManaRegen
+print('\n=== ALL STATUS EFFECTS (from handlers) ===')
+for f in sorted(glob.glob('Assets/Scripts/Core/StatusEffect/Handlers/*Handler.cs')):
+    print(f'  {os.path.basename(f)}')
 
-**Stat Debuffs (7):** DebuffStrength, DebuffMagicPower, DebuffPhysicalDefense, DebuffMagicDefense, DebuffLuck, DebuffMaxMana, DebuffManaRegen
+print('\n=== ALL TAG DEFINITIONS (from code) ===')
+for f in sorted(glob.glob('Assets/Scripts/Core/EventEncounter/Reactions/Tags/Definitions/*TagDefinition.cs')):
+    print(f'  {os.path.basename(f)}')
 
-**Special (1):** Melt (PhysicalDefense debuff, stat_modifier template)
+print('\n=== ALL PASSIVE TRIGGERS (from code) ===')
+for f in sorted(glob.glob('Assets/Scripts/Core/Passive/Triggers/*Trigger.cs')):
+    print(f'  {os.path.basename(f)}')
 
-**Custom Handlers (8):** Shock (lightning+wet bonus), Concentrate (mana+Concentrated), Summon (spawn unit), RestHeal (conditional heal), Scramble (swap slot positions), Item (equip to inventory), Siphon (steal random stat from target, buff self), Deceive (Fear + Concussion)
+print('\n=== ALL PASSIVE EFFECTS (from code) ===')
+for f in sorted(glob.glob('Assets/Scripts/Core/Passive/Effects/*Effect.cs')):
+    print(f'  {os.path.basename(f)}')
 
-**Interaction (11):** Enter, Talk, Steal, Search, Pray, Rest, Open, Trade, Recruit, Leave, Charm
+print('\n=== ALL STATS (from code) ===')
+import re
+with open('Assets/Scripts/Core/EntityStats/StatType.cs') as f:
+    body = f.read().split('{', 2)[2].split('}')[0]
+    for m in re.findall(r'(\w+)', body):
+        if m[0].isupper(): print(f'  {m}')
 
-### Status Effects (24 total)
+conn.close()
+"
+```
 
-Burning, Wet, Poisoned, Frozen, Slowed, Cursed, Buffed, Shielded, ExtraTurn, Stun, Concussion, Fear, Bleeding, Concentrated, Growing, Thorns, Reflecting, Hardening, Drunk, Frostbitten, Energetic, Tired, Sleep, Anxiety
+This auto-discovers everything. No hardcoded lists to maintain.
 
-### Passive Triggers (10 + taunt marker)
-
-on_ally_hit, on_self_hit, on_round_end, on_round_start, on_turn_start, on_turn_end, on_word_played, on_word_length, on_word_tag, on_kill, taunt
-
-### Passive Effects (6)
-
-heal, damage, shield, mana, apply_status, steal_stat
-
-### Passive Targets (5)
-
-Self, AllAllies, AllEnemies, Injured, Attacker
-
-### Tags (20)
-
-NATURE, ELEMENTAL, OFFENSIVE, RESTORATION, SHADOW, PHYSICAL, DEFENSIVE, ARCANE, HOLY, SUPPORT, PSYCHIC, SPELL, MELEE, SOCIAL, THOUGHTS, RELAX, DWELLING, BEAST, FLYING, LIGHT, CLEANSING, DEBUFF, STEALTH
+**RULE: Before labeling anything "NEW", grep for it first:**
+```bash
+rg -i "mechanic_name" Assets/Scripts/ --type cs
+```
 
 ### Action Templates
 

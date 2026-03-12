@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.WordAction;
 using TextRPG.Core.WordInput;
@@ -19,11 +20,21 @@ namespace TextRPG.Core.ActionExecution
         private readonly IStatusEffectService _statusEffects;
         private readonly IAnimationResolver _animationResolver;
         private readonly IActionValueModifier _valueModifier;
+        private readonly ILuckService _luckService;
+
+        private static readonly HashSet<string> DamageActions = new()
+        {
+            ActionNames.Damage, ActionNames.MagicDamage, ActionNames.WeaponDamage,
+            ActionNames.Smash, ActionNames.Ignite, ActionNames.Combust,
+            ActionNames.Cannonade, ActionNames.Peck, ActionNames.Shock, ActionNames.Plunder,
+            ActionNames.Cataclysm, ActionNames.Cleave
+        };
 
         public ActionExecutionService(IEventBus eventBus, IWordResolver wordResolver,
             IActionHandlerRegistry handlerRegistry, ICombatContext combatContext,
             IEntityStatsService entityStats = null, IStatusEffectService statusEffects = null,
-            IAnimationResolver animationResolver = null, IActionValueModifier valueModifier = null)
+            IAnimationResolver animationResolver = null, IActionValueModifier valueModifier = null,
+            ILuckService luckService = null)
             : base(eventBus)
         {
             _wordResolver = wordResolver;
@@ -33,6 +44,7 @@ namespace TextRPG.Core.ActionExecution
             _statusEffects = statusEffects;
             _animationResolver = animationResolver;
             _valueModifier = valueModifier;
+            _luckService = luckService;
             Subscribe<WordSubmittedEvent>(OnWordSubmitted);
         }
 
@@ -140,9 +152,13 @@ namespace TextRPG.Core.ActionExecution
                         handler.Execute(ctx);
                     }
 
+                    bool isCritical = false;
+                    if (_luckService != null && DamageActions.Contains(mapping.ActionId))
+                        isCritical = _luckService.RollCritical(_combatContext.SourceEntity);
+
                     resolved.Add(new ResolvedAction(
                         mapping.ActionId, value,
-                        _combatContext.SourceEntity, targets, word, mapping.AssocWord));
+                        _combatContext.SourceEntity, targets, word, mapping.AssocWord, isCritical));
                 }
             }
 
@@ -167,7 +183,7 @@ namespace TextRPG.Core.ActionExecution
             {
                 if (_handlerRegistry.TryGet(action.ActionId, out var handler))
                 {
-                    var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word, action.AssocWord);
+                    var context = new ActionContext(action.Source, action.Targets, action.Value, action.Word, action.AssocWord, action.IsCritical);
                     handler.Execute(context);
                     Publish(new ActionHandlerExecutedEvent(action.ActionId, action.Value, action.Source, action.Targets));
                 }

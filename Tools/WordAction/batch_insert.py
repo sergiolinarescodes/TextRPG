@@ -44,7 +44,7 @@ VALID_ACTIONS = {
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
     "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal", "Scramble", "Melt",
     "Peck", "Screech", "Purify", "Awaken", "Siphon", "Deceive", "Recuperate", "Comfort", "Overcharge",
-    "Cannonade", "Plunder", "Attune", "Ignite", "Combust",
+    "Cannonade", "Plunder", "Attune", "Ignite", "Combust", "Cataclysm", "Cleave", "Lockpick",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",
@@ -95,16 +95,18 @@ VALID_TAGS = {
     "PHYSICAL", "DEFENSIVE", "ARCANE", "HOLY", "SUPPORT", "PSYCHIC",
     "SPELL", "MELEE", "SOCIAL", "BEAST", "FLYING", "LIGHT", "CLEANSING",
     "DEBUFF", "STEALTH", "RELAX", "THOUGHTS", "DWELLING", "LIGHTNING", "WEATHER",
-    "BOTANICAL", "DRAIN", "UNDEAD", "NAVAL", "FIRE",
+    "BOTANICAL", "DRAIN", "UNDEAD", "NAVAL", "FIRE", "COSMIC", "DESTRUCTION",
+    "BLADE", "JUNGLE", "SIGHT",
 }
 
 VALID_TRIGGERS = {
     "on_ally_hit", "on_self_hit", "on_round_end", "on_round_start",
     "on_turn_start", "on_turn_end", "on_word_played", "on_word_length",
-    "on_word_tag", "on_kill", "on_ally_death", "on_death", "taunt",
+    "on_word_tag", "on_kill", "on_ally_death", "on_death", "on_damage_dealt",
+    "on_letter_in_word", "taunt",
 }
 
-VALID_EFFECTS = {"heal", "damage", "shield", "mana", "apply_status", "steal_stat"}
+VALID_EFFECTS = {"heal", "damage", "shield", "mana", "apply_status", "steal_stat", "gold", "buff_stat"}
 
 VALID_PASSIVE_TARGETS = {"Self", "AllAllies", "AllEnemies", "Injured", "Attacker"}
 

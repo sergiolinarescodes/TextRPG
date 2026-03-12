@@ -12,6 +12,8 @@ namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
         public void Execute(InteractionOutcomeContext context)
         {
             context.Ctx.EntityStats.ApplyShield(context.Source, context.Value);
+            context.Ctx.EventBus.Publish(new InteractionMessageEvent(
+                $"+{context.Value} Shield", context.Target));
         }
     }
 }

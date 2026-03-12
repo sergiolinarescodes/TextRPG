@@ -90,15 +90,19 @@ namespace TextRPG.Core.ActionExecution
             if (ctx.StatusEffects != null)
                 registry.Register(ActionNames.Recuperate, new RecuperateActionHandler(ctx));
 
-            // 5e. Cannonade (multi-hit random targeting) + Plunder (damage + stat steal)
+            // 5e. Cannonade (multi-hit random targeting) + Plunder (damage + stat steal) + Cleave (splash damage)
             registry.Register(ActionNames.Cannonade, new CannonadeActionHandler(ctx));
             registry.Register(ActionNames.Plunder, new PlunderActionHandler(ctx));
+            registry.Register(ActionNames.Cleave, new CleaveActionHandler(ctx));
 
             // 7. Attune (letter reserve)
             if (ctx.LetterReserve != null)
                 registry.Register(ActionNames.Attune, new AttuneActionHandler(ctx.LetterReserve, ctx.EventBus));
 
-            // 8. Interaction actions
+            // 8. Lockpick
+            registry.Register(ActionNames.Lockpick, new LockpickActionHandler(ctx));
+
+            // 9. Interaction actions
             foreach (var action in ActionNames.InteractionActions)
                 registry.Register(action, new InteractionActionHandler(action, ctx));
 

@@ -29,8 +29,11 @@ namespace TextRPG.Core.StatusEffect.Handlers
 
             UpdateModifiers(target, instance.StackCount, ctx);
 
-            // Chance to proc Sleep: 10% per stack
-            if (Random.Range(0, 100) < 10 * instance.StackCount)
+            // Chance to proc Sleep: 10% per stack, reduced by luck
+            float sleepChance = 10 * instance.StackCount / 100f;
+            if (ctx.LuckService != null)
+                sleepChance = ctx.LuckService.AdjustChance(sleepChance, target, false);
+            if (Random.value < sleepChance)
                 ctx.StatusEffects.ApplyEffect(target, StatusEffectType.Sleep,
                     StatusEffectInstance.PermanentDuration, target);
         }

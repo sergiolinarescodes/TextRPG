@@ -4,6 +4,7 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.LetterReserve;
+using TextRPG.Core.Luck;
 using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
@@ -26,6 +27,7 @@ namespace TextRPG.Core.ActionExecution
         public IGameServices Services { get; }
         public IEntityTagProvider EntityTagProvider { get; }
         public ILetterReserveService LetterReserve { get; }
+        public ILuckService LuckService { get; }
 
         public ActionHandlerContext(
             IEntityStatsService entityStats,
@@ -38,7 +40,8 @@ namespace TextRPG.Core.ActionExecution
             IReadOnlyDictionary<string, EntityDefinition> unitRegistry = null,
             ICombatSlotService slotService = null,
             IEntityTagProvider entityTagProvider = null,
-            ILetterReserveService letterReserve = null)
+            ILetterReserveService letterReserve = null,
+            ILuckService luckService = null)
         {
             EntityStats = entityStats;
             EventBus = eventBus;
@@ -51,6 +54,7 @@ namespace TextRPG.Core.ActionExecution
             SlotService = slotService;
             EntityTagProvider = entityTagProvider;
             LetterReserve = letterReserve;
+            LuckService = luckService;
         }
 
         public ActionHandlerContext(IGameServices services, ICombatContext combatContext)
@@ -65,6 +69,7 @@ namespace TextRPG.Core.ActionExecution
             InteractionTable = services.InteractionTable ?? new StatusEffectInteractionTable();
             UnitRegistry = services.UnitRegistry;
             SlotService = services.SlotService;
+            LuckService = services.LuckService;
         }
     }
 }

@@ -21,8 +21,10 @@ namespace TextRPG.Core.PlayerClass
             ManaRegen: 3,
             StartingMana: 6,
             Constitution: 1,
+            Dexterity: 0,
             Passives: Array.Empty<PassiveEntry>(),
-            PassiveDescriptions: new[] { "Arcane Scholar: Learn a random scroll on each level up" });
+            PassiveDescriptions: new[] { "Arcane Scholar: Learn a random scroll on each level up" },
+            StartingItems: Array.Empty<string>());
 
         public static readonly ClassDefinition Warrior = new(
             Class: PlayerClass.Warrior,
@@ -39,8 +41,10 @@ namespace TextRPG.Core.PlayerClass
             ManaRegen: 1,
             StartingMana: 3,
             Constitution: 1,
+            Dexterity: 0,
             Passives: Array.Empty<PassiveEntry>(),
-            PassiveDescriptions: new[] { "Brute Force: MELEE actions deal 50% more damage" });
+            PassiveDescriptions: new[] { "Brute Force: MELEE actions deal 50% more damage" },
+            StartingItems: Array.Empty<string>());
 
         public static readonly ClassDefinition Merchant = new(
             Class: PlayerClass.Merchant,
@@ -57,6 +61,7 @@ namespace TextRPG.Core.PlayerClass
             ManaRegen: 2,
             StartingMana: 4,
             Constitution: 1,
+            Dexterity: 0,
             Passives: new[]
             {
                 new PassiveEntry("on_word_tag", "SOCIAL", "shield", null, 2, "Self")
@@ -65,13 +70,39 @@ namespace TextRPG.Core.PlayerClass
             {
                 "Golden Touch: Gain +1 bonus gold on every gold gain",
                 "Charming Presence: Social words grant Shield(2)"
-            });
+            },
+            StartingItems: Array.Empty<string>());
+
+        public static readonly ClassDefinition Rogue = new(
+            Class: PlayerClass.Rogue,
+            DisplayName: "Rogue",
+            Description: "A nimble trickster who picks locks and plunders treasure.",
+            Color: new Color(0.5f, 0.85f, 0.5f),
+            MaxHealth: 32,
+            Strength: 5,
+            MagicPower: 3,
+            PhysicalDefense: 3,
+            MagicDefense: 2,
+            Luck: 5,
+            MaxMana: 6,
+            ManaRegen: 2,
+            StartingMana: 4,
+            Constitution: 1,
+            Dexterity: 7,
+            Passives: Array.Empty<PassiveEntry>(),
+            PassiveDescriptions: new[]
+            {
+                "Locksmith: Start with 3 lockpicks",
+                "Treasure Hunter: Gain bonus XP (2 + level) from opening chests"
+            },
+            StartingItems: new[] { "lockpick" });
 
         public static ClassDefinition Get(PlayerClass playerClass) => playerClass switch
         {
             PlayerClass.Mage => Mage,
             PlayerClass.Warrior => Warrior,
             PlayerClass.Merchant => Merchant,
+            PlayerClass.Rogue => Rogue,
             _ => throw new ArgumentOutOfRangeException(nameof(playerClass), playerClass, null)
         };
     }

@@ -146,8 +146,7 @@ namespace TextRPG.Core.CombatLoop.Scenarios
 
             _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
                 s.InventoryService, s.ItemRegistry, s.WeaponService, s.ConsumableService,
-                s.PlayerInventoryId, playerId, root,
-                () => _encounterService?.IsEncounterActive == true);
+                s.PlayerInventoryId, playerId, root);
             _equipment.BuildBars(middleArea);
 
             _wordInput = new WordInputController(s.EventBus, s.WordInputService, s.DrunkLetterService,

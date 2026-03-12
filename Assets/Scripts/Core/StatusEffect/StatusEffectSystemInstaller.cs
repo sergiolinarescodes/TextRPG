@@ -1,6 +1,7 @@
 using Reflex.Core;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
@@ -26,7 +27,11 @@ namespace TextRPG.Core.StatusEffect
                 try { encounterService = container.Resolve<IEncounterService>(); } catch { /* optional */ }
                 handlerContext.EncounterService = encounterService;
 
-                var service = new StatusEffectService(eventBus, entityStats, turnService, handlerRegistry, handlerContext);
+                ILuckService luckService = null;
+                try { luckService = container.Resolve<ILuckService>(); } catch { /* optional */ }
+                handlerContext.LuckService = luckService;
+
+                var service = new StatusEffectService(eventBus, entityStats, turnService, handlerRegistry, handlerContext, luckService: luckService);
                 handlerContext.StatusEffects = service;
                 return (IStatusEffectService)service;
             }, typeof(IStatusEffectService));

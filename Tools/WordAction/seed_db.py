@@ -364,13 +364,15 @@ SEED_ACTIONS = [
     ("dawn",       "BuffMagicDefense", 1, "Self", None, None, "", 1),
     ("dawn",       "Awaken", 1, "AllAlliesAndSelf", None, None, "", 2),
 
-    # Raven summon words (singular=1 unit, plural=2 units, higher cost)
+    # Raven summon words (singular=1 unit, plural=2 units via seq, higher cost)
     ("raven",      "Summon", 1, "Self", None, None, "", 0),
-    ("ravens",     "Summon", 2, "Self", None, None, "", 0),
+    ("ravens",     "Summon", 1, "Self", None, None, "raven", 0),
+    ("ravens",     "Summon", 1, "Self", None, None, "raven", 1),
 
     # Treasonist summon words
     ("treasonist",  "Summon", 1, "Self", None, None, "", 0),
-    ("treasonists", "Summon", 2, "Self", None, None, "", 0),
+    ("treasonists", "Summon", 1, "Self", None, None, "treasonist", 0),
+    ("treasonists", "Summon", 1, "Self", None, None, "treasonist", 1),
 
     # Siphon showcase (family words are pre-registered as drafts in the DB)
     ("siphon",     "Siphon", 1, "SingleEnemy", None, None, "", 0),
@@ -383,8 +385,9 @@ SEED_ACTIONS = [
     ("thundering", "Overcharge", 2, "Self", None, None, "", 1),
 
     # Lounge summon word
-    ("lounge",     "Summon", 3, "Self", None, None, "", 0),
-    ("lounges",    "Summon", 5, "Self", None, None, "", 0),
+    ("lounge",     "Summon", 1, "Self", None, None, "", 0),
+    ("lounges",    "Summon", 1, "Self", None, None, "lounge", 0),
+    ("lounges",    "Summon", 1, "Self", None, None, "lounge", 1),
 
     # Lounge unit ability words (AI uses these)
     ("recuperate", "Recuperate", 2, "AllAlliesAndSelf", None, None, "", 0),
@@ -393,7 +396,8 @@ SEED_ACTIONS = [
 
     # Twinflower summon words
     ("twinflower",  "Summon", 1, "Self", None, None, "", 0),
-    ("twinflowers", "Summon", 2, "Self", None, None, "", 0),
+    ("twinflowers", "Summon", 1, "Self", None, None, "twinflower", 0),
+    ("twinflowers", "Summon", 1, "Self", None, None, "twinflower", 1),
 
     # Ghost Ship summon word
     ("ghostship",   "Summon", 5, "Self", None, None, "", 0),
@@ -411,9 +415,38 @@ SEED_ACTIONS = [
 
     # Firemaster unit words
     ("firemaster",  "Summon", 1, "Self", None, None, "", 0),
-    ("firemasters", "Summon", 2, "Self", None, None, "", 0),
+    ("firemasters", "Summon", 1, "Self", None, None, "firemaster", 0),
+    ("firemasters", "Summon", 1, "Self", None, None, "firemaster", 1),
     ("ignite",      "Ignite", 2, "SingleEnemy", None, None, "", 0),
     ("combust",     "Combust", 2, "SingleEnemy", None, None, "", 0),
+
+    # Mercenary unit words
+    ("mercenary",   "Summon", 1, "Self", None, None, "", 0),
+    ("mercenaries", "Summon", 1, "Self", None, None, "mercenary", 0),
+    ("mercenaries", "Summon", 1, "Self", None, None, "mercenary", 1),
+
+    # Cataclysm showcase
+    ("supernova",   "Cataclysm", 4, "All", None, None, "", 0),
+    ("supernovas",  "Cataclysm", 4, "All", None, None, "", 0),
+
+    # Cleave showcase
+    ("machete",     "Cleave", 3, None, None, None, "", 0),     ("machete",     "Bleed", 1, None, None, None, "", 0),
+    ("machetes",    "Cleave", 3, None, None, None, "", 0),     ("machetes",    "Bleed", 1, None, None, None, "", 0),
+
+    # Telescope item
+    ("telescope",   "Item", 1, "Self", None, None, "", 0),
+    ("telescopes",  "Item", 1, "Self", None, None, "", 0),
+
+    # Lockpick consumable — assoc_word links consumable to ammo
+    ("lockpick",    "Item", 3, "Self", None, None, "pick", 0),
+
+    # Lockpick ammo word (only usable through consumable mode)
+    ("pick",        "Lockpick", 1, "RandomEnemy", None, None, "", 0),
+
+    # Standalone lockpick words (typed, high mana cost)
+    ("lockpick",    "Lockpick", 1, "RandomEnemy", None, None, "", 8),
+    ("jimmy",       "Lockpick", 1, "RandomEnemy", None, None, "", 0),
+    ("picklock",    "Lockpick", 1, "RandomEnemy", None, None, "", 0),
 ]
 
 # (word, target, cost, range, area)
@@ -469,7 +502,7 @@ SEED_META = [
     # Enemy ability meta
     ("shout",       "AreaEnemies",  2, 0, "Single"),
     ("mace",        "Melee",        0, 1, "Single"),
-    ("raise",       "Self",         1, 0, "Single"),
+    ("raise",       "Self",         2, 0, "Single"),
     # New enemy ability meta
     ("screech",     "AllEnemies",   1, 0, "Single"),
     ("peck",        "SingleEnemy",  0, 0, "Single"),
@@ -478,15 +511,15 @@ SEED_META = [
     ("awaken",      "AllAlliesAndSelf", 2, 0, "Single"),
     ("dawning",     "AllAlliesAndSelf", 4, 0, "Single"),
     ("dawn",        "AllAlliesAndSelf", 4, 0, "Single"),
-    ("raven",       "Self",         5, 0, "Single"),
+    ("raven",       "Self",         6, 0, "Single"),
     ("ravens",      "Self",         10, 0, "Single"),
-    ("treasonist",  "Self",         5, 0, "Single"),
+    ("treasonist",  "Self",         6, 0, "Single"),
     ("treasonists", "Self",         10, 0, "Single"),
     ("siphon",      "SingleEnemy",  1, 0, "Single"),
     ("deceive",     "SingleEnemy",  2, 0, "Single"),
     ("thundering",  "SingleEnemy",  3, 0, "Single"),
     # Lounge summon meta
-    ("lounge",      "Self",         4, 0, "Single"),
+    ("lounge",      "Self",         5, 0, "Single"),
     ("lounges",     "Self",         10, 0, "Single"),
     # Lounge unit ability meta
     ("recuperate",  "AllAlliesAndSelf", 2, 0, "Single"),
@@ -524,14 +557,14 @@ SEED_META = [
     ("fortify",     "Self",         2, 0, "Single"),
     ("toughen",     "Self",         0, 0, "Single"),
     # Structure summon meta
-    ("fortress",    "Self",         3, 0, "Single"),
-    ("totem",       "Self",         2, 0, "Single"),
-    ("turret",      "Self",         2, 0, "Single"),
-    ("library",     "Self",         3, 0, "Single"),
-    ("grove",       "Self",         2, 0, "Single"),
-    ("sentinel",    "Self",         3, 0, "Single"),
-    ("pyre",        "Self",         2, 0, "Single"),
-    ("predator",    "Self",         3, 0, "Single"),
+    ("fortress",    "Self",         4, 0, "Single"),
+    ("totem",       "Self",         3, 0, "Single"),
+    ("turret",      "Self",         3, 0, "Single"),
+    ("library",     "Self",         4, 0, "Single"),
+    ("grove",       "Self",         3, 0, "Single"),
+    ("sentinel",    "Self",         4, 0, "Single"),
+    ("pyre",        "Self",         3, 0, "Single"),
+    ("predator",    "Self",         4, 0, "Single"),
     # Duplicate-action meta
     ("barrage",     "SingleEnemy",  2, 3, "Single"),
     ("soothe",      "Self",         1, 0, "Single"),
@@ -590,23 +623,40 @@ SEED_META = [
     ("exit",        "SingleEnemy",  0, 0, "Single"),
     ("depart",      "SingleEnemy",  0, 0, "Single"),
     # Twinflower summon meta
-    ("twinflower",  "SingleEnemy",  3, 0, "Single"),
-    ("twinflowers", "SingleEnemy",  5, 0, "Single"),
+    ("twinflower",  "SingleEnemy",  4, 0, "Single"),
+    ("twinflowers", "SingleEnemy",  8, 0, "Single"),
     # Ghost Ship summon meta
-    ("ghostship",   "Self",         5, 0, "Single"),
+    ("ghostship",   "Self",         6, 0, "Single"),
     # Ghost Ship ability meta
     ("cannonade",   "AllEnemies",   2, 0, "Single"),
-    ("crewmate",    "Self",         1, 0, "Single"),
+    ("crewmate",    "Self",         2, 0, "Single"),
     # Pirate ability meta
     ("plunder",     "SingleEnemy",  1, 0, "Single"),
     ("grog",        "Self",         0, 0, "Single"),
     # Attune showcase meta
     ("attune",      "Self",         2, 0, "Single"),
     # Firemaster unit meta
-    ("firemaster",  "SingleEnemy",  4, 0, "Single"),
-    ("firemasters", "SingleEnemy",  7, 0, "Single"),
+    ("firemaster",  "SingleEnemy",  5, 0, "Single"),
+    ("firemasters", "SingleEnemy",  10, 0, "Single"),
     ("ignite",      "SingleEnemy",  1, 0, "Single"),
     ("combust",     "SingleEnemy",  2, 0, "Single"),
+    # Mercenary unit meta
+    ("mercenary",   "SingleEnemy",  5, 0, "Single"),
+    ("mercenaries", "SingleEnemy",  10, 0, "Single"),
+    # Cataclysm showcase meta
+    ("supernova",   "All",          4, 0, "Single"),
+    ("supernovas",  "All",          4, 0, "Single"),
+    # Cleave showcase meta
+    ("machete",     "SingleEnemy",  2, 0, "Single"),
+    ("machetes",    "TwoRandomEnemies", 3, 0, "Single"),
+    # Telescope item meta
+    ("telescope",   "Self",         1, 0, "Single"),
+    ("telescopes",  "Self",         1, 0, "Single"),
+    # Lockpick meta
+    ("lockpick",    "SingleEnemy",  8, 0, "Single"),
+    ("pick",        "RandomEnemy",  0, 0, "Single"),
+    ("jimmy",       "SingleEnemy",  8, 0, "Single"),
+    ("picklock",    "SingleEnemy",  8, 0, "Single"),
 ]
 
 # (word, tag)
@@ -768,6 +818,23 @@ SEED_TAGS = [
     ("firemasters", "ELEMENTAL"), ("firemasters", "OFFENSIVE"), ("firemasters", "SPELL"), ("firemasters", "FIRE"),
     ("ignite",      "ELEMENTAL"), ("ignite",      "OFFENSIVE"), ("ignite",      "FIRE"),
     ("combust",     "ELEMENTAL"), ("combust",     "OFFENSIVE"), ("combust",     "FIRE"),
+    # Mercenary tags
+    ("mercenary",   "MELEE"), ("mercenary",   "PHYSICAL"), ("mercenary",   "OFFENSIVE"), ("mercenary",   "SOCIAL"),
+    ("mercenaries", "MELEE"), ("mercenaries", "PHYSICAL"), ("mercenaries", "OFFENSIVE"), ("mercenaries", "SOCIAL"),
+    # Cataclysm showcase tags
+    ("supernova",   "OFFENSIVE"), ("supernova",   "ARCANE"), ("supernova",   "FIRE"), ("supernova",   "COSMIC"), ("supernova",   "DESTRUCTION"),
+    ("supernovas",  "OFFENSIVE"), ("supernovas",  "ARCANE"), ("supernovas",  "FIRE"), ("supernovas",  "COSMIC"), ("supernovas",  "DESTRUCTION"),
+    # Cleave showcase tags
+    ("machete",     "OFFENSIVE"), ("machete",     "MELEE"), ("machete",     "PHYSICAL"), ("machete",     "BLADE"), ("machete",     "JUNGLE"),
+    ("machetes",    "OFFENSIVE"), ("machetes",    "MELEE"), ("machetes",    "PHYSICAL"), ("machetes",    "BLADE"), ("machetes",    "JUNGLE"),
+    # Telescope item tags
+    ("telescope",   "SUPPORT"), ("telescope",   "LIGHT"), ("telescope",   "SIGHT"),
+    ("telescopes",  "SUPPORT"), ("telescopes",  "LIGHT"), ("telescopes",  "SIGHT"),
+    # Lockpick tags
+    ("lockpick",    "TOOL"), ("lockpick", "STEALTH"),
+    ("pick",        "TOOL"),
+    ("jimmy",       "TOOL"), ("jimmy", "STEALTH"),
+    ("picklock",    "TOOL"), ("picklock", "STEALTH"),
 ]
 
 # (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b, tier, dexterity, constitution)
@@ -805,6 +872,8 @@ SEED_UNITS = [
     ("pirate",   "PIRATE",     "enemy",     8,  5, 0, 1, 1, 2, 0, 0.6, 0.4, 0.2, 0, 3, 0),
     # Summons (tier 0) — firemaster
     ("firemaster", "FIREMASTER", "enemy",   14, 0, 7, 1, 4, 1, 0, 0.9, 0.4, 0.1, 0, 0, 0),
+    # Summons (tier 1) — mercenary (recruitable via mercenary unit_tag)
+    ("mercenary", "MERCENARY", "enemy",     12, 6, 0, 3, 1, 2, 0, 0.8, 0.65, 0.2, 1, 2, 0),
 ]
 
 # (unit_id, word)
@@ -828,6 +897,7 @@ SEED_UNIT_ABILITIES = [
     ("ghostship", "cannonade"), ("ghostship", "crewmate"),
     ("pirate", "plunder"), ("pirate", "grog"),
     ("firemaster", "ignite"), ("firemaster", "combust"),
+    ("mercenary", "plunder"), ("mercenary", "scratch"),
 ]
 
 # (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
@@ -848,6 +918,8 @@ SEED_UNIT_PASSIVES = [
     ("ghostship",  "on_ally_death", None, "shield",        None,      2, "Self",          0),
     ("pirate",     "on_turn_end",  None, "damage",        None,      1, "AllEnemies",    0),
     ("firemaster", "on_word_tag",  "FIRE", "apply_status", "Burning", 2, "AllEnemies",    0),
+    ("mercenary",  "on_damage_dealt", None, "mana",         None,      1, "AllAllies",    0),
+    ("mercenary",  "on_damage_dealt", None, "gold",         None,      1, "AllAllies",    1),
 ]
 
 # (unit_id, tag) — material/property tags for tag-based reactions
@@ -866,6 +938,8 @@ SEED_UNIT_TAGS = [
     ("treasonist", "humanoid"),
     ("twinflower", "flammable"),
     ("firemaster", "flammable"),
+    ("mercenary", "mercenary"),
+    ("mercenary", "humanoid"),
 ]
 
 # (item_id, display_name, item_type, durability, strength, magic_power, phys_defense, magic_defense, luck, max_health, max_mana, color_r, color_g, color_b)
@@ -878,12 +952,15 @@ SEED_ITEMS = [
     ("amulet", "AMULET", "accessory", 0, 0, 1, 0, 0, 0, 0, 0,  0.4, 0.8, 0.4),
     ("helm",   "HELM",   "head",      0, 0, 0, 3, 0, 0, 0, 0,  0.6, 0.6, 0.6),
     ("beer",   "BEER",   "consumable", 3, 0, 0, 0, 0, 0, 0, 0,  1.0, 0.85, 0.2),
+    ("telescope", "TELESCOPE", "accessory", 0, 0, 0, 0, 0, 2, 1, 0,  0.6, 0.75, 0.9),
+    ("lockpick",  "LOCKPICK",  "consumable", 3, 0, 0, 0, 0, 0, 0, 0,  0.6, 0.6, 0.6),
 ]
 
 # (item_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
 SEED_ITEM_PASSIVES = [
     ("amulet", "on_word_played", None, "mana", None, 1, "Self", 0),
     ("helm",   "on_self_hit",    None, "shield", None, 1, "Self", 0),
+    ("telescope", "on_letter_in_word", "vowel", "buff_stat", "Luck", 1, "Self", 0),
 ]
 
 # (encounter_id, display_name)

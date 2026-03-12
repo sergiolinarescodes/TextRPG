@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.StatusEffect.Handlers;
 using TextRPG.Core.TurnSystem;
 using Unidad.Core.EventBus;
@@ -15,12 +16,13 @@ namespace TextRPG.Core.StatusEffect
         private readonly IStatusEffectHandlerRegistry _handlerRegistry;
         private readonly IStatusEffectHandlerContext _handlerContext;
         private readonly StatusEffectInteractionTable _interactionTable;
+        private readonly ILuckService _luckService;
         private readonly Dictionary<EntityId, List<StatusEffectInstance>> _effects = new();
         private int _modifierCounter;
 
         public StatusEffectService(IEventBus eventBus, IEntityStatsService entityStats, ITurnService turnService,
             IStatusEffectHandlerRegistry handlerRegistry, IStatusEffectHandlerContext handlerContext,
-            StatusEffectInteractionTable interactionTable = null)
+            StatusEffectInteractionTable interactionTable = null, ILuckService luckService = null)
             : base(eventBus)
         {
             _entityStats = entityStats;
@@ -28,6 +30,7 @@ namespace TextRPG.Core.StatusEffect
             _handlerRegistry = handlerRegistry;
             _handlerContext = handlerContext;
             _interactionTable = interactionTable ?? new StatusEffectInteractionTable();
+            _luckService = luckService;
             Subscribe<TurnEndedEvent>(OnTurnEnded);
             Subscribe<EntityStats.HealedEvent>(OnHealed);
             Subscribe<EntityStats.DamageTakenEvent>(OnDamageTaken);
@@ -168,9 +171,15 @@ namespace TextRPG.Core.StatusEffect
             if (HasEffect(e.EntityId, StatusEffectType.Sleep))
             {
                 int stacks = GetStackCount(e.EntityId, StatusEffectType.Sleep);
-                int resistChance = stacks * 20;
-                if (resistChance < 100 && UnityEngine.Random.Range(0, 100) >= resistChance)
-                    RemoveEffect(e.EntityId, StatusEffectType.Sleep);
+                float resistChance = stacks * 20 / 100f;
+                if (resistChance < 1.0f)
+                {
+                    float wakeChance = 1.0f - resistChance;
+                    if (_luckService != null)
+                        wakeChance = _luckService.AdjustChance(wakeChance, e.EntityId, true);
+                    if (UnityEngine.Random.value < wakeChance)
+                        RemoveEffect(e.EntityId, StatusEffectType.Sleep);
+                }
             }
         }
 

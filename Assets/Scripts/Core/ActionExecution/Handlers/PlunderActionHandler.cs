@@ -1,5 +1,6 @@
 using System;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using Unidad.Core.EventBus;
 
 namespace TextRPG.Core.ActionExecution.Handlers
@@ -14,6 +15,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         private readonly IEntityStatsService _entityStats;
         private readonly IEventBus _eventBus;
+        private readonly ILuckService _luckService;
         private readonly Random _rng = new();
         private int _nextId;
 
@@ -23,6 +25,7 @@ namespace TextRPG.Core.ActionExecution.Handlers
         {
             _entityStats = ctx.EntityStats;
             _eventBus = ctx.EventBus;
+            _luckService = ctx.LuckService;
         }
 
         public void Execute(ActionContext context)
@@ -36,6 +39,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
                 // Physical damage
                 int damage = StatScaling.OffensiveScale(context.Value, sourceStr,
                     _entityStats.GetStat(target, StatType.PhysicalDefense));
+
+                damage = StatScaling.ApplyCritical(damage, context, _luckService, _eventBus, target);
                 _entityStats.ApplyDamage(target, damage);
 
                 // Steal one random stat

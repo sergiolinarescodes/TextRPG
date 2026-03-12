@@ -11,6 +11,8 @@ using TextRPG.Core.TurnSystem;
 using TextRPG.Core.WordAction;
 using Unidad.Core.Bootstrap;
 using Unidad.Core.EventBus;
+using TextRPG.Core.LetterChallenge;
+using Unidad.Core.Resource;
 using Unidad.Core.Testing;
 
 namespace TextRPG.Core.Passive
@@ -34,11 +36,18 @@ namespace TextRPG.Core.Passive
                 IActionAnimationService animationService = null;
                 try { animationService = container.Resolve<IActionAnimationService>(); } catch { /* optional */ }
 
+                IResourceService resourceService = null;
+                try { resourceService = container.Resolve<IResourceService>(); } catch { /* optional */ }
+
+                ILetterChallengeService letterChallengeService = null;
+                try { letterChallengeService = container.Resolve<ILetterChallengeService>(); } catch { /* optional */ }
+
                 var triggerRegistry = CreateTriggerRegistry();
                 var effectRegistry = CreateEffectRegistry(null);
                 var targetResolver = new PassiveTargetResolver();
                 var context = new PassiveContext(entityStats, slotService, eventBus, encounterService,
-                    statusEffects, tagResolver, turnService, animationService);
+                    statusEffects, tagResolver, turnService, animationService, resourceService,
+                    letterChallengeService);
 
                 return (IPassiveService)new PassiveService(eventBus, triggerRegistry, effectRegistry,
                     targetResolver, context);

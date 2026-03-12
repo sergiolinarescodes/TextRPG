@@ -134,8 +134,7 @@ namespace TextRPG.Core.Scroll.Scenarios
             // Equipment controller (builds left + right bars)
             _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
                 s.InventoryService, s.ItemRegistry, s.WeaponService, s.ConsumableService,
-                s.PlayerInventoryId, playerId, root,
-                () => _encounterAdapter?.IsEncounterActive == true);
+                s.PlayerInventoryId, playerId, root);
             _equipment.BuildBars(middleArea);
 
             // Word input controller (builds main text panel)

@@ -1,6 +1,7 @@
 using Reflex.Core;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Luck;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.TurnSystem;
 using TextRPG.Core.Weapon;
@@ -29,6 +30,9 @@ namespace TextRPG.Core.ActionExecution
             builder.AddSingleton(container =>
             {
                 var unitRegistry = UnitDatabaseLoader.LoadAll();
+                ILuckService luckService = null;
+                try { luckService = container.Resolve<ILuckService>(); } catch { /* optional */ }
+
                 var handlerContext = new ActionHandlerContext(
                     container.Resolve<IEntityStatsService>(),
                     container.Resolve<IEventBus>(),
@@ -36,7 +40,8 @@ namespace TextRPG.Core.ActionExecution
                     container.Resolve<IStatusEffectService>(),
                     container.Resolve<ITurnService>(),
                     container.Resolve<IWeaponService>(),
-                    unitRegistry: unitRegistry);
+                    unitRegistry: unitRegistry,
+                    luckService: luckService);
 
                 var registry = ActionHandlerFactory.CreateDefault(handlerContext);
                 return (IActionHandlerRegistry)registry;
@@ -51,7 +56,9 @@ namespace TextRPG.Core.ActionExecution
                 var entityStats = container.Resolve<IEntityStatsService>();
                 var statusEffects = container.Resolve<IStatusEffectService>();
                 var animationResolver = container.Resolve<IAnimationResolver>();
-                return (IActionExecutionService)new ActionExecutionService(eventBus, wordResolver, handlerRegistry, combatContext, entityStats, statusEffects, animationResolver);
+                ILuckService luck = null;
+                try { luck = container.Resolve<ILuckService>(); } catch { /* optional */ }
+                return (IActionExecutionService)new ActionExecutionService(eventBus, wordResolver, handlerRegistry, combatContext, entityStats, statusEffects, animationResolver, luckService: luck);
             }, typeof(IActionExecutionService));
 
             builder.AddSingleton(container =>

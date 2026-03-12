@@ -23,7 +23,6 @@ namespace TextRPG.Core.UnitRendering
         private readonly InventoryId _playerInventoryId;
         private readonly EntityId _playerId;
         private readonly VisualElement _rootElement;
-        private readonly Func<bool> _isEncounterActive;
         private readonly List<IDisposable> _subscriptions = new();
 
         private VisualElement _weaponSlot;
@@ -44,7 +43,7 @@ namespace TextRPG.Core.UnitRendering
             IInventoryService inventoryService, IItemRegistry itemRegistry,
             IWeaponService weaponService, IConsumableService consumableService,
             InventoryId playerInventoryId, EntityId playerId,
-            VisualElement rootElement, Func<bool> isEncounterActive)
+            VisualElement rootElement)
         {
             _eventBus = eventBus;
             _equipmentService = equipmentService;
@@ -55,7 +54,6 @@ namespace TextRPG.Core.UnitRendering
             _playerInventoryId = playerInventoryId;
             _playerId = playerId;
             _rootElement = rootElement;
-            _isEncounterActive = isEncounterActive;
         }
 
         public void BuildBars(VisualElement middleArea)
@@ -230,7 +228,6 @@ namespace TextRPG.Core.UnitRendering
 
         private void OnInventorySlotPointerDown(PointerDownEvent evt, int slotIndex)
         {
-            if (_isEncounterActive()) return;
             if (_inventoryService == null) return;
             var slot = _inventoryService.GetSlot(_playerInventoryId, slotIndex);
             if (slot.IsEmpty) return;
@@ -244,8 +241,7 @@ namespace TextRPG.Core.UnitRendering
 
         private void OnEquipmentSlotPointerDown(PointerDownEvent evt, int slotIndex)
         {
-            if (_isEncounterActive()) return;
-            if (_equipmentService == null) return;
+            if (!_equipmentService.CanUnequipInBattle()) return;
             var slotType = (EquipmentSlotType)slotIndex;
             var equipped = _equipmentService.GetEquipped(_playerId, slotType);
             if (equipped == null) return;
@@ -307,6 +303,7 @@ namespace TextRPG.Core.UnitRendering
                 var targetSlotType = (EquipmentSlotType)i;
                 var itemSlotType = _equipmentService.GetSlotTypeForItem(_dragItemWord);
                 if (itemSlotType == null || itemSlotType.Value != targetSlotType) return false;
+                if (!_equipmentService.CanEquipSlotInBattle(targetSlotType)) return false;
 
                 return _equipmentService.EquipFromInventory(_playerId, _dragItemWord, _inventoryService, _playerInventoryId);
             }

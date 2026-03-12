@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Deep audit of word action distribution — finds imbalances and suggests rebalancing.
 
+Imports VALID_* sets from batch_insert.py (single source of truth) and cross-references
+against the DB + filesystem to find blind spots in either direction.
+
 Outputs a detailed report covering:
 - Action usage distribution with under/over-represented flags
 - Target type distribution
@@ -9,55 +12,28 @@ Outputs a detailed report covering:
 - Cost distribution
 - Summon/unit coverage
 - Passive trigger/effect diversity
-- Specific words that could be rebalanced (duplicate profiles, outlier values)
+- Tag definitions (filesystem scan)
+- Handler file counts (filesystem scan)
 """
 
+import glob
 import os
 import sqlite3
 import sys
 from collections import Counter, defaultdict
 
-DB_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "Assets", "StreamingAssets", "wordactions.db"
+SCRIPT_DIR = os.path.dirname(__file__)
+
+DB_PATH = os.path.join(SCRIPT_DIR, "..", "..", "Assets", "StreamingAssets", "wordactions.db")
+
+ASSETS_DIR = os.path.join(SCRIPT_DIR, "..", "..", "Assets", "Scripts", "Core")
+
+# Import from batch_insert.py — single source of truth, zero duplication.
+from batch_insert import (
+    VALID_ACTIONS, VALID_TAGS, VALID_TRIGGERS, VALID_EFFECTS,
+    VALID_TARGETS, VALID_PASSIVE_TARGETS, VALID_ITEM_TYPES,
+    VALID_STATUS_EFFECTS, VALID_UNIT_TYPES,
 )
-
-# Expected action set for completeness check
-ALL_ACTIONS = {
-    "Water", "Earth", "Wind", "Push", "Damage", "Slow", "Burn",
-    "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
-    "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
-    "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
-    "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
-    "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
-    "Item",
-}
-
-ALL_TAGS = {
-    "NATURE", "ELEMENTAL", "OFFENSIVE", "RESTORATION", "SHADOW",
-    "PHYSICAL", "DEFENSIVE", "ARCANE", "HOLY", "SUPPORT", "PSYCHIC",
-}
-
-ALL_TARGETS = {
-    "Self", "SingleEnemy", "AllEnemies", "AllAllies", "AllAlliesAndSelf",
-    "All", "Melee", "FrontEnemy", "MiddleEnemy", "BackEnemy",
-    "RandomEnemy", "RandomAlly", "RandomAny",
-    "LowestHealthEnemy", "HighestHealthEnemy",
-    "LowestDefenseEnemy", "HighestDefenseEnemy",
-    "LowestStrengthEnemy", "HighestStrengthEnemy",
-    "LowestMagicEnemy", "HighestMagicEnemy",
-    "RandomLowestHealthEnemy", "RandomHighestHealthEnemy",
-    "HalfEnemiesRandom", "TwoRandomEnemies", "ThreeRandomEnemies",
-}
-
-ALL_TRIGGERS = {
-    "on_ally_hit", "on_self_hit", "on_round_end", "on_round_start",
-    "on_turn_start", "on_turn_end", "on_word_played", "on_word_length",
-    "on_word_tag", "on_kill", "taunt",
-}
-
-ALL_EFFECTS = {"heal", "damage", "shield", "mana", "apply_status"}
-
-ALL_ITEM_TYPES = {"weapon", "trinket", "head", "wear", "accessory"}
 
 
 def pct(n, total):
@@ -90,7 +66,7 @@ def main():
     print(f"Total meta entries:  {total_meta:>6,}")
     print(f"Avg actions/word:    {total_action_rows / max(1, total_words_with_actions):>6.1f}")
 
-    # ── Action distribution ──
+    # ── Action distribution (dual-check: DB ↔ VALID_ACTIONS) ──
     section("ACTION DISTRIBUTION")
     action_counts = dict(conn.execute(
         "SELECT action_name, COUNT(*) FROM word_actions GROUP BY action_name ORDER BY COUNT(*) DESC"
@@ -100,25 +76,33 @@ def main():
         "SELECT action_name, COUNT(DISTINCT word) FROM word_actions GROUP BY action_name ORDER BY COUNT(DISTINCT word) DESC"
     ).fetchall())
 
-    print(f"{'Action':<25} {'Rows':>6} {'Words':>6} {'% Words':>8}  Notes")
-    print(f"{'-'*25} {'-'*6} {'-'*6} {'-'*8}  {'-'*20}")
+    # Show ALL actions from both DB and VALID set
+    all_known_actions = set(action_counts.keys()) | VALID_ACTIONS
 
-    for action in sorted(ALL_ACTIONS, key=lambda a: action_word_counts.get(a, 0), reverse=True):
+    print(f"{'Action':<25} {'Rows':>6} {'Words':>6} {'% Words':>8}  Notes")
+    print(f"{'-'*25} {'-'*6} {'-'*6} {'-'*8}  {'-'*30}")
+
+    for action in sorted(all_known_actions, key=lambda a: action_word_counts.get(a, 0), reverse=True):
         rows = action_counts.get(action, 0)
         words = action_word_counts.get(action, 0)
         p = pct(words, total_words_with_actions)
         notes = ""
-        if words == 0:
+        if action in action_counts and action not in VALID_ACTIONS:
+            notes = "!! In DB but NOT in batch_insert.py"
+        elif action not in action_counts and action in VALID_ACTIONS:
             notes = "!! UNUSED — needs words"
-        elif words / total_words_with_actions < 0.01:
+        elif words > 0 and words / total_words_with_actions < 0.01:
             notes = "! Under-represented (<1%)"
-        elif words / total_words_with_actions > 0.25:
+        elif words > 0 and words / total_words_with_actions > 0.25:
             notes = "! Over-represented (>25%)"
         print(f"{action:<25} {rows:>6} {words:>6} {p:>8}  {notes}")
 
-    unused_actions = ALL_ACTIONS - set(action_counts.keys())
-    if unused_actions:
-        print(f"\nUnused actions ({len(unused_actions)}): {', '.join(sorted(unused_actions))}")
+    db_only = set(action_counts.keys()) - VALID_ACTIONS
+    valid_only = VALID_ACTIONS - set(action_counts.keys())
+    if db_only:
+        print(f"\n!! Actions in DB but NOT in VALID_ACTIONS ({len(db_only)}): {', '.join(sorted(db_only))}")
+    if valid_only:
+        print(f"\n!! Actions in VALID_ACTIONS but NOT in DB ({len(valid_only)}): {', '.join(sorted(valid_only))}")
 
     # ── Value distribution per action ──
     section("VALUE DISTRIBUTION PER ACTION")
@@ -153,8 +137,7 @@ def main():
         print(f"{target:<30} {count:>6} {p:>8}  {notes}")
 
     used_targets = set(t for t, _ in target_counts)
-    unused_targets = ALL_TARGETS - used_targets
-    # Filter out composite targets from unused (those are dynamic)
+    unused_targets = VALID_TARGETS - used_targets
     if unused_targets:
         print(f"\nUnused target types ({len(unused_targets)}): {', '.join(sorted(unused_targets))}")
 
@@ -167,26 +150,38 @@ def main():
         bar = "#" * min(50, count)
         print(f"  Cost {cost}: {count:>5}  {bar}")
 
-    # ── Tag coverage ──
+    # ── Tag coverage (dual-check: DB ↔ VALID_TAGS) ──
     section("TAG COVERAGE")
     tag_counts = conn.execute(
         "SELECT tag, COUNT(DISTINCT word) FROM word_tags GROUP BY tag ORDER BY COUNT(DISTINCT word) DESC"
     ).fetchall()
     total_tagged = conn.execute("SELECT COUNT(DISTINCT word) FROM word_tags").fetchone()[0]
 
+    all_known_tags = set(t for t, _ in tag_counts) | VALID_TAGS
+
     print(f"Words with tags: {total_tagged:>6,}")
     print(f"{'Tag':<15} {'Words':>6} {'%':>8}  Notes")
-    print(f"{'-'*15} {'-'*6} {'-'*8}  {'-'*20}")
-    for tag, count in tag_counts:
+    print(f"{'-'*15} {'-'*6} {'-'*8}  {'-'*30}")
+
+    tag_count_dict = dict(tag_counts)
+    for tag in sorted(all_known_tags, key=lambda t: tag_count_dict.get(t, 0), reverse=True):
+        count = tag_count_dict.get(tag, 0)
         p = pct(count, total_tagged)
         notes = ""
-        if count / max(1, total_tagged) < 0.03:
+        if tag in tag_count_dict and tag not in VALID_TAGS:
+            notes = "!! In DB but NOT in batch_insert.py"
+        elif tag not in tag_count_dict and tag in VALID_TAGS:
+            notes = "!! UNUSED — needs words"
+        elif count > 0 and count / max(1, total_tagged) < 0.03:
             notes = "! Under-represented (<3%)"
         print(f"{tag:<15} {count:>6} {p:>8}  {notes}")
 
-    unused_tags = ALL_TAGS - set(t for t, _ in tag_counts)
-    if unused_tags:
-        print(f"\nUnused tags: {', '.join(sorted(unused_tags))}")
+    db_only_tags = set(t for t, _ in tag_counts) - VALID_TAGS
+    valid_only_tags = VALID_TAGS - set(t for t, _ in tag_counts)
+    if db_only_tags:
+        print(f"\n!! Tags in DB but NOT in VALID_TAGS ({len(db_only_tags)}): {', '.join(sorted(db_only_tags))}")
+    if valid_only_tags:
+        print(f"\n!! Tags in VALID_TAGS but NOT in DB ({len(valid_only_tags)}): {', '.join(sorted(valid_only_tags))}")
 
     # ── Tags per word distribution ──
     tags_per_word = conn.execute(
@@ -196,6 +191,40 @@ def main():
     print(f"\nTags-per-word distribution:")
     for n in sorted(tag_count_dist.keys()):
         print(f"  {n} tag(s): {tag_count_dist[n]} words")
+
+    # ── TAG DEFINITIONS (filesystem scan) ──
+    section("TAG DEFINITIONS (filesystem)")
+    tag_def_files = sorted(glob.glob(os.path.join(
+        ASSETS_DIR, "EventEncounter", "Reactions", "Tags", "Definitions", "*TagDefinition.cs")))
+    print(f"Tag definition files: {len(tag_def_files)}")
+    for f in tag_def_files:
+        print(f"  {os.path.basename(f)}")
+
+    try:
+        unit_tag_counts = conn.execute(
+            "SELECT tag, COUNT(*) FROM unit_tags GROUP BY tag ORDER BY COUNT(*) DESC"
+        ).fetchall()
+        print(f"\nUnit tags in DB: {sum(c for _, c in unit_tag_counts)} entries across {len(unit_tag_counts)} tags")
+        for tag, count in unit_tag_counts:
+            print(f"  {tag}: {count}")
+    except Exception:
+        print("\n  (unit_tags table not found)")
+
+    # ── HANDLER FILE COUNTS (filesystem scan) ──
+    section("HANDLER FILE COUNTS (filesystem)")
+    handler_dirs = {
+        "Action handlers": os.path.join(ASSETS_DIR, "ActionExecution", "Handlers", "*.cs"),
+        "Status handlers": os.path.join(ASSETS_DIR, "StatusEffect", "Handlers", "*Handler.cs"),
+        "Passive triggers": os.path.join(ASSETS_DIR, "Passive", "Triggers", "*Trigger.cs"),
+        "Passive effects": os.path.join(ASSETS_DIR, "Passive", "Effects", "*Effect.cs"),
+        "Reaction outcomes": os.path.join(ASSETS_DIR, "EventEncounter", "Reactions", "Outcomes", "*.cs"),
+    }
+
+    for label, pattern in handler_dirs.items():
+        files = sorted(glob.glob(pattern))
+        print(f"\n{label}: {len(files)}")
+        for f in files:
+            print(f"  {os.path.basename(f)}")
 
     # ── Duplicate action profiles ──
     section("DUPLICATE ACTION PROFILES")
@@ -220,7 +249,7 @@ def main():
     else:
         print(f"\n  {dupe_count} duplicate profile groups — consider varying values or adding secondary effects")
 
-    # ── Unit / Passive analysis ──
+    # ── Unit / Passive analysis (dual-check: DB ↔ VALID_*) ──
     try:
         unit_total = conn.execute("SELECT COUNT(*) FROM units").fetchone()[0]
     except Exception:
@@ -239,38 +268,55 @@ def main():
         passive_total = conn.execute("SELECT COUNT(*) FROM unit_passives").fetchone()[0]
         print(f"\nTotal passives: {passive_total}")
 
+        # Triggers: dual-check DB ↔ VALID_TRIGGERS
         trigger_counts = dict(conn.execute(
             "SELECT trigger_id, COUNT(*) FROM unit_passives GROUP BY trigger_id ORDER BY COUNT(*) DESC"
         ).fetchall())
+        all_known_triggers = set(trigger_counts.keys()) | VALID_TRIGGERS
 
         print(f"\n{'Trigger':<20} {'Count':>6}  Notes")
-        print(f"{'-'*20} {'-'*6}  {'-'*20}")
-        for trigger in sorted(ALL_TRIGGERS, key=lambda t: trigger_counts.get(t, 0), reverse=True):
+        print(f"{'-'*20} {'-'*6}  {'-'*30}")
+        for trigger in sorted(all_known_triggers, key=lambda t: trigger_counts.get(t, 0), reverse=True):
             count = trigger_counts.get(trigger, 0)
-            notes = "!! UNUSED" if count == 0 else ""
+            notes = ""
+            if trigger in trigger_counts and trigger not in VALID_TRIGGERS:
+                notes = "!! In DB but NOT in batch_insert.py"
+            elif trigger not in trigger_counts and trigger in VALID_TRIGGERS:
+                notes = "!! UNUSED in DB"
             print(f"{trigger:<20} {count:>6}  {notes}")
 
+        # Effects: dual-check DB ↔ VALID_EFFECTS
         effect_counts = dict(conn.execute(
             "SELECT effect_id, COUNT(*) FROM unit_passives WHERE effect_id != '' GROUP BY effect_id ORDER BY COUNT(*) DESC"
         ).fetchall())
+        all_known_effects = set(effect_counts.keys()) | VALID_EFFECTS
 
         print(f"\n{'Effect':<20} {'Count':>6}  Notes")
-        print(f"{'-'*20} {'-'*6}  {'-'*20}")
-        for effect in sorted(ALL_EFFECTS, key=lambda e: effect_counts.get(e, 0), reverse=True):
+        print(f"{'-'*20} {'-'*6}  {'-'*30}")
+        for effect in sorted(all_known_effects, key=lambda e: effect_counts.get(e, 0), reverse=True):
             count = effect_counts.get(effect, 0)
-            notes = "!! UNUSED" if count == 0 else ""
+            notes = ""
+            if effect in effect_counts and effect not in VALID_EFFECTS:
+                notes = "!! In DB but NOT in batch_insert.py"
+            elif effect not in effect_counts and effect in VALID_EFFECTS:
+                notes = "!! UNUSED in DB"
             print(f"{effect:<20} {count:>6}  {notes}")
 
+        # Passive targets: dual-check
         ptarget_counts = dict(conn.execute(
             "SELECT target, COUNT(*) FROM unit_passives GROUP BY target ORDER BY COUNT(*) DESC"
         ).fetchall())
+        all_known_ptargets = set(ptarget_counts.keys()) | VALID_PASSIVE_TARGETS
 
-        all_ptargets = {"Self", "AllAllies", "AllEnemies", "Injured", "Attacker"}
         print(f"\n{'Passive Target':<20} {'Count':>6}  Notes")
-        print(f"{'-'*20} {'-'*6}  {'-'*20}")
-        for pt in sorted(all_ptargets, key=lambda t: ptarget_counts.get(t, 0), reverse=True):
+        print(f"{'-'*20} {'-'*6}  {'-'*30}")
+        for pt in sorted(all_known_ptargets, key=lambda t: ptarget_counts.get(t, 0), reverse=True):
             count = ptarget_counts.get(pt, 0)
-            notes = "!! UNUSED" if count == 0 else ""
+            notes = ""
+            if pt in ptarget_counts and pt not in VALID_PASSIVE_TARGETS:
+                notes = "!! In DB but NOT in batch_insert.py"
+            elif pt not in ptarget_counts and pt in VALID_PASSIVE_TARGETS:
+                notes = "!! UNUSED in DB"
             print(f"{pt:<20} {count:>6}  {notes}")
 
         # Summon coverage
@@ -320,20 +366,21 @@ def main():
     recs = []
 
     if item_total > 0:
-        unused_item_types = ALL_ITEM_TYPES - set(t for t, _ in item_type_counts)
+        unused_item_types = VALID_ITEM_TYPES - set(t for t, _ in item_type_counts)
         if unused_item_types:
             recs.append(f"Add items of unused types: {', '.join(sorted(unused_item_types))}")
 
+    unused_actions = VALID_ACTIONS - set(action_counts.keys())
     if unused_actions:
         recs.append(f"Add words using unused actions: {', '.join(sorted(unused_actions))}")
 
-    under_actions = [a for a in ALL_ACTIONS
+    under_actions = [a for a in VALID_ACTIONS
                      if action_word_counts.get(a, 0) > 0
                      and action_word_counts[a] / max(1, total_words_with_actions) < 0.01]
     if under_actions:
         recs.append(f"Boost under-represented actions (<1%): {', '.join(sorted(under_actions))}")
 
-    over_actions = [a for a in ALL_ACTIONS
+    over_actions = [a for a in VALID_ACTIONS
                     if action_word_counts.get(a, 0) / max(1, total_words_with_actions) > 0.25]
     if over_actions:
         recs.append(f"Reduce over-represented actions (>25%): {', '.join(sorted(over_actions))}")
@@ -342,6 +389,7 @@ def main():
     if dominant_targets:
         recs.append(f"Diversify targeting — dominant targets (>50%): {', '.join(dominant_targets)}")
 
+    unused_tags = VALID_TAGS - set(t for t, _ in tag_counts)
     if unused_tags:
         recs.append(f"Use unused tags: {', '.join(sorted(unused_tags))}")
 

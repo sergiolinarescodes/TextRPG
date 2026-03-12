@@ -15,6 +15,8 @@ namespace TextRPG.Core.Passive
             ["mana"] = new Color(0.3f, 0.5f, 1f),
             ["apply_status"] = Color.yellow,
             ["steal_stat"] = new Color(0.6f, 0.2f, 0.8f),
+            ["gold"] = new Color(0.8f, 0.65f, 0.2f),
+            ["buff_stat"] = new Color(0.4f, 0.9f, 0.4f),
         };
 
         private static readonly Dictionary<string, string> TriggerNames = new()
@@ -31,6 +33,8 @@ namespace TextRPG.Core.Passive
             ["on_kill"] = "On kill",
             ["on_ally_death"] = "On ally death",
             ["on_death"] = "On death",
+            ["on_damage_dealt"] = "On damage dealt",
+            ["on_letter_in_word"] = "On letter match",
             [PassiveConstants.Taunt] = "Taunt",
         };
 
@@ -42,6 +46,8 @@ namespace TextRPG.Core.Passive
             ["mana"] = "restore mana",
             ["apply_status"] = "apply status",
             ["steal_stat"] = "steal stat",
+            ["gold"] = "earn gold",
+            ["buff_stat"] = "buff stat",
         };
 
         private static readonly Dictionary<string, string> TargetNames = new()
@@ -68,13 +74,35 @@ namespace TextRPG.Core.Passive
                 triggerText = $"{trigger} ({entry.TriggerParam}+ letters)";
             else if (entry.TriggerId == "on_word_tag" && entry.TriggerParam != null)
                 triggerText = $"{trigger} ({entry.TriggerParam})";
+            else if (entry.TriggerId == "on_letter_in_word" && entry.TriggerParam != null)
+            {
+                var modeDesc = entry.TriggerParam switch
+                {
+                    "vowel" => "a random vowel",
+                    "consonant" => "a random consonant",
+                    _ when entry.TriggerParam.StartsWith("fixed:") => $"the letter '{entry.TriggerParam.Split(':')[1].ToUpper()}'",
+                    _ when entry.TriggerParam.StartsWith("multi:") => $"the letters '{entry.TriggerParam.Split(':')[1].ToUpper()}'",
+                    _ => $"a random letter",
+                };
+
+                var effectDesc = entry.EffectId == "buff_stat" && entry.EffectParam != null
+                    ? $"gain +{entry.Value} {entry.EffectParam}"
+                    : $"{effect} {entry.Value} to {target}";
+
+                var fullDesc = $"Each turn, {modeDesc} is selected. Type a word containing it to {effectDesc} (permanent)";
+                return new PassiveDefinition(effect, fullDesc, color);
+            }
             else if (entry.TriggerId == "on_death" && entry.TriggerParam == "siphon")
                 return new PassiveDefinition("Release", "On death: release absorbed stats as healing to allies",
                     new Color(0.6f, 0.2f, 0.8f));
 
-            var effectText = entry.EffectId == "apply_status" && entry.EffectParam != null
-                ? $"apply {entry.EffectParam}"
-                : $"{effect} {entry.Value}";
+            string effectText;
+            if (entry.EffectId == "apply_status" && entry.EffectParam != null)
+                effectText = $"apply {entry.EffectParam}";
+            else if (entry.EffectId == "buff_stat" && entry.EffectParam != null)
+                effectText = $"+{entry.Value} {entry.EffectParam}";
+            else
+                effectText = $"{effect} {entry.Value}";
 
             var description = $"{triggerText}: {effectText} to {target}";
 

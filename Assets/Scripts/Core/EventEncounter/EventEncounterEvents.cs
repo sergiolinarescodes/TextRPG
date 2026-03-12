@@ -16,4 +16,6 @@ namespace TextRPG.Core.EventEncounter
     public readonly record struct SpawnCombatEvent(string EncounterId);
     public readonly record struct RecruitEvent(string UnitType);
     public readonly record struct EntityRecruitedEvent(EntityId EntityId, EntityId Recruiter);
+
+    public readonly record struct ChestOpenedEvent(EntityId Chest, EntityId Opener);
 }

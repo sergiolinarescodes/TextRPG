@@ -18,6 +18,8 @@ namespace TextRPG.Core.PlayerClass
         int ManaRegen,
         int StartingMana,
         int Constitution,
+        int Dexterity,
         PassiveEntry[] Passives,
-        string[] PassiveDescriptions);
+        string[] PassiveDescriptions,
+        string[] StartingItems);
 }

@@ -7,7 +7,10 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
+using TextRPG.Core.LetterChallenge;
 using TextRPG.Core.LetterReserve;
+using TextRPG.Core.Lockpick;
+using TextRPG.Core.Luck;
 using TextRPG.Core.Passive;
 using TextRPG.Core.PlayerClass;
 using TextRPG.Core.EntityStats;
@@ -41,6 +44,7 @@ namespace TextRPG.Core.Services
             var wordInputService = new WordInputService(eventBus, drunkLetterService);
             var unitService = new UnitService(eventBus);
             var entityStats = new EntityStatsService(eventBus);
+            var luckService = new LuckService(entityStats);
 
             var wordActionData = WordActionDatabaseLoader.Load();
             var wordResolver = new FilteredWordResolver(wordActionData.Resolver, wordActionData.AmmoWordSet);
@@ -62,8 +66,9 @@ namespace TextRPG.Core.Services
             var effectHandlerRegistry = StatusEffectSystemInstaller.CreateHandlerRegistry();
             var handlerContext = new StatusEffectHandlerContext(entityStats, turnService, eventBus);
             var statusEffects = new StatusEffectService(eventBus, entityStats, turnService,
-                effectHandlerRegistry, handlerContext);
+                effectHandlerRegistry, handlerContext, luckService: luckService);
             ((StatusEffectHandlerContext)handlerContext).StatusEffects = (IStatusEffectService)statusEffects;
+            ((StatusEffectHandlerContext)handlerContext).LuckService = luckService;
 
             // Weapon + Item
             var weaponRegistry = WeaponSystemInstaller.BuildWeaponRegistry(wordActionData);
@@ -91,10 +96,17 @@ namespace TextRPG.Core.Services
             // Letter reserve (run-lifetime, used by Attune and future letter-based triggers)
             var letterReserve = new LetterReserveService(eventBus);
 
+            // Letter challenge service (run-lifetime, used by on_letter_in_word passive trigger)
+            var letterChallengeService = new LetterChallengeService(eventBus);
+
+            // Static data (loaded early so action handlers can access unit definitions)
+            var allUnits = UnitDatabaseLoader.LoadAll();
+
             // Action handlers
             var actionHandlerCtx = new ActionHandlerContext(entityStats, eventBus, combatContext,
                 statusEffects, turnService, weaponService, slotService: slotService,
-                entityTagProvider: reactionService, letterReserve: letterReserve);
+                entityTagProvider: reactionService, letterReserve: letterReserve,
+                luckService: luckService, unitRegistry: allUnits);
             var handlerRegistry = ActionHandlerFactory.CreateDefault(actionHandlerCtx);
 
             // Player entity (class-based stats)
@@ -111,8 +123,6 @@ namespace TextRPG.Core.Services
                         new ItemId(itemWord), itemDef.DisplayName, 1));
             }
 
-            // Static data
-            var allUnits = UnitDatabaseLoader.LoadAll();
             var allEventEncounters = LoadEventEncounters();
 
             // Enemy + spell resolvers
@@ -150,7 +160,8 @@ namespace TextRPG.Core.Services
             var effectRegistry = PassiveSystemInstaller.CreateEffectRegistry(null);
             var targetResolver = new PassiveTargetResolver();
             var passiveContext = new PassiveContext(entityStats, slotService, eventBus, encounterAdapter,
-                tagResolver: wordTagResolver, animationService: animationService);
+                tagResolver: wordTagResolver, animationService: animationService,
+                resourceService: resourceService, letterChallengeService: letterChallengeService);
             var passiveService = new PassiveService(eventBus, triggerRegistry, effectRegistry,
                 targetResolver, passiveContext, allUnits);
 
@@ -158,12 +169,18 @@ namespace TextRPG.Core.Services
             drunkLetterService.SetStatusEffects(statusEffects);
 
             // Anxiety service (circular ref same pattern)
-            var anxietyService = new AnxietyService(eventBus, wordTagResolver);
+            var anxietyService = new AnxietyService(eventBus, wordTagResolver, luckService);
             anxietyService.SetStatusEffects(statusEffects);
 
             // Equipment service
             var equipmentService = new EquipmentService(eventBus, itemRegistry, entityStats,
                 passiveService, weaponService, consumableService);
+
+            // Auto-equip starting items from class definition
+            if (classDef.StartingItems is { Length: > 0 })
+                foreach (var itemWord in classDef.StartingItems)
+                    if (itemRegistry.TryGet(itemWord, out _))
+                        equipmentService.Equip(playerId, itemWord);
 
             // Item action handler (needs EquipmentService which depends on PassiveService)
             handlerRegistry.Register("Item", new ItemActionHandler(actionHandlerCtx,
@@ -180,9 +197,16 @@ namespace TextRPG.Core.Services
             var spellService = new SpellService(eventBus, wordResolver, wordCooldown,
                 spellResolver, wordTagResolver);
 
-            // Class service (needs SpellService for Mage scroll learning)
+            // Loot reward service
+            var lootRewardService = new LootRewardService(eventBus, itemRegistry,
+                inventoryService, playerInventoryId, playerId, spellService, wordResolver);
+
+            // Experience service
+            var experienceService = new ExperienceService(eventBus, lootRewardService);
+
+            // Class service (needs SpellService for Mage, ExperienceService for Rogue)
             var classService = new ClassService(eventBus, selectedClass, playerId,
-                wordTagResolver, spellService, wordResolver, resourceService);
+                wordTagResolver, spellService, wordResolver, resourceService, experienceService);
 
             // Register Merchant composable passives
             if (classDef.Passives is { Length: > 0 })
@@ -192,14 +216,7 @@ namespace TextRPG.Core.Services
             var letterReserveModifier = new LetterReserveValueModifier(letterReserve, eventBus, playerId);
             var compositeModifier = new CompositeActionValueModifier(classService, letterReserveModifier);
             var actionExecution = new ActionExecutionService(eventBus, compositeResolver, handlerRegistry,
-                combatContext, entityStats, statusEffects, animResolver, compositeModifier);
-
-            // Loot reward service
-            var lootRewardService = new LootRewardService(eventBus, itemRegistry,
-                inventoryService, playerInventoryId, playerId, spellService, wordResolver);
-
-            // Experience service
-            var experienceService = new ExperienceService(eventBus, lootRewardService);
+                combatContext, entityStats, statusEffects, animResolver, compositeModifier, luckService);
 
             // Status visual service
             var statusVisualService = new StatusEffectVisualService(eventBus);
@@ -207,6 +224,9 @@ namespace TextRPG.Core.Services
             // TickRunner
             var tickRunner = sceneRoot.AddComponent<TickRunner>();
             tickRunner.Initialize(new UnityTimeProvider(), new ITickable[] { animationService });
+
+            // Lockpick service
+            var lockpickService = new LockpickService(eventBus, entityStats, luckService);
 
             // Run service
             var runService = new RunService(eventBus, lootRewardService);
@@ -258,9 +278,12 @@ namespace TextRPG.Core.Services
                 AllUnits = allUnits,
                 AllEventEncounters = allEventEncounters,
                 AnxietyService = anxietyService,
+                LuckService = luckService,
                 ExperienceService = experienceService,
                 ClassService = classService,
                 LetterReserve = letterReserve,
+                LetterChallengeService = letterChallengeService,
+                LockpickService = lockpickService,
             };
         }
 

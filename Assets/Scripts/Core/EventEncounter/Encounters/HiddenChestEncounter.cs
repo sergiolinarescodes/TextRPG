@@ -14,7 +14,7 @@ namespace TextRPG.Core.EventEncounter.Encounters
                 new InteractionReaction("Search", "message", "You notice the lock is rusted...", 0),
             },
             "A locked wooden chest",
-            Tags: new[] { "flammable", "breakable", "meltable" },
+            Tags: new[] { "flammable", "breakable", "meltable", "chest", "lockpickable" },
             DeathReward: "random",
             DeathRewardValue: 1),
         });

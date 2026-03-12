@@ -10,6 +10,8 @@ namespace TextRPG.Core.EventEncounter.Reactions.Outcomes
         public void Execute(InteractionOutcomeContext context)
         {
             context.Ctx.EntityStats.ApplyMana(context.Source, context.Value);
+            context.Ctx.EventBus.Publish(new InteractionMessageEvent(
+                $"Restored {context.Value} Mana", context.Target));
         }
     }
 }
