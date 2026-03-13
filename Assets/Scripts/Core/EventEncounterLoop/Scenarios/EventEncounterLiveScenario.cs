@@ -79,6 +79,9 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             s.ReactionContext.EncounterService = encounterService;
             _encounterService = encounterService;
 
+            if (s.LockpickService is Lockpick.LockpickService lockpick)
+                lockpick.SetEncounterService(encounterService);
+
             // Use an encounter adapter for passives (event encounters don't have a real IEncounterService)
             var encounterAdapter = new ScenarioEncounterAdapter();
             encounterAdapter.SetPlayer(playerId);
@@ -98,6 +101,9 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
                 s.UnitService.Register(uid,
                     new UnitDefinition(uid, def.Name, def.MaxHealth, 0, 0, 0, def.Color));
             }
+
+            // Give full starting mana for event encounters
+            s.EntityStats.ApplyMana(playerId, 12);
 
             // Start encounter
             _encounterService.StartEncounter(encounterDef, playerId);
