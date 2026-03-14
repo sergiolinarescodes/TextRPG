@@ -9,13 +9,16 @@ namespace TextRPG.Core.StatusEffect
 
     internal sealed class DrunkLetterService : SystemServiceBase, IDrunkLetterService
     {
-        private const int LettersPerStack = 5;
+        private const int DrunkLettersPerStack = 1;
+        private const int ConcussionLettersPerStack = 1;
 
         private readonly EntityId _playerId;
         private readonly Dictionary<char, char> _scrambleMap = new();
         private readonly HashSet<char> _remappedChars = new();
         private readonly char[] _alphabet;
         private int _currentStacks;
+        private int _drunkStacks;
+        private int _concussionStacks;
 
         public bool IsActive => _currentStacks > 0;
         public int CurrentStacks => _currentStacks;
@@ -53,45 +56,41 @@ namespace TextRPG.Core.StatusEffect
 
         private void OnEffectApplied(StatusEffectAppliedEvent e)
         {
-            if (e.Type != StatusEffectType.Drunk || !e.Target.Equals(_playerId)) return;
-            UpdateStacks(e.Target);
+            if (!e.Target.Equals(_playerId)) return;
+            if (e.Type == StatusEffectType.Drunk || e.Type == StatusEffectType.Concussion)
+                UpdateStacks();
         }
 
         private void OnEffectRemoved(StatusEffectRemovedEvent e)
         {
-            if (e.Type != StatusEffectType.Drunk || !e.Target.Equals(_playerId)) return;
-            Clear();
+            if (!e.Target.Equals(_playerId)) return;
+            if (e.Type == StatusEffectType.Drunk || e.Type == StatusEffectType.Concussion)
+                UpdateStacks();
         }
 
         private void OnEffectTicked(StatusEffectTickedEvent e)
         {
-            if (e.Type != StatusEffectType.Drunk || !e.Target.Equals(_playerId)) return;
-            UpdateStacks(e.Target);
+            if (!e.Target.Equals(_playerId)) return;
+            if (e.Type == StatusEffectType.Drunk || e.Type == StatusEffectType.Concussion)
+                UpdateStacks();
         }
 
         private void OnEffectExpired(StatusEffectExpiredEvent e)
         {
-            if (e.Type != StatusEffectType.Drunk || !e.Target.Equals(_playerId)) return;
-            Clear();
+            if (!e.Target.Equals(_playerId)) return;
+            if (e.Type == StatusEffectType.Drunk || e.Type == StatusEffectType.Concussion)
+                UpdateStacks();
         }
 
-        private void UpdateStacks(EntityId target)
+        private void UpdateStacks()
         {
-            // We need the IStatusEffectService to get stack count, but we subscribe to events
-            // which carry the change. For StackIntensity effects, AppliedEvent fires after stacks change.
-            // We'll read the stack count from StatusEffectService if available via a callback,
-            // but the simplest approach: use the Duration field from the event as proxy.
-            // Actually, events don't carry stack count directly. We need the service reference.
-            // The plan says to react to events and call Randomize with new stack count.
-            // We'll accept IStatusEffectService as optional param.
-            // For now, rely on being able to call _statusEffects.GetStackCount().
-
-            // This is handled by injecting IStatusEffectService via a setter (same pattern as StatusEffectHandlerContext).
             if (_statusEffects == null) return;
-            var stacks = _statusEffects.GetStackCount(target, StatusEffectType.Drunk);
-            if (stacks == _currentStacks) return;
-            _currentStacks = stacks;
-            Randomize(stacks);
+            _drunkStacks = _statusEffects.GetStackCount(_playerId, StatusEffectType.Drunk);
+            _concussionStacks = _statusEffects.GetStackCount(_playerId, StatusEffectType.Concussion);
+            int totalLetters = _drunkStacks * DrunkLettersPerStack + _concussionStacks * ConcussionLettersPerStack;
+            if (totalLetters == _currentStacks) return;
+            _currentStacks = totalLetters;
+            Randomize(totalLetters);
         }
 
         private IStatusEffectService _statusEffects;
@@ -101,20 +100,20 @@ namespace TextRPG.Core.StatusEffect
             _statusEffects = service;
         }
 
-        private void Randomize(int stacks)
+        private void Randomize(int letterCount)
         {
             _scrambleMap.Clear();
             _remappedChars.Clear();
 
-            if (stacks <= 0)
+            if (letterCount <= 0)
             {
                 Publish(new DrunkLettersChangedEvent(_scrambleMap));
                 return;
             }
 
-            int count = System.Math.Min(stacks * LettersPerStack, 26);
+            int count = System.Math.Min(letterCount, 26);
 
-            // Fisher-Yates shuffle on a copy of the alphabet
+            // Fisher-Yates shuffle to pick which letters get scrambled
             var shuffled = (char[])_alphabet.Clone();
             for (int i = shuffled.Length - 1; i > 0; i--)
             {
@@ -122,39 +121,18 @@ namespace TextRPG.Core.StatusEffect
                 (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
             }
 
-            // Pick first 'count' letters to scramble
-            var picked = new char[count];
-            System.Array.Copy(shuffled, picked, count);
-
-            // For each picked letter, assign a random different replacement
-            // Shuffle the picked array again and use as replacement targets
-            var replacements = (char[])picked.Clone();
-            // Ensure no letter maps to itself (derangement)
-            for (int attempts = 0; attempts < 100; attempts++)
+            // For each picked letter, map to a random different letter from the full alphabet
+            for (int i = 0; i < count; i++)
             {
-                for (int i = replacements.Length - 1; i > 0; i--)
+                char source = shuffled[i];
+                char target;
+                do
                 {
-                    int j = UnityEngine.Random.Range(0, i + 1);
-                    (replacements[i], replacements[j]) = (replacements[j], replacements[i]);
-                }
+                    target = _alphabet[UnityEngine.Random.Range(0, 26)];
+                } while (target == source);
 
-                bool hasFixedPoint = false;
-                for (int i = 0; i < picked.Length; i++)
-                {
-                    if (picked[i] == replacements[i])
-                    {
-                        hasFixedPoint = true;
-                        break;
-                    }
-                }
-
-                if (!hasFixedPoint) break;
-            }
-
-            for (int i = 0; i < picked.Length; i++)
-            {
-                _scrambleMap[picked[i]] = replacements[i];
-                _remappedChars.Add(replacements[i]);
+                _scrambleMap[source] = target;
+                _remappedChars.Add(target);
             }
 
             Publish(new DrunkLettersChangedEvent(_scrambleMap));
@@ -163,6 +141,8 @@ namespace TextRPG.Core.StatusEffect
         private void Clear()
         {
             _currentStacks = 0;
+            _drunkStacks = 0;
+            _concussionStacks = 0;
             _scrambleMap.Clear();
             _remappedChars.Clear();
             Publish(new DrunkLettersChangedEvent(_scrambleMap));

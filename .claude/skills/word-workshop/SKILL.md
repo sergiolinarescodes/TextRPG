@@ -144,7 +144,7 @@ Present 3-4 cost options with reference comparisons. Each option description MUS
 - Option 3: higher cost — description lists premium words
 - Option 4: the highest cost if word is particularly powerful
 
-Then for plural form: cost = singular cost + 3 (standard plural summon surcharge).
+Then for plural form: cost = singular cost x2 (double the singular cost).
 
 For the **unit's ability words**, also set costs:
 - Simple ability words (single action): cost 0-1
@@ -187,11 +187,37 @@ Propose 2-3 options for a complementary secondary action, or "No secondary."
 - Option 2: a different complementary action
 - Option 3: "No secondary action"
 
+#### Step 2b — Per-Action Targeting
+**Only when 2+ actions are chosen.** Skip for single-action words.
+
+**Every action can target anything** — Burn(Self), Drunk(Enemy), Shield(AllAllies), Poison(Self), Stun(FrontEnemy), Heal(AllAllies), etc. This is where the most creative word designs come from. Don't default to "everything targets the same thing" — ask what THIS word would actually do.
+
+Present 3-4 creative targeting options based on the chosen actions. **Always propose at least one split-target option.** Think about the word's meaning — does it hurt the user? Help allies? Debilitate enemies? Mix effects across targets?
+
+`AskUserQuestion`: "How should this word target?"
+- Option 1: "All actions target [word-level target]" (simple, uniform targeting)
+- Option 2: A creative split based on the word's meaning (e.g., "Damage → Enemy, Poison → Self — the word implies self-harm for power")
+- Option 3: A different creative split (e.g., "Buff → AllAlliesAndSelf, Fear → AllEnemies — a rallying effect")
+- Option 4: "Custom targeting" (let user specify per action)
+
+**Go beyond the basic patterns.** Think about:
+- Self-harm for power: Buff(Self) + Bleed/Poison/Damage(Self)
+- Friendly fire: Damage(AllEnemies) + Damage(AllAllies)
+- Cursed gifts: Heal(Self) + Drunk/Poison(Self)
+- Tactical precision: Stun(FrontEnemy) + Damage(BackEnemy)
+- Contagion: status effects on enemies AND self
+- Overexertion: strong buff(Self) + DoT(Self)
+- Any action can target any valid target — let the word's meaning guide it
+
+When per-action targeting is chosen, set the word-level `target` to the primary action's target (for UI display).
+
 #### Step 3 — Tags
 Multi-select from relevant existing tags, then ALWAYS offer new tag ideas (same as unit flow Steps 4 + 4b).
 
 #### Step 4 — Mana Cost
 **MANDATORY step.** Query the DB for words with the same primary action to show cost comparisons.
+
+**IMPORTANT — targeting reference caveat**: Most existing words in the DB use old-style word-level targeting (all actions share one target). Do NOT use existing words as a model for how targeting should work. Use them only for **cost calibration** (how much mana for this power level). For targeting decisions, always refer to Step 2b and the per-action targeting patterns — design targeting from the word's meaning, not from what existing words do.
 
 ```bash
 py -c "
@@ -211,7 +237,7 @@ conn.close()
 "
 ```
 
-Present 3-4 cost options with previews showing existing words at each cost level. Each option description MUST include 2-3 existing reference words with their action combos and targets.
+Present 3-4 cost options with previews showing existing words at each cost level. Each option description MUST include 2-3 existing reference words with their action combos and targets (for cost reference only — not as targeting models).
 
 Use this **Mana Cost Reference Table** for calibration:
 
@@ -229,16 +255,19 @@ Use this **Mana Cost Reference Table** for calibration:
 - Self-only beneficial (heal, buff, shield): -1 cost (no offensive threat)
 - Combo with secondary debuff (Bleed, status): +1 cost
 - Summon words (singular): base ability cost + 4
-- Summon words (plural/dual): singular cost + 3 (summons both ally slots)
+- Summon words (plural/dual): singular cost x2 (double, summons both ally slots)
 
 `AskUserQuestion`: "What mana cost for this word?"
 - Option descriptions MUST reference specific existing words at each cost level
 
 For **plural forms**: typically same cost or +1 if target upgrades (e.g., SingleEnemy → TwoRandomEnemies).
-For **plural summon forms**: singular cost + 3 (dual summon premium).
+For **plural summon forms**: singular cost x2 (double).
 
 #### Step 5 — Confirm
-Summary including **mana cost + reference justification** + file list + implement question (same as unit flow Step 6).
+Summary including:
+- Actions with per-action targets when they differ (e.g., "Damage:5 → Enemy, Damage:2 → Self")
+- **Mana cost + reference justification**
+- File list + implement question (same as unit flow Step 6)
 
 ---
 
@@ -281,7 +310,7 @@ After user approval, implement following the appropriate pattern below.
 1. Add `public const string` to `ActionNames.cs`
 2. Add `ActionTemplateDef` entry to `ActionDefinitionTable.cs`
 3. Add to `VALID_ACTIONS` in `batch_insert.py`
-4. Add row to AVAILABLE ACTIONS table in `ralph-prompt.md`
+4. Add entry to `ACTION_DESCRIPTIONS` in `context.py`
 5. Add the inspiring word to `seed_db.py` (SEED_ACTIONS, SEED_META, SEED_TAGS)
 6. Add verification checks to `CombatActionVerificationScenario`
 
@@ -297,7 +326,7 @@ All of the above, plus:
 1. Create `internal sealed class` with `[AutoScan]` in `Passive/Triggers/`
 2. Add display mapping in `PassiveDefinitions.cs` (trigger name + description)
 3. Add to `VALID_TRIGGERS` in `batch_insert.py`
-4. Add to Available triggers table in `ralph-prompt.md`
+4. (context.py auto-reads from batch_insert.py — no separate update needed)
 5. Design a showcase unit/item that uses it, add to `seed_db.py`
 6. Add verification checks in `PassiveVerificationScenario`
 
@@ -306,7 +335,7 @@ All of the above, plus:
 1. Create `internal sealed class` with `[AutoScan]` in `Passive/Effects/`
 2. Add display mapping in `PassiveDefinitions.cs` (effect name + color)
 3. Add to `VALID_EFFECTS` in `batch_insert.py`
-4. Add to Available effects table in `ralph-prompt.md`
+4. (context.py auto-reads from batch_insert.py — no separate update needed)
 5. Design a showcase unit/item that uses it, add to `seed_db.py`
 6. Add verification checks in `PassiveVerificationScenario`
 
@@ -318,7 +347,7 @@ All of the above, plus:
 4. Add constant to `ActionNames.cs` + template def to `ActionDefinitionTable.cs`
 5. Register handler in `StatusEffectHandlerFactory`
 6. Add to `VALID_STATUS_EFFECTS` in `batch_insert.py`
-7. Update Available statuses in `ralph-prompt.md`
+7. Add to `VALID_STATUS_EFFECTS` in `batch_insert.py`
 8. Add to `StatusEffectColors` if custom color needed
 9. Add the inspiring word to `seed_db.py`
 
@@ -368,14 +397,14 @@ The **Letter Challenge System** (`ILetterChallengeService`) enables passives tha
 
 1. **Add related words to `preregister_families.py`** (NOT seed_db.py): When brainstorming word families (e.g., "Purify is reusable by: cleanse, cure, remedy..."), add 5-10 related words to the `FAMILIES` list in `Tools/WordAction/preregister_families.py` with preliminary classifications. These are inserted into the DB with `status='draft'` — immediately playable but flagged for refinement. When ralph-loop encounters a draft word, its `INSERT OR REPLACE` automatically overwrites the draft entry with `status=NULL` (refined).
 
-2. **Update WORD FAMILIES table in `ralph-prompt.md`**: Add a row listing 10-20 words that map to the new action/tag. This helps ralph-loop classify words it encounters that weren't pre-registered.
+2. **Update WORD_FAMILIES/TAG_FAMILIES in `context.py`**: Add an entry listing 10-20 words that map to the new action/tag. This helps ralph-loop classify words it encounters that weren't pre-registered.
 
 3. **Balance mana costs across the family using the chosen word as anchor**: The mana cost selected during design becomes the **reference cost** for the entire word family. When pre-registering related words in `preregister_families.py`, calibrate each word's cost relative to the anchor:
    - Same action profile as anchor → same cost
    - Fewer/weaker actions → -1 cost
    - More/stronger actions or combo additions → +1 cost
    - AoE targeting upgrade → +1 cost
-   - Summons: base ability cost + 4 for singular, singular cost + 3 for plural (dual summon)
+   - Summons: base ability cost + 3 for singular, singular cost x2 for plural (double)
 
    This creates a consistent cost curve that ralph-loop can reference. When ralph-loop encounters a word that maps to an existing action, it should check the DB for other words with that action and match costs proportionally.
 
@@ -418,7 +447,7 @@ If no → show summary of all mechanics created this session:
 3. **Always check existing mechanics first** — Only propose new code when it adds genuine reusability
 4. **Reusability threshold** — New mechanic should benefit 5+ future words to justify code complexity
 5. **Showcase entries** — Every new mechanic gets at least one word in seed_db.py
-6. **Update the pipeline** — Every new mechanic must update batch_insert.py + ralph-prompt.md so ralph-loop can classify words into it
+6. **Update the pipeline** — Every new mechanic must update batch_insert.py + context.py so ralph-loop can classify words into it
 7. **Use AskUserQuestion for ALL decisions** — Never ask users to type when they can click
 8. **Singular + plural summon pattern** — ALWAYS add both singular and plural forms. For Summon words, the DB pattern is CRITICAL:
    - **Singular** (e.g., "mercenary"): 1 Summon row, value=1, assoc_word="" (word itself IS the unit_id), seq=0
@@ -426,7 +455,7 @@ If no → show summary of all mechanics created this session:
    - **NEVER** use value=2 on a single Summon row to mean "summon 2" — each row = 1 summon execution.
    - **assoc_word is mandatory** when the word differs from the unit_id (all plurals, plus words like "crewmate" → "pirate").
    - Max ally slots is 2. Max enemy slots is 3.
-9. **Mana cost is a design decision** — ALWAYS ask the user to choose mana cost with DB-sourced comparisons of similar words. The chosen cost becomes the reference anchor for all related words in preregister_families.py and ralph-prompt.md WORD FAMILIES. This is critical for ralph-loop: when it encounters a new word that maps to an existing action, it calibrates cost by looking at what similar words cost in the DB.
+9. **Mana cost is a design decision** — ALWAYS ask the user to choose mana cost with DB-sourced comparisons of similar words. The chosen cost becomes the reference anchor for all related words in preregister_families.py and context.py WORD_FAMILIES. This is critical for ralph-loop: when it encounters a new word that maps to an existing action, it calibrates cost by looking at what similar words cost in the DB.
 
 ---
 
@@ -533,6 +562,7 @@ rg -i "mechanic_name" Assets/Scripts/ --type cs
 | Batch insert | `Tools/WordAction/batch_insert.py` |
 | Draft families | `Tools/WordAction/preregister_families.py` |
 | Ralph prompt | `ralph-prompt.md` |
+| Context generator | `Tools/WordAction/context.py` |
 | Audit script | `Tools/WordAction/audit.py` |
 
 ### batch_insert.py Validation Sets

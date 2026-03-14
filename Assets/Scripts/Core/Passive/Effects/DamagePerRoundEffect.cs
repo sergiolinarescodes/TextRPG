@@ -1,0 +1,26 @@
+using System.Collections.Generic;
+using TextRPG.Core.EntityStats;
+using TextRPG.Core.Services;
+
+namespace TextRPG.Core.Passive.Effects
+{
+    [AutoScan]
+    internal sealed class DamagePerRoundEffect : IPassiveEffect
+    {
+        public string EffectId => "damage_per_round";
+
+        public void Execute(EntityId owner, int value, string effectParam,
+                            IReadOnlyList<EntityId> targets, IPassiveContext ctx)
+        {
+            int round = ctx.TurnService?.CurrentRoundNumber ?? 1;
+            int scaledDamage = value * round;
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                var target = targets[i];
+                if (!ctx.EntityStats.HasEntity(target) || ctx.EntityStats.GetCurrentHealth(target) <= 0) continue;
+                ctx.EntityStats.ApplyDamage(target, scaledDamage, owner);
+            }
+        }
+    }
+}

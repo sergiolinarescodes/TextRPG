@@ -11,12 +11,16 @@ namespace TextRPG.Core.WordAction
             ["RandomEnemy"] = "Random Enemy",
             ["AllEnemies"] = "All Enemies",
             ["AllAllies"] = "All Allies",
+            ["AllAlliesAndSelf"] = "All Allies & Self",
             ["FrontEnemy"] = "Front",
             ["MiddleEnemy"] = "Middle",
             ["BackEnemy"] = "Back",
-            ["LowestHpEnemy"] = "Weakest Enemy",
-            ["HighestHpEnemy"] = "Strongest Enemy",
-            ["LowestHpAlly"] = "Weakest Ally",
+            ["LowestHealthEnemy"] = "Weakest",
+            ["HighestHealthEnemy"] = "Strongest",
+            ["RandomAlly"] = "Random Ally",
+            ["RandomAny"] = "Random",
+            ["TwoRandomEnemies"] = "2 Random",
+            ["HalfEnemiesRandom"] = "Half Enemies",
             ["All"] = "All",
             ["Self"] = "Self",
         };
@@ -35,7 +39,7 @@ namespace TextRPG.Core.WordAction
         public static string FormatNatural(WordActionMapping mapping)
         {
             var v = mapping.Value;
-            return mapping.ActionId switch
+            var text = mapping.ActionId switch
             {
                 "Damage" => $"Deals {v} damage",
                 "MagicDamage" => $"Deals {v} magic damage",
@@ -49,7 +53,7 @@ namespace TextRPG.Core.WordAction
                 "Stun" => $"Stuns ({v})",
                 "Freeze" => $"Frostbites ({v})",
                 "Concussion" => $"Concusses ({v})",
-                "Push" => $"Pushes {v}",
+
                 "Poison" => $"Poisons ({v})",
                 "Bleed" => $"Bleeds ({v})",
                 "Drunk" => $"Drunk ({v} stacks)",
@@ -63,6 +67,8 @@ namespace TextRPG.Core.WordAction
                 "Sleep" => $"Sleeps ({v})",
                 "RestHeal" => $"Rest heals {v}",
                 "Melt" => $"Melts ({v})",
+                "Sunder" => $"Strips {v} buffs (+1 dmg each)",
+                "Silence" => $"Silences ({v})",
                 "Ignite" => $"Ignites ({v})",
                 "Combust" => $"Combusts ({v})",
                 "BuffStrength" => $"+{v} STR",
@@ -82,6 +88,14 @@ namespace TextRPG.Core.WordAction
                 "Mana" => $"Restores {v} mana",
                 _ => $"{mapping.ActionId} {v}"
             };
+
+            if (mapping.Target != null)
+            {
+                var target = TargetAliases.TryGetValue(mapping.Target, out var alias) ? alias : mapping.Target;
+                text = $"{text} ({target})";
+            }
+
+            return text;
         }
 
         public static Color GetColor(string actionId, IActionRegistry registry)

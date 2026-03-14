@@ -158,20 +158,17 @@ sqlite3 Assets/StreamingAssets/wordactions.db "INSERT INTO word_actions(word, ac
 
 Pipeline scripts: `Tools/WordAction/batch_next.py`, `batch_insert.py`, `stats.py`, `audit.py`
 
-## Updating ralph-prompt.md
+## Updating pipeline reference data
 
-When adding a new action, update TWO sections in `ralph-prompt.md`:
+When adding a new action, update these files:
 
-1. **AVAILABLE ACTIONS table** — add a row with `ActionId` and `Effect` description:
-   ```
-   | `HolyDamage` | Deal holy damage scaled by MagicPower vs MagicDefense (Value = amount). Use for divine/holy attacks. Always pair with `HOLY` tag. |
-   ```
+1. **`Tools/WordAction/batch_insert.py`** — add to `VALID_ACTIONS` set
+2. **`Tools/WordAction/context.py`** — add entry to `ACTION_DESCRIPTIONS` dict with a concise description
+3. **`ralph-prompt.md`** — if the action has special classification rules (always paired with a tag, specific targeting), add a bullet point under CLASSIFICATION GUIDELINES
 
-2. **CLASSIFICATION GUIDELINES** — if the action has special classification rules (e.g., always paired with a tag, specific targeting), add a bullet point.
+If adding a new **interaction action**, also add to `ActionNames.InteractionActions` in C#.
 
-If adding a new **interaction action**, also update the `INTERACTION ACTIONS` table.
-
-If adding a new **status effect** that actions can apply, update the `Available statuses for apply_status` line and the `Composite status targeting` section.
+If adding a new **status effect**, add to `VALID_STATUS_EFFECTS` in `batch_insert.py`.
 
 ## Key Files
 
@@ -194,5 +191,5 @@ If adding a new **status effect** that actions can apply, update the `Available 
 - [ ] Add template def to `ActionDefinitionTable.cs` OR create custom handler + register in `ActionHandlerFactory`
 - [ ] Add `word_actions` rows in SQLite DB (via pipeline or direct SQL)
 - [ ] Add verification checks in `CombatActionVerificationScenario` (exact values, not just invocation)
-- [ ] Update `ralph-prompt.md` — add row to AVAILABLE ACTIONS table with ActionId + Effect description
-- [ ] If new status effect: update `Available statuses for apply_status` + composite targeting in `ralph-prompt.md`
+- [ ] Update `batch_insert.py` VALID_ACTIONS + `context.py` ACTION_DESCRIPTIONS
+- [ ] If new status effect: update `batch_insert.py` VALID_STATUS_EFFECTS

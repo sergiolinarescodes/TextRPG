@@ -43,14 +43,20 @@ namespace TextRPG.Core.ActionExecution.Handlers
             }
             doneTagCheck:
 
-            // Scale with MagicPower
-            if (_ctx.EntityStats != null)
+            for (int i = 0; i < context.Targets.Count; i++)
             {
-                int magicPower = _ctx.EntityStats.GetStat(context.Source, StatType.MagicPower);
-                heal += magicPower / 3;
-            }
+                var target = context.Targets[i];
+                int targetHeal = heal;
 
-            _ctx.EntityStats?.ApplyHeal(context.Source, heal);
+                // Scale with target's MagicPower
+                if (_ctx.EntityStats != null)
+                {
+                    int magicPower = _ctx.EntityStats.GetStat(target, StatType.MagicPower);
+                    targetHeal += magicPower / 3;
+                }
+
+                _ctx.EntityStats?.ApplyHeal(target, targetHeal);
+            }
         }
     }
 }

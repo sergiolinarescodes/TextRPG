@@ -1,6 +1,5 @@
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
-using TextRPG.Core.Equipment;
 using Unidad.Core.EventBus;
 using Unidad.Core.Systems;
 
@@ -8,22 +7,18 @@ namespace TextRPG.Core.Experience
 {
     internal sealed class ExperienceService : SystemServiceBase, IExperienceService
     {
-        private readonly ILootRewardService _lootRewardService;
         private IEncounterService _encounterService;
         private int _currentLevel = 1;
         private int _currentXp;
-        private int _pendingLevelUps;
 
         public int CurrentLevel => _currentLevel;
         public int CurrentXp => _currentXp;
         public int XpForNextLevel => _currentLevel * 20;
         public float XpProgress => XpForNextLevel > 0 ? (float)_currentXp / XpForNextLevel : 0f;
 
-        public ExperienceService(IEventBus eventBus, ILootRewardService lootRewardService) : base(eventBus)
+        public ExperienceService(IEventBus eventBus) : base(eventBus)
         {
-            _lootRewardService = lootRewardService;
             Subscribe<EntityDiedEvent>(OnEntityDied);
-            Subscribe<LootRewardSelectedEvent>(OnLootSelected);
         }
 
         internal void SetEncounterService(IEncounterService encounterService)
@@ -45,7 +40,6 @@ namespace TextRPG.Core.Experience
             {
                 _currentXp -= XpForNextLevel;
                 _currentLevel++;
-                _pendingLevelUps++;
             }
 
             Publish(new ExperienceGainedEvent(evt.EntityId, xpAmount, _currentXp, XpForNextLevel, _currentLevel));
@@ -64,7 +58,6 @@ namespace TextRPG.Core.Experience
             {
                 _currentXp -= XpForNextLevel;
                 _currentLevel++;
-                _pendingLevelUps++;
             }
 
             Publish(new ExperienceGainedEvent(default, amount, _currentXp, XpForNextLevel, _currentLevel));
@@ -73,13 +66,5 @@ namespace TextRPG.Core.Experience
                 Publish(new LevelUpEvent(_currentLevel, previousLevel));
         }
 
-        private void OnLootSelected(LootRewardSelectedEvent evt)
-        {
-            if (_pendingLevelUps > 0)
-            {
-                _pendingLevelUps--;
-                _lootRewardService.GenerateAndOffer();
-            }
-        }
     }
 }

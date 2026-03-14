@@ -31,11 +31,16 @@ namespace TextRPG.Core.UnitRendering
             _setInputEnabled = setInputEnabled;
 
             _subscriptions.Add(_eventBus.Subscribe<LootRewardOfferedEvent>(evt => ShowLootSelection(evt.Options)));
-            _subscriptions.Add(_eventBus.Subscribe<LootRewardSelectedEvent>(_ => HideLootSelection()));
+            _subscriptions.Add(_eventBus.Subscribe<LootRewardSelectedEvent>(_ =>
+            {
+                if (!_lootRewardService.IsAwaitingSelection)
+                    HideLootSelection();
+            }));
         }
 
         private void ShowLootSelection(LootRewardOption[] options)
         {
+            _lootOverlay?.RemoveFromHierarchy();
             _setInputEnabled(false);
 
             _lootOverlay = new VisualElement();

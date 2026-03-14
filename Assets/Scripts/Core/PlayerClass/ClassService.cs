@@ -8,6 +8,7 @@ using TextRPG.Core.Experience;
 using TextRPG.Core.Scroll;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
+using Unidad.Core.Inventory;
 using Unidad.Core.Resource;
 using Unidad.Core.Systems;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
@@ -29,6 +30,8 @@ namespace TextRPG.Core.PlayerClass
         private readonly IWordResolver _wordResolver;
         private readonly IResourceService _resourceService;
         private readonly IExperienceService _experienceService;
+        private readonly IInventoryService _inventoryService;
+        private readonly InventoryId _playerInventoryId;
         private readonly Random _rng = new();
         private bool _isGrantingBonus;
 
@@ -40,7 +43,9 @@ namespace TextRPG.Core.PlayerClass
             ISpellService spellService = null,
             IWordResolver wordResolver = null,
             IResourceService resourceService = null,
-            IExperienceService experienceService = null)
+            IExperienceService experienceService = null,
+            IInventoryService inventoryService = null,
+            InventoryId playerInventoryId = default)
             : base(eventBus)
         {
             _selectedClass = selectedClass;
@@ -51,8 +56,11 @@ namespace TextRPG.Core.PlayerClass
             _wordResolver = wordResolver;
             _resourceService = resourceService;
             _experienceService = experienceService;
+            _inventoryService = inventoryService;
+            _playerInventoryId = playerInventoryId;
 
-            if (selectedClass == PlayerClass.Mage && _spellService != null && _wordResolver != null)
+            if (selectedClass == PlayerClass.Mage && _spellService != null && _wordResolver != null
+                && _inventoryService != null)
                 Subscribe<LevelUpEvent>(OnLevelUp);
 
             if (selectedClass == PlayerClass.Merchant && _resourceService != null)
@@ -71,8 +79,11 @@ namespace TextRPG.Core.PlayerClass
                 var scroll = ScrollGenerator.Generate(_wordResolver, exclude, _rng);
                 if (scroll == null) break;
 
-                _spellService.LearnSpell(scroll);
-                Publish(new ClassScrollLearnedEvent(evt.PreviousLevel + i + 1, scroll.ScrambledWord));
+                var itemKey = $"scroll_{scroll.ScrambledWord}";
+                _spellService.RegisterScrollItem(itemKey, scroll);
+                _inventoryService.DefineItem(new ItemDefinition(new ItemId(itemKey), scroll.DisplayName, 1));
+                _inventoryService.Add(_playerInventoryId, new ItemId(itemKey));
+                Publish(new ScrollAcquiredEvent(itemKey, scroll));
             }
         }
 

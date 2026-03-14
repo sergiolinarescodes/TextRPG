@@ -29,7 +29,6 @@ namespace TextRPG.Core.ActionExecution
                 "shield" => new ShieldActionHandler(ctx),
                 "mana_self" => new ThinkingActionHandler(ctx),
                 "noop" => new PayActionHandler(),
-                "push" => new PushActionHandler(ctx),
 
                 _ => throw new ArgumentException($"Unknown action template: {def.Template}")
             };
@@ -67,12 +66,17 @@ namespace TextRPG.Core.ActionExecution
             if (ctx.SlotService != null)
                 registry.Register(ActionNames.Scramble, new ScrambleActionHandler(ctx));
 
+            // Sunder (strip positive effects + damage)
+            if (ctx.StatusEffects != null)
+                registry.Register(ActionNames.Sunder, new SunderActionHandler(ctx));
+
             // 5. Creature actions (peck, screech) and cleansing actions (purify, awaken)
             if (ctx.StatusEffects != null)
             {
                 registry.Register(ActionNames.Peck, new PeckActionHandler(ctx));
                 registry.Register(ActionNames.Screech, new ScreechActionHandler(ctx));
                 registry.Register(ActionNames.Purify, new PurifyActionHandler(ctx));
+                registry.Register(ActionNames.Cauterize, new CauterizeActionHandler(ctx));
                 registry.Register(ActionNames.Awaken, new AwakenActionHandler(ctx));
                 registry.Register(ActionNames.Deceive, new DeceiveActionHandler(ctx));
                 registry.Register(ActionNames.Ignite, new IgniteActionHandler(ctx));

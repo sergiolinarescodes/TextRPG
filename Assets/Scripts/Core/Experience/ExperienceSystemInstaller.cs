@@ -1,5 +1,4 @@
 using Reflex.Core;
-using TextRPG.Core.Equipment;
 using Unidad.Core.Bootstrap;
 using Unidad.Core.EventBus;
 using Unidad.Core.Testing;
@@ -13,8 +12,7 @@ namespace TextRPG.Core.Experience
             builder.AddSingleton(container =>
             {
                 var eventBus = container.Resolve<IEventBus>();
-                var lootRewardService = container.Resolve<ILootRewardService>();
-                return (IExperienceService)new ExperienceService(eventBus, lootRewardService);
+                return (IExperienceService)new ExperienceService(eventBus);
             }, typeof(IExperienceService));
         }
 

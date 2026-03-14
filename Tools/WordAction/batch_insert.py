@@ -38,13 +38,14 @@ DB_PATH = os.path.join(
 )
 
 VALID_ACTIONS = {
-    "Water", "Earth", "Wind", "Push", "Damage", "MagicDamage", "Slow", "Burn",
+    "Water", "Earth", "Damage", "MagicDamage", "Slow", "Burn",
     "Freeze", "Curse", "Heavy", "Shock", "Heal", "Dark", "Light",
     "Poison", "Shield", "Summon", "Time", "Fear", "Stun", "Concussion",
     "Concentrate", "Bleed", "Grow", "Thorns", "Reflect", "Hardening",
     "Drunk", "Smash", "Pay", "Energize", "Relax", "Sleep", "RestHeal", "Scramble", "Melt",
     "Peck", "Screech", "Purify", "Awaken", "Siphon", "Deceive", "Recuperate", "Comfort", "Overcharge",
     "Cannonade", "Plunder", "Attune", "Ignite", "Combust", "Cataclysm", "Cleave", "Lockpick",
+    "Sunder", "Silence", "Cauterize",
     "BuffStrength", "BuffMagicPower", "BuffPhysicalDefense", "BuffMagicDefense", "BuffLuck",
     "DebuffStrength", "DebuffMagicPower", "DebuffPhysicalDefense", "DebuffMagicDefense", "DebuffLuck",
     "Item",
@@ -75,7 +76,7 @@ VALID_STATUS_EFFECTS = {
     "Buffed", "Shielded", "ExtraTurn", "Stun", "Concussion", "Fear",
     "Bleeding", "Concentrated",
     "Growing", "Thorns", "Reflecting", "Hardening",
-    "Awakened",
+    "Awakened", "Silenced",
 }
 
 def is_valid_target(target):
@@ -97,16 +98,17 @@ VALID_TAGS = {
     "DEBUFF", "STEALTH", "RELAX", "THOUGHTS", "DWELLING", "LIGHTNING", "WEATHER",
     "BOTANICAL", "DRAIN", "UNDEAD", "NAVAL", "FIRE", "COSMIC", "DESTRUCTION",
     "BLADE", "JUNGLE", "SIGHT",
+    "NULLIFY", "CONTROL", "MEDICAL", "TANK", "CRAFT", "AIR",
 }
 
 VALID_TRIGGERS = {
     "on_ally_hit", "on_self_hit", "on_round_end", "on_round_start",
     "on_turn_start", "on_turn_end", "on_word_played", "on_word_length",
     "on_word_tag", "on_kill", "on_ally_death", "on_death", "on_damage_dealt",
-    "on_letter_in_word", "taunt",
+    "on_letter_in_word", "on_weapon_fire", "taunt",
 }
 
-VALID_EFFECTS = {"heal", "damage", "shield", "mana", "apply_status", "steal_stat", "gold", "buff_stat"}
+VALID_EFFECTS = {"heal", "damage", "damage_per_round", "shield", "mana", "apply_status", "steal_stat", "gold", "buff_stat"}
 
 VALID_PASSIVE_TARGETS = {"Self", "AllAllies", "AllEnemies", "Injured", "Attacker"}
 
@@ -121,7 +123,19 @@ def main():
         sys.exit(1)
 
     is_draft = "--draft" in sys.argv
-    data = json.load(sys.stdin)
+
+    # Support --file <path> to read from file instead of stdin (avoids bash quoting issues)
+    file_path = None
+    for i, arg in enumerate(sys.argv):
+        if arg == "--file" and i + 1 < len(sys.argv):
+            file_path = sys.argv[i + 1]
+            break
+
+    if file_path:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = json.load(sys.stdin)
     if not isinstance(data, list):
         print("Error: expected a JSON array", file=sys.stderr)
         sys.exit(1)
@@ -146,7 +160,7 @@ def main():
         if not is_valid_target(target):
             print(f"Warning: unknown target '{target}' for '{word}', defaulting to SingleEnemy", file=sys.stderr)
             target = "SingleEnemy"
-        cost = max(0, min(10, int(entry.get("cost", 0))))
+        cost = max(0, min(20, int(entry.get("cost", 0))))
         range_val = max(0, int(entry.get("range", 0)))
         area = entry.get("area", "Single")
         if area not in VALID_AREAS:

@@ -4,6 +4,22 @@ Classify NLTK dictionary words into the game's action system via SQLite database
 
 ---
 
+## CONTEXT MANAGEMENT
+
+Each iteration runs in a **fresh context window** (no accumulated history). State lives in the SQLite DB and filesystem.
+
+- **Keep batch JSON output minimal** — write JSON to `Tools/WordAction/batch_temp.json` and pipe it to `batch_insert.py`, do NOT paste large JSON blocks inline
+- **Run `context.py` every iteration** — it contains valid actions, targets, tags, and distribution data
+
+### Running the loop
+```bash
+bash Tools/WordAction/ralph-loop.sh        # 10 iterations (default)
+bash Tools/WordAction/ralph-loop.sh 50     # 50 iterations
+bash Tools/WordAction/ralph-loop.sh 0      # run until COMPLETE
+```
+
+---
+
 ## PIPELINE TOOLS
 
 | Script | Purpose |
@@ -13,6 +29,8 @@ Classify NLTK dictionary words into the game's action system via SQLite database
 | `Tools/WordAction/batch_next.py --count N` | Get next N unclassified words as JSON |
 | `Tools/WordAction/batch_insert.py` | Read classified JSON from stdin, insert into DB |
 | `Tools/WordAction/stats.py` | Show progress (total/processed/remaining) |
+| `Tools/WordAction/context.py` | Generate full reference data (valid actions, targets, tags, families, DB distribution) |
+| `Tools/WordAction/audit.py` | Deep audit of word action distribution |
 
 ---
 
@@ -20,16 +38,19 @@ Classify NLTK dictionary words into the game's action system via SQLite database
 
 ### Step 1: Get next batch
 ```bash
-python Tools/WordAction/batch_next.py --count 100
+py Tools/WordAction/batch_next.py --count 100
 ```
 If output is `COMPLETE`, all words are done — stop.
 
-### Step 1.5: Analyze current state
+### Step 1.5: Load context and analyze state
 ```bash
-python Tools/WordAction/stats.py
-python Tools/WordAction/audit.py
+py Tools/WordAction/context.py
+py Tools/WordAction/stats.py
+py Tools/WordAction/audit.py
 ```
-Review the output before classifying. Understand:
+**`context.py` outputs ALL reference data you need**: valid actions with descriptions, valid targets/tags/triggers/effects, word family pre-classifications, and current DB distribution. Read its output carefully — it replaces all reference tables.
+
+Review the audit output to understand:
 - **Action distribution**: which actions are overused/underused?
 - **Tag coverage**: which tags need more words?
 - **Unit diversity**: are summons clustered around the same passive archetypes?
@@ -72,6 +93,30 @@ Output JSON array:
         ]
     },
     {
+        "word": "sacrifice",
+        "target": "SingleEnemy",
+        "cost": 2,
+        "range": 0,
+        "area": "Single",
+        "tags": ["SHADOW", "OFFENSIVE"],
+        "actions": [
+            {"action": "Damage", "value": 5, "target": "SingleEnemy"},
+            {"action": "Damage", "value": 2, "target": "Self"}
+        ]
+    },
+    {
+        "word": "rampage",
+        "target": "AllEnemies",
+        "cost": 4,
+        "range": 0,
+        "area": "Single",
+        "tags": ["OFFENSIVE", "MELEE", "PHYSICAL"],
+        "actions": [
+            {"action": "Damage", "value": 3, "target": "AllEnemies"},
+            {"action": "BuffStrength", "value": 2, "target": "Self"}
+        ]
+    },
+    {
         "word": "library",
         "target": "Self",
         "cost": 3,
@@ -106,123 +151,53 @@ Output JSON array:
 ]
 ```
 
-**Per-action targeting**: Actions can optionally include `"target"`, `"range"`, and `"area"` fields to override the word-level defaults. Use this when a word's actions target different things (e.g. "absorb" damages an enemy but heals self). When omitted, the action inherits from the word-level `target`/`range`/`area`.
+### Per-Action Targeting (Multi-Target Words)
+
+**Every action supports its own target.** Any action — Damage, Heal, Burn, Drunk, Freeze, Poison, Shield, Buff, Debuff, Concentrate, Thorns, Reflect, Hardening, Grow, Energize, Stun, Fear, Sleep, Mana, etc. — can target anything: Self, SingleEnemy, AllEnemies, AllAllies, RandomEnemy, positional slots, stat-based picks, or any other valid target.
+
+This is the key to creative word design. Don't think of actions as having "default" targets. Think about what THIS word would actually do, and target each action independently.
+
+**Rules:**
+- All actions share the same target → use word-level `"target"` only (no per-action fields needed)
+- Actions target different things → each action MUST have an explicit `"target"` field
+- Word-level `"target"` = the primary target (used for UI/display). Set it to whichever action is the "main" one
+
+**Design patterns:**
+
+| Pattern | Actions | Example words |
+|---------|---------|---------------|
+| Vampiric | Damage(Enemy) + Heal(Self) | absorb, drain, leech |
+| Sacrifice | Damage(Enemy,high) + Damage/Poison(Self) | sacrifice, immolate, martyr |
+| Berserker | Damage(AllEnemies) + Buff(Self) | rampage, frenzy, berserk |
+| Rally | Buff(AllAlliesAndSelf) + Fear(AllEnemies) | warcry, rally, inspire |
+| Guardian | Shield(AllAllies) + Hardening(Self) | protect, fortify, bulwark |
+| Cursed Gift | Heal(Self) + Drunk/Poison(Self) | moonshine, toxicant, hemlock |
+| Intimidation | Fear(AllEnemies) + BuffStrength(Self) | intimidate, menace, terrorize |
+| Sabotage | DebuffStrength(Enemy) + Poison(Enemy) + Shield(Self) | sabotage, undermine |
+| Friendly Fire | Damage(AllEnemies) + Damage(AllAllies) | earthquake, shockwave, cataclysm |
+| Contagion | Poison(AllEnemies) + Burn(Self) | plague, outbreak, pandemic |
+| Overexertion | BuffStrength(Self,high) + Bleed(Self) | overexert, strain, push |
+| Tactical | Stun(FrontEnemy) + Damage(BackEnemy) | flank, pincer, outmaneuver |
+
+**Think creatively.** A word like "gamble" could BuffLuck(Self) + Damage(Self). "Bribe" could DebuffStrength(SingleEnemy) + Mana(Self). "Martyr" could Heal(AllAllies) + Damage(Self). Any combination is possible — let the word's meaning drive the targeting.
 
 ### Step 3: Insert into DB
+Write the JSON array to `Tools/WordAction/batch_temp.json` using the Write tool, then run:
 ```bash
-echo '<JSON>' | python Tools/WordAction/batch_insert.py
+py Tools/WordAction/batch_insert.py --file Tools/WordAction/batch_temp.json
 ```
+**IMPORTANT**: Do NOT use heredocs (`<<EOF`), `echo`, or `cat` to pipe JSON through stdin — this breaks on Windows bash due to quote escaping. Always write to a file first, then use `--file`.
 
 ### Step 4: Check progress
 ```bash
-python Tools/WordAction/stats.py
-```
-
----
-
-## AVAILABLE ACTIONS
-
-| ActionId | Effect |
-|----------|--------|
-| `Damage` | Deal physical direct damage (Value = amount). Use for physical attacks (punch, slash, crush). Do NOT use for magical/elemental attacks — use `MagicDamage` instead. |
-| `MagicDamage` | Deal magic damage scaled by MagicPower vs MagicDefense (Value = amount). Use for ALL magical/elemental damage: fire spells, water spells, shadow magic, holy attacks, etc. Any word that deals damage through magical means should use `MagicDamage` instead of `Damage`. Always pair with `SPELL` tag. |
-| `Heal` | Restore health (Value = amount) |
-| `Burn` | Apply Burning DoT (Value = duration) |
-| `Water` | Apply Wet status (Value = duration) |
-| `Push` | Push targets away (Value = tiles) |
-| `Shock` | Lightning damage + bonus to Wet targets |
-| `Fear` | Apply Fear debuff (Value = duration) |
-| `Stun` | Apply Stun (Value = duration) |
-| `Freeze` | Apply Frostbitten — attacks last, cumulative MagicPower loss per tick (Value = stacks). Removes Burning on apply (applies Wet). |
-| `Concussion` | Apply Concussion stacking debuff (Value = stacks) |
-| `Concentrate` | Restore mana + apply Concentrated buff (Value = mana amount) |
-| `Bleed` | Apply Bleeding DoT — grows if untreated, heals reduce (Value = ignored, uses 999 duration) |
-| `Summon` | Summon a unit (Value = creature level). If the word matches a unit in the DB, uses that unit's stats and passives. Structure-type units (high HP, no/few attacks, defensive passives) use words like "fortress", "wall", "totem", "barricade". Offensive structures like "turret" have attack abilities + offensive passives (e.g. retaliate damage when allies are hit). |
-| `Slow` | Slow target (Value = duration) |
-| `BuffStrength` | Buff Strength stat (Value = amount) |
-| `BuffMagicPower` | Buff Magic Power stat (Value = amount) |
-| `BuffPhysicalDefense` | Buff Physical Defense stat (Value = amount) |
-| `BuffMagicDefense` | Buff Magic Defense stat (Value = amount) |
-| `BuffLuck` | Buff Luck stat (Value = amount) |
-| `DebuffStrength` | Debuff Strength stat (Value = amount) |
-| `DebuffMagicPower` | Debuff Magic Power stat (Value = amount) |
-| `DebuffPhysicalDefense` | Debuff Physical Defense stat (Value = amount) |
-| `DebuffMagicDefense` | Debuff Magic Defense stat (Value = amount) |
-| `DebuffLuck` | Debuff Luck stat (Value = amount) |
-| `Heavy` | Heavy impact (Value = intensity) |
-| `Wind` | Wind elemental (Value = intensity) |
-| `Earth` | Earth elemental (Value = intensity) |
-| `Dark` | Dark magic (Value = intensity) |
-| `Light` | Light magic (Value = intensity) |
-| `Curse` | Apply curse debuff (Value = duration) |
-| `Poison` | Apply poison DoT (Value = duration) |
-| `Grow` | Apply Growing regen — heals per tick, bonus when Wet (Value = duration) |
-| `Thorns` | Apply Thorns — retaliates damage back to attackers (Value = duration) |
-| `Reflect` | Apply Reflecting — redirects single-target abilities back to caster (Value = stacks) |
-| `Hardening` | Apply Hardening — flat damage reduction that decays each turn (Value = stacks) |
-| `Drunk` | Apply Drunk status — scrambles keyboard letters. Value = stacks (5 letters per stack). Applied to SELF. Stacks decrement each turn. |
-| `Shield` | Apply shield (Value = amount) |
-| `Item` | Equippable item — goes to player inventory. Value = durability (0 = infinite). Requires an `"item"` field with type, stats, and optional passives. Weapon-type items use `assoc_word` to link ammo words. Consumable-type items auto-equip and have durability = uses. |
-| `Melt` | Melts or softens materials through intense heat — differs from Burn (combustion of flammable materials). Melt works on metal, ice, wax. In combat, debuffs physical defense (Value = amount). |
-| `Smash` | Powerful physical impact that deals heavy damage and can break objects (Value = damage amount). Works on breakable targets in events. |
-| `Pay` | Spend currency/valuables — used for bribery, trading, recruitment. Target is Self (payment comes from the payer). Value = gold amount paid. Used with "give" prefix to target NPCs (e.g. "give money" pays an NPC). |
-| `Energize` | Apply Energetic to self — next word's actions fire 2x at half value (rounded up), then applies Tired(1). Value = duration. |
-| `Relax` | Noop action — tag-driven. RELAX-tagged words remove 1 Anxiety stack from source. Value ignored. |
-| `Sleep` | Apply Sleep to self — skip turns, wake on damage (resist chance = 20% per stack). Value = stacks. |
-| `RestHeal` | Heal self. Base heal from value, +5 if no enemies, +10 if DWELLING entity present. Scales with MagicPower/3. |
-| `Scramble` | Swap target's slot position with another unit in the same row. Disrupts enemy formations. Value is ignored (use 1). Target should be an enemy — the handler picks the swap partner automatically. Great on AoE words (tsunami, earthquake) to represent chaotic displacement. |
-| `Time` | Time manipulation (Value = intensity) |
-| `Peck` | Physical damage (Str vs PDef) + apply Bleeding in one action. Value = base damage. Use for sharp, piercing animal attacks (beak, claw, fang). Reusable by bird/beast creature words. Always pair with `BEAST` or `MELEE` tag. |
-| `Screech` | Apply Fear + Concussion to targets in one action. Value = Fear duration (Concussion is always 1 stack). A terrifying shriek that disorients. Use for loud, disruptive creature abilities. Always pair with `BEAST` tag. |
-| `Purify` | Remove up to Value negative statuses from targets (prioritizes Stun > Fear > Sleep > Frostbitten > Burning > Poisoned > Bleeding > others). Use for cleansing, curing, washing away debuffs. Target should be Self or AllAlliesAndSelf. Always pair with `CLEANSING` or `HOLY` tag. |
-| `Awaken` | Remove Sleep, Stun, and Frostbitten from targets, then apply Awakened status (+1 all stats for 1 turn). Use for rousing, reviving, energizing allies from crowd control. Value is ignored. Always pair with `LIGHT` or `HOLY` tag. |
-| `Siphon` | Steal a random stat (Str/Mgc/PDef/MDef/Luck) from target and give it to caster. Value = amount stolen per stat. Use for draining, leeching, stealing power. Pair with `DEBUFF`, `STEALTH`, or `PSYCHIC` tag. |
-| `Deceive` | Apply Fear (duration = value) + Concussion (permanent) to target. Use for tricking, confusing, misleading enemies. Pair with `PSYCHIC`, `SHADOW`, or `DEBUFF` tag. |
-| `Recuperate` | Heal target (MagicPower-scaled) AND remove 1 random negative status. Combines healing + cleansing. Use for recovery, convalescence, restoring. Target should be AllAlliesAndSelf or Self. Pair with `RESTORATION`, `CLEANSING`, or `SUPPORT` tag. |
-| `Comfort` | Apply Energetic status to target (not self). Grants extra turn next round. Use for encouraging, reassuring, inspiring allies. Pair with `SUPPORT` or `SOCIAL` tag. |
-| `Overcharge` | Buff self MagicPower by Value + apply Energetic status. A power-up combo: use before Shock/MagicDamage for amplified hits. Value = buff amount AND Energetic duration. Pair with `ELEMENTAL`, `LIGHTNING`, or `SPELL` tag. |
-| `Cannonade` | Multi-hit attack — fires Value shots at random enemies, each dealing 1 base damage (Str-scaled). Can hit same enemy multiple times. Use for artillery, volleys, barrages, bombardment. Pair with `NAVAL`, `OFFENSIVE` tag. |
-| `Plunder` | Physical damage (Str vs PDef) + steal 1 random stat from target. Combines attack with theft. Use for pirate/raider/bandit words. Pair with `OFFENSIVE`, `SHADOW`, or `MELEE` tag. |
-| `Attune` | Save the word's letters as "attuned" charges for the rest of the encounter. Future words that contain attuned letters get +20% power per attuned letter consumed (one-time per letter). No damage/status — pure utility. Value is ignored. Target should be `Self`. Pair with `ARCANE`, `SPELL`, or `SUPPORT` tag. Best on long words with common letters (e, t, a, n, s) to maximize future value. |
-| `Ignite` | Magic damage (MagicPower vs MagicDefense) + apply Burning (duration = Value). Fire version of Peck. Use for fire/heat attack words. Pair with FIRE or ELEMENTAL tag. |
-| `Combust` | Detonate Burning on target: if Burning, remove it and deal bonus MagicDamage (value + remaining stacks, MagicPower vs MagicDefense). If not Burning, deal base MagicDamage only. Pair with FIRE or ELEMENTAL tag. |
-| `Cataclysm` | Massive magic damage (MagicPower vs MagicDefense) that hits ALL entities — enemies AND allies. High risk, high reward AoE nuke. Target should be `All`. Pair with `COSMIC`, `DESTRUCTION`, `FIRE`, or `ARCANE` tag. |
-| `Cleave` | Physical damage (Str vs PDef) to primary target + half damage to one other random enemy. A sweeping melee strike with splash damage. Use for bladed/slashing weapon words. Pair with `BLADE`, `MELEE`, or `PHYSICAL` tag. |
-| `Lockpick` | Attempt to pick a lock on a lockpickable target. Triggers a multi-step sequence with progress messages, success chance based on Dexterity + Luck. On success, opens the target (fires Open reaction chain). High mana cost (~8) when typed as a word. Use for lock-related, thief, and tool words. Pair with `TOOL` or `STEALTH` tag. |
-
-### INTERACTION ACTIONS
-
-These actions are used for **event encounters** (non-combat: inns, shrines, chests, NPCs). They do NOT deal damage or apply status effects. The game's reaction system handles outcomes (heal, reward, transition, etc.) based on what the player targets. Value is always 1 for interaction actions. Target is usually `SingleEnemy` (the interactable entity).
-
-| ActionId | Usage | Example words |
-|----------|-------|---------------|
-| `Enter` | Enter/go to a place | enter, go, visit, arrive, venture |
-| `Talk` | Speak to an NPC | talk, speak, greet, converse, chat |
-| `Steal` | Attempt to steal from target | steal, swipe, pilfer, pickpocket, filch |
-| `Search` | Search/examine something | search, examine, inspect, investigate, scrutinize |
-| `Pray` | Pray at a shrine or altar | pray, worship, beseech, kneel, invoke |
-| `Rest` | Rest or sleep (target Self) | rest, sleep, nap, snooze, doze |
-| `Open` | Open a container/door | open, unlock, unseal, unbar, crack |
-| `Trade` | Trade with a merchant | trade, barter, haggle, deal, exchange |
-| `Recruit` | Recruit/hire an ally | recruit, hire, enlist, summon, rally |
-| `Leave` | Leave/exit current area | leave, exit, depart, withdraw, flee |
-
-**When to classify as interaction action:**
-- Words whose primary meaning is a social/exploration action (not combat)
-- Words that imply interacting with objects or people non-violently
-- Synonyms of the above action types
-- **Do NOT give interaction actions to combat words** — "attack", "slash", "fireball" remain combat actions
-
-**Interaction action format:**
-```json
-{"action": "Enter", "value": 1}
+py Tools/WordAction/stats.py
 ```
 
 ---
 
 ## UNIT PASSIVES (for Summon words)
 
-Units summoned via `Summon` action can have composable passives. When classifying a summon word, include a `"unit"` field with stats, abilities, and passives. The `unit_id` is the word itself (lowercase).
+Units summoned via `Summon` action can have composable passives. Include a `"unit"` field with stats, abilities, and passives. The `unit_id` is the word itself (lowercase). See `context.py` output for valid triggers, effects, targets, and statuses.
 
 ### Unit JSON format
 
@@ -244,55 +219,11 @@ Units summoned via `Summon` action can have composable passives. When classifyin
 ```
 
 - `unit_type`: `"enemy"` (has abilities, fights) or `"structure"` (few/no abilities, passive effects)
-- `actions`: array of word strings the unit can use in combat (e.g. `["scratch", "charge"]`). These must be words that exist in the DB with their own `word_actions` entries
+- `actions`: array of word strings the unit can use in combat — must be words that exist in the DB
 - `passives`: array of passive objects (trigger + effect + target)
 - `color`: `[r, g, b]` floats 0.0-1.0 (display color)
 - Stats: `max_health` 5-100, others 0-15, `starting_shield` 0-20
-- `taunt` passive: `{"trigger": "taunt"}` — no effect/target/value needed (marker only, forces enemy targeting)
-
-### Available triggers
-
-| Trigger | trigger_param | When it fires |
-|---------|--------------|---------------|
-| `on_ally_hit` | — | When any ally takes damage |
-| `on_self_hit` | — | When this unit takes damage |
-| `on_round_end` | — | At end of each combat round |
-| `on_round_start` | — | At start of each combat round |
-| `on_turn_start` | — | At start of each turn |
-| `on_turn_end` | — | At end of each turn |
-| `on_word_played` | — | When any word is played |
-| `on_word_length` | min length (e.g. `"6"`) | When a played word has >= N letters |
-| `on_word_tag` | tag (e.g. `"NATURE"`) | When a played word has the specified tag |
-| `on_kill` | — | When any enemy is killed |
-| `on_death` | optional (`"siphon"`) | When this unit dies. If triggerParam=`"siphon"`, accumulated siphon total is used as heal value |
-| `on_damage_dealt` | — | When this unit deals damage to any target |
-| `on_letter_in_word` | `vowel`, `consonant`, `any`, `fixed:X` | When typed word contains a randomly selected letter (re-selected each turn) |
-| `taunt` | — | Marker: forces enemies to target this unit (no effect/target needed) |
-
-### Available effects
-
-| Effect | effect_param | What it does |
-|--------|-------------|--------------|
-| `heal` | — | Heal targets by `value` HP |
-| `damage` | — | Deal `value` damage to targets |
-| `shield` | — | Grant `value` shield to targets |
-| `mana` | — | Restore `value` mana to targets |
-| `apply_status` | status name (e.g. `"Burning"`) | Apply status effect to targets for `value` duration |
-| `steal_stat` | — | Steal `value` points of a random stat (Str/Mgc/PDef/MDef/Luck) from targets and give to owner |
-| `gold` | — | Add `value` gold to the player's gold resource |
-| `buff_stat` | stat name (e.g. `"Luck"`, `"Strength"`) | Permanently buff target's stat by `value` for the rest of combat (cumulative) |
-
-Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`, `Awakened`
-
-### Available passive targets
-
-| Target | Resolves to |
-|--------|------------|
-| `Self` | The unit itself |
-| `AllAllies` | All friendly units (including player) |
-| `AllEnemies` | All enemy units |
-| `Injured` | The ally that was damaged (for hit triggers) |
-| `Attacker` | The entity that dealt damage (for hit triggers) |
+- `taunt` passive: `{"trigger": "taunt"}` — marker only, forces enemy targeting
 
 ### Passive design archetypes
 
@@ -305,43 +236,43 @@ Available statuses for `apply_status`: `Burning`, `Wet`, `Poisoned`, `Frozen`, `
 | Nature synergy | structure | on_word_tag NATURE | heal | AllAllies | grove, garden, glade |
 | Aura emitters | structure | on_round_start | apply_status | AllEnemies | pyre, beacon, brazier |
 | Mana sources | structure | on_word_played | mana | Self | fountain, nexus, leyline |
-| Death release | structure | on_death (siphon) | heal | AllAllies | twinflower — siphons stats, heals allies on death |
+| Death release | structure | on_death (siphon) | heal | AllAllies | twinflower |
 | Shield givers | structure | on_ally_hit | shield | Injured | sentinel, aegis, ward |
 | Taunt tanks | structure | taunt | — | — | sentinel, guardian, decoy |
 | Kill-reward | enemy | on_kill | heal | Self | predator, hunter, reaper |
 
 ### Enemy mana balance (for units with abilities)
 
-Enemy units have a fixed mana pool: **MaxMana=10, StartingMana=5, ManaRegen=2/turn**. Abilities should be designed so mana is a meaningful resource — enemies lead with their signature ability then build up mana before using it again.
+Enemy units have a fixed mana pool: **MaxMana=10, StartingMana=5, ManaRegen=2/turn**.
 
-| Cost | Turn 1 (5 mana) | Turn 2 (+2 regen) | Turn 3 (+2 regen) | Turn 4 (+2 regen) | Frequency |
-|------|-----------------|-------------------|-------------------|-------------------|-----------|
-| **5** | Use (5→0) | scratch (2) | scratch (4) | Use (6→1) | Every 3 turns |
-| **4** | Use (5→1) | scratch (3) | Use (5→1) | scratch (3) | Every 2 turns |
-| **3** | Use (5→2) | Use (4→1) | Use (3→0) | scratch (2) | ~2 of 3 turns |
-| **2** | Use (5→3) | Use (5→3) | Use (5→3) | Use (5→3) | Every turn |
+| Cost | Turn 1 (5 mana) | Turn 2 (+2 regen) | Turn 3 (+2 regen) | Frequency |
+|------|-----------------|-------------------|-------------------|-----------|
+| **5** | Use (5→0) | scratch (2) | scratch (4) | Every 3 turns |
+| **4** | Use (5→1) | scratch (3) | Use (5→1) | Every 2 turns |
+| **3** | Use (5→2) | Use (4→1) | Use (3→0) | ~2 of 3 turns |
+| **2** | Use (5→3) | Use (5→3) | Use (5→3) | Every turn |
 
 **Design rules:**
-- **Signature ability** (cost 4-5): The enemy's defining move. Strong effect (AoE fear, summon, multi-action combo). Used turn 1, then every 2-3 turns.
-- **Mid-tier filler** (cost 2-3): Secondary ability for enemies with two real moves (e.g. shaman's spark, wraith's hex). Used between signature cooldowns.
-- **Free fallback** (cost 0): Basic attacks like "mace" or "slam" — better than scratch but not special. Only for brutes/beasts whose identity is "hit things".
-- **Scratch** (cost 0, 1 dmg): Universal last resort. AI strongly avoids it — only used when completely out of mana.
-- **Never cost 1**: Cost 1 with 2 regen means the enemy uses it every turn with no tradeoff. Minimum meaningful cost is 2.
+- **Signature ability** (cost 4-5): Defining move. Strong effect. Used turn 1, then every 2-3 turns.
+- **Mid-tier filler** (cost 2-3): Secondary ability between signature cooldowns.
+- **Free fallback** (cost 0): Basic attacks — better than scratch but not special.
+- **Scratch** (cost 0, 1 dmg): Universal last resort. AI strongly avoids it.
+- **Never cost 1**: Cost 1 with 2 regen means every turn with no tradeoff.
 
 **Enemy design patterns:**
 
-| Pattern | Ability 1 | Ability 2 | Example | Behavior |
-|---------|-----------|-----------|---------|----------|
-| Signature + scratch | cost 4-5 | scratch (0) | bat, goblin, skeleton | Big move turn 1, scratch until recharged |
-| Signature + free attack | cost 4-5 | basic attack (0) | orc, golem, predator | Big move turn 1, basic attack until recharged |
-| Signature + filler | cost 5 | cost 2 | shaman, wraith | Signature turn 1, filler to stay active, signature again when full |
-| All-in | cost 5 | scratch (0) | sellsword | One devastating combo, then weak until recharged |
+| Pattern | Ability 1 | Ability 2 | Example |
+|---------|-----------|-----------|---------|
+| Signature + scratch | cost 4-5 | scratch (0) | bat, goblin, skeleton |
+| Signature + free attack | cost 4-5 | basic attack (0) | orc, golem, predator |
+| Signature + filler | cost 5 | cost 2 | shaman, wraith |
+| All-in | cost 5 | scratch (0) | sellsword |
 
 ---
 
 ## EQUIPPABLE ITEMS (for Item words)
 
-Words with the `Item` action become equippable items. When classifying an item word, include an `"item"` field with type, stats, and optional passives. The `item_id` is the word itself (lowercase).
+Words with the `Item` action become equippable items. Include an `"item"` field with type, stats, and optional passives. The `item_id` is the word itself (lowercase). See `context.py` output for valid item types.
 
 ### Item JSON format
 
@@ -368,7 +299,7 @@ Words with the `Item` action become equippable items. When classifying an item w
 }
 ```
 
-**Item tags**: Optional `"tags"` array on the `"item"` field. Used for inventory-gated mechanics like "give" prefix. Words with SILVER/VALUABLE word_tags require a matching tagged item in inventory when used with "give" — the item is consumed. Words with a Pay action (e.g. "give money", "give gold") deduct from the player's gold resource instead. Example: `"tags": ["SILVER"]` on a silver bar item means it can be consumed when the player types "give silver".
+**Item tags**: Optional `"tags"` array on the `"item"` field. Words with SILVER/VALUABLE word_tags require a matching tagged item in inventory when used with "give".
 
 Weapon-type items use `assoc_word` to link ammo words:
 ```json
@@ -397,8 +328,6 @@ Weapon-type items use `assoc_word` to link ammo words:
 ```
 
 **Consumable example** (beer with healing + drunk ammo):
-
-Word "beer" — item_type consumable, durability 3 (3 uses), ammo word "sip":
 ```json
 {
     "word": "beer",
@@ -406,10 +335,8 @@ Word "beer" — item_type consumable, durability 3 (3 uses), ammo word "sip":
     "cost": 0,
     "range": 0,
     "area": "Single",
-    "tags": ["SUPPORT", "HEALING"],
-    "actions": [
-        {"action": "Item", "value": 3, "assoc_word": "sip"}
-    ],
+    "tags": ["SUPPORT"],
+    "actions": [{"action": "Item", "value": 3, "assoc_word": "sip"}],
     "item": {
         "display_name": "BEER",
         "item_type": "consumable",
@@ -423,22 +350,6 @@ Word "beer" — item_type consumable, durability 3 (3 uses), ammo word "sip":
 }
 ```
 
-Word "sip" (ammo for beer) — heals 10 HP and applies 2 stacks of Drunk:
-```json
-{
-    "word": "sip",
-    "target": "Self",
-    "cost": 0,
-    "range": 0,
-    "area": "Single",
-    "tags": ["SUPPORT"],
-    "actions": [
-        {"action": "Heal", "value": 10},
-        {"action": "Drunk", "value": 2}
-    ]
-}
-```
-
 ### Item types and equipment slots
 
 | item_type | Slot | Behavior |
@@ -446,26 +357,25 @@ Word "sip" (ammo for beer) — heals 10 HP and applies 2 stacks of Drunk:
 | `head` | HEAD | Passive stats only |
 | `wear` | WEAR | Passive stats only |
 | `accessory` | ACCESSORY | Stats + optional passives |
-| `consumable` | CONSUMABLE | Auto-equips. Durability = uses. Ammo via `assoc_word` triggers any action (Heal, Drunk, etc.). Destroyed when uses run out. |
+| `consumable` | CONSUMABLE | Auto-equips. Durability = uses. Ammo via `assoc_word`. Destroyed when empty. |
 | `weapon` | WEAPON | Stats + ammo via `assoc_word`, durability |
 
 ### Item design archetypes
 
 | Word Theme | item_type | Stats Focus | Passives | Examples |
 |---|---|---|---|---|
-| Crowns/Helms | head | magic_power, luck, phys_defense | on_self_hit: shield | crown, helm, tiara, hood |
-| Armor/Cloaks | wear | phys_defense, magic_defense | — | cloak, robe, armor, vest |
-| Rings/Bands | accessory | strength, luck | — | ring, band, bracelet, charm |
-| Amulets/Pendants | accessory | magic_power | on_word_played: mana | amulet, pendant, talisman, locket |
-| Potions/Drinks | consumable | — | — | beer, potion, elixir, wine, ale, mead |
-| Food/Herbs | consumable | — | — | bread, apple, mushroom, herb, berry |
-| Swords/Axes | weapon | strength | — | sword, axe, spear, dagger |
-| Staves/Wands | weapon | magic_power | on_word_tag: damage | staff, wand, scepter, rod |
-| Guns/Bows | weapon | — | — | gun, bow, crossbow, cannon |
+| Crowns/Helms | head | magic_power, luck | on_self_hit: shield | crown, helm, tiara |
+| Armor/Cloaks | wear | phys_defense, magic_defense | — | cloak, robe, armor |
+| Rings/Bands | accessory | strength, luck | — | ring, band, bracelet |
+| Amulets | accessory | magic_power | on_word_played: mana | amulet, pendant, talisman |
+| Potions/Drinks | consumable | — | — | beer, potion, elixir |
+| Food/Herbs | consumable | — | — | bread, apple, mushroom |
+| Swords/Axes | weapon | strength | — | sword, axe, spear |
+| Staves/Wands | weapon | magic_power | on_word_tag: damage | staff, wand, scepter |
 
 ### Item rules
-- Item stats: 0-5 per stat, total stat budget roughly 2-5 depending on item rarity
-- Item cost is always 0 (equipping is free — item goes to inventory first)
+- Item stats: 0-5 per stat, total budget ~2-5
+- Item cost is always 0 (equipping is free)
 - Weapon durability: 3-10 (0 = infinite, avoid infinite for weapons)
 - Non-weapon durability: 0 (equipment doesn't break)
 - Item passives use the same trigger/effect/target system as unit passives
@@ -474,273 +384,162 @@ Word "sip" (ammo for beer) — heals 10 HP and applies 2 stacks of Drunk:
 
 ---
 
-## TARGETING
-
-**Basic:** `Self`, `SingleEnemy`, `AllEnemies` (alias: `AreaEnemies`), `All` (alias: `AreaAll`), `AllAllies`, `AllAlliesAndSelf`
-**Positional:** `FrontEnemy` (slot 0, or nearest), `MiddleEnemy` (slot 1, or nearest), `BackEnemy` (slot 2, or nearest), `Melee` (alias for FrontEnemy), `Area` (alias for AllEnemies)
-**Random:** `RandomEnemy`, `RandomAlly`, `RandomAny`
-**Stat-based:** `LowestHealthEnemy`, `HighestHealthEnemy`, `LowestDefenseEnemy`, `HighestDefenseEnemy`, `LowestStrengthEnemy`, `HighestStrengthEnemy`, `LowestMagicEnemy`, `HighestMagicEnemy`
-**Random+stat:** `RandomLowestHealthEnemy`, `RandomHighestHealthEnemy`
-**Status (any):** `RandomEnemyWithStatus`, `RandomEnemyWithoutStatus`, `AllEnemiesWithStatus`, `AllEnemiesWithoutStatus`
-**Subset:** `HalfEnemiesRandom`, `TwoRandomEnemies`, `ThreeRandomEnemies`
-
-### Composite status targeting (preferred)
-
-Use `BaseType+StatusEffect` format to target enemies with a specific status. Any base target type can be combined with any status effect:
-
-- `AllEnemies+Burning` — all burning enemies
-- `RandomEnemy+Wet` — random wet enemy
-- `LowestHealthEnemy+Poisoned` — lowest-HP poisoned enemy
-- `SingleEnemy+Bleeding` — single bleeding enemy
-
-Available status effects: `Burning`, `Wet`, `Poisoned`, `Frozen`, `Slowed`, `Cursed`, `Buffed`, `Shielded`, `Stun`, `Concussion`, `Fear`, `Bleeding`, `Concentrated`, `Growing`, `Thorns`, `Reflecting`, `Hardening`, `Frostbitten`, `Energetic`, `Tired`, `Sleep`, `Anxiety`, `Awakened`
-
----
-
-## AREA SHAPES
-
-**Note:** The combat system uses a slot-based layout (no 2D grid), so area shapes are ignored at runtime. Always use `"area": "Single"` (default). Targeting is fully determined by the `target` field.
-
----
-
-## TAGS
-
-`NATURE`, `ELEMENTAL`, `OFFENSIVE`, `RESTORATION`, `SHADOW`, `PHYSICAL`, `DEFENSIVE`, `ARCANE`, `HOLY`, `SUPPORT`, `PSYCHIC`, `THOUGHTS`, `RELAX`, `DWELLING`, `MELEE`, `SOCIAL`, `BEAST`, `FLYING`, `LIGHT`, `CLEANSING`, `DEBUFF`, `STEALTH`, `LIGHTNING`, `WEATHER`, `BOTANICAL`, `DRAIN`, `UNDEAD`, `NAVAL`, `FIRE`
-
-- `MELEE`: Close-combat physical attacks (shove, thrust, hit, strike, smash, crush, charge, slam, pounce, etc.). Triggers Warrior's "Brute Force" passive (+50% damage).
-- `SOCIAL`: Social interaction words (talk, speak, greet, trade, barter, charm, flatter, persuade). Triggers Merchant's "Charming Presence" passive (grants Shield).
-- `BEAST`: Animals, creatures, and monsters (wolf, hawk, serpent, bear, spider, raven, bat, etc.). Use for creature-themed attack words.
-- `FLYING`: Airborne creatures and wind-related effects (hawk, eagle, bat, owl, raven, fairy, moth, etc.).
-- `LIGHT`: Light, radiance, dawn, sun. Distinct from HOLY (not religious). Use for: glow, shine, flash, beam, sunrise, aurora, luminous, bright.
-- `CLEANSING`: Purification, removal, washing away. Use for: purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure.
-- `DEBUFF`: Weakening, draining, sabotaging. Use for: weaken, corrode, rust, wither, decay, sap, drain, curse, hex, blight, cripple, enfeeble, diminish, erode.
-- `STEALTH`: Sneaky, covert, hidden. Use for: spy, assassin, thief, rogue, ninja, ghost, phantom, lurk, skulk, ambush, sneak, prowl, vanish.
-- `LIGHTNING`: Electrical, shock, voltage. Use for: lightning, thunder, bolt, spark, shock, jolt, zap, surge, voltage, static, electrify, galvanize.
-- `WEATHER`: Atmospheric phenomena, storms, climate. Use for: storm, rain, hail, blizzard, tornado, cyclone, gale, fog, thunder, hurricane, monsoon, tempest.
-- `BOTANICAL`: Plants, flowers, herbs, vegetation. Use for: rose, vine, bloom, sprout, petal, moss, fern, orchid, lily, tulip, twinflower, blossom, seedling, root, ivy.
-- `DRAIN`: Life-draining, parasitic, energy-sapping. Use for: leech, drain, absorb, siphon, sap, parasite, devour, consume, extract, deplete, wither, vampire.
-- `FIRE`: Fire, flame, heat, combustion. Use for: fire, flame, blaze, inferno, scorch, ember, torch, pyre, ash, cinder, combustion, magma, lava, volcano, kindle, ignite, combust.
-
----
-
-## WORD FAMILIES — Pre-Classified Action Hints
-
-**IMPORTANT**: Before classifying a word, check this table first. If the word appears here, it has already been pre-approved for the listed actions/tags. Use these as your primary classification and add supplementary actions only if they fit naturally. Some of these words are already in the DB with `status='draft'` — when you encounter them, refine their classification (your INSERT OR REPLACE will overwrite the draft with a finalized entry).
-
-| Action | Pre-classified words (use this action when you encounter them) |
-|--------|--------------------------------------------------------------|
-| `Peck` | peck, pecks, nip, nips, nibble, nibbles, jab, jabs, bite, bites, claw, claws, talon, talons, fang, fangs, gouge, gouges, stab (bird/beast variant) |
-| `Screech` | screech, shriek, shrikes, howl, howls, wail, wails, roar, roars, bellow, bellows, screams, cry, cries (creature variant) |
-| `Purify` | purify, cleanse, cure, remedy, antidote, baptize, absolve, wash, rinse, disinfect, sanitize, sterilize, detox, detoxify, exorcise, dispel |
-| `Awaken` | awaken, rouse, wake, stir, revive, arouse, invigorate, resuscitate, animate, enliven, vivify, rally, rejuvenate |
-| `Siphon` | siphon, drain, leech, absorb, steal, pilfer, extract, devour, vampiric, parasitic, latch, suck, tap |
-| `Deceive` | deceive, trick, mislead, confuse, bewilder, bamboozle, dupe, hoodwink, bluff, feint, distract, misdirect, beguile |
-| `Summon` (raven unit) | raven, ravens, crow, crows, jackdaw, magpie, corvid |
-| `Summon` (treasonist unit) | treasonist, treasonists, spy, spies, traitor, traitors, saboteur, saboteurs, infiltrator, mole |
-| `Summon` (lounge unit) | lounge, lounges, sofa, couch, settee, hammock, recliner, divan |
-| `Summon` (twinflower unit) | twinflower, twinflowers |
-| `Recuperate` | recuperate, recover, unwind, convalesce, nurse, rehabilitate, convalescent, restful, revitalize, renew |
-| `Comfort` | comfort, encourage, reassure, inspire, uplift, embolden, motivate, hearten, bolster, rally |
-| `Overcharge` | overcharge, surge, jolt, electrify, galvanize, supercharge, amplify, boost, energize (power-up variant), charge (electrical variant) |
-| `Summon` (ghostship unit) | ghostship, ghost ship, phantom ship, spectral vessel, galleon |
-| `Cannonade` | cannonade, volley, barrage, bombardment, salvo, broadside, fusillade, battery, shelling |
-| `Plunder` | plunder, pillage, loot, raid, maraud, ransack, rob, pirate, buccaneer, brigand, corsair |
-| `Attune` | attune, harmonize, resonate, synchronize, calibrate, align, tune, chord, frequency, attunement, resound, reverberate |
-| `Ignite` | kindle, inflame, scald, sear, char, singe, cauterize, incinerate |
-| `Combust` | detonate, explode, erupt, rupture, burst, implode |
-| `Summon` (firemaster unit) | firemaster, firemasters |
-| `Summon` (mercenary unit) | mercenary, mercenaries, soldier, sellsword, bodyguard, gladiator, enforcer, warden, conscript, knight |
-| `Cataclysm` | supernova, supernovas, apocalypse, armageddon, cataclysm, annihilation, obliteration, doomsday, ragnarok, catastrophe, holocaust, extinction, devastation, calamity |
-| `Cleave` | machete, machetes, axe, hatchet, cleaver, scythe, saber, katana, broadsword, falchion, glaive, halberd, slash, hack, chop, carve, sever, bisect, rend |
-| `Item` (telescope accessory) | telescope, telescopes, spyglass, binoculars, lens, scope, monocle, periscope, prism, spectacles, microscope, beacon |
-| `Lockpick` | lockpick, jimmy, picklock, skeleton_key, crowbar, jemmy, shiv, probe, tumbler, bypass, latch, keyhole, pin |
-
-| Tag | Pre-classified words (apply this tag when you encounter them) |
-|-----|--------------------------------------------------------------|
-| `BEAST` | wolf, wolves, hawk, hawks, serpent, serpents, bear, bears, spider, spiders, eagle, eagles, falcon, falcons, vulture, vultures, hyena, hyenas, jackal, jackals, panther, panthers, tiger, tigers, lion, lions, shark, sharks |
-| `FLYING` | hawk, hawks, eagle, eagles, falcon, falcons, owl, owls, bat, bats, moth, moths, butterfly, dragonfly, fairy, sprite, phoenix, griffin, pegasus, wyvern |
-| `SIGHT` | telescope, telescopes, spyglass, binoculars, lens, scope, monocle, periscope, prism, spectacles, microscope, beacon, lantern, spotlight, observatory, lookout, watchtower |
-| `LIGHT` | glow, shine, flash, beam, ray, sunrise, aurora, luminous, bright, radiant, brilliant, gleam, shimmer, sparkle, dazzle, illuminate, lantern, torch, candle, lighthouse |
-| `CLEANSING` | purify, wash, rinse, cleanse, baptize, scrub, disinfect, cure, remedy, sanitize, sterilize, detox, soap, lather, bathe, shower, launder |
-| `DEBUFF` | weaken, corrode, rust, wither, decay, sap, drain, curse, hex, blight, cripple, enfeeble, diminish, erode, siphon, leech, undermine, sabotage, impair |
-| `STEALTH` | spy, assassin, thief, rogue, ninja, ghost, phantom, lurk, skulk, ambush, sneak, prowl, shadow, vanish, cloak, disguise, infiltrate, camouflage |
-| `LIGHTNING` | lightning, thunder, bolt, spark, shock, jolt, zap, surge, voltage, static, electrify, galvanize, thunderbolt, thunderclap, electrode |
-| `WEATHER` | storm, rain, hail, blizzard, tornado, cyclone, gale, fog, thunder, hurricane, monsoon, tempest, drought, frost, sleet, typhoon, squall |
-| `RELAX` | lounge, relax, unwind, chill, rest, nap, doze, laze, idle, meditate, recline, slouch, snooze, siesta |
-| `BOTANICAL` | rose, vine, bloom, sprout, petal, moss, fern, orchid, lily, tulip, blossom, seedling, root, ivy, herb, flora |
-| `DRAIN` | leech, drain, absorb, siphon, sap, parasite, devour, consume, extract, deplete, wither, vampire |
-| `UNDEAD` | ghost, phantom, specter, wraith, skeleton, zombie, lich, vampire, revenant, banshee, necromancer, corpse, ghoul, mummy, apparition |
-| `NAVAL` | ship, anchor, cannon, sail, hull, mast, keel, stern, bow, fleet, armada, corsair, pirate, buccaneer, galleon, frigate, captain, sailor |
-| `FIRE` | fire, flame, blaze, inferno, scorch, ember, torch, pyre, ash, cinder, combustion, magma, lava, volcano, kindle, ignite, combust, furnace, forge, smelt |
-| `COSMIC` | supernova, comet, meteor, asteroid, nebula, galaxy, star, pulsar, quasar, cosmos, celestial, stellar, astral, eclipse, void, singularity, orbit |
-| `DESTRUCTION` | supernova, apocalypse, armageddon, cataclysm, annihilation, obliteration, demolish, devastation, ruin, havoc, wreckage, carnage, rampage, ravage |
-| `BLADE` | machete, axe, sword, dagger, knife, scythe, saber, katana, rapier, cutlass, cleaver, hatchet, scimitar, broadsword, falchion, glaive, halberd, stiletto, dirk |
-| `JUNGLE` | machete, vine, python, piranha, jaguar, mosquito, canopy, swamp, tropical, bamboo, parrot, monkey, toucan, anaconda, orchid, fern, humidity, rainforest |
-| `TOOL` | lockpick, jimmy, picklock, skeleton_key, crowbar, jemmy, shiv, probe, tumbler, bypass, latch, keyhole, pin, wrench, pliers, hammer, chisel, screwdriver |
-
----
-
 ## DESIGN AWARENESS
 
-Every game word is a **design decision** — it permanently shapes the player's vocabulary and the game's possibility space. Treat each classification as if you're designing a card for a deckbuilder: it needs a clear identity, a reason to exist, and a role in the ecosystem.
+Every game word is a **design decision** — it permanently shapes the player's vocabulary. Treat each classification as designing a card for a deckbuilder: clear identity, reason to exist, role in the ecosystem.
 
-When classifying words, consider the FULL ecosystem of word relationships:
-- **Actions**: direct combat effects (Damage, Heal, Burn, etc.) — what makes THIS word's combo different from existing words?
-- **Summons**: spawning units with their own abilities and composable passives — what unique battlefield role does this unit fill?
-- **Items**: equippable gear that grants stats and/or passives (5 slots: head, wear, accessory, consumable, weapon) — which slot needs this item? What build does it enable?
-- **Tags**: categories for passive triggers and thematic grouping — which existing passives does this tag activate?
+Consider the FULL ecosystem:
+- **Actions**: What makes THIS word's combo different from existing words?
+- **Summons**: What unique battlefield role does this unit fill?
+- **Items**: Which slot needs this item? What build does it enable?
+- **Tags**: Which existing passives does this tag activate?
 
-Each word should contribute to ONE of these roles. Don't make every word a simple damage dealer.
+**Design principle: fewer well-designed words > many generic ones.** If a word doesn't offer something distinct, classify it as non-game.
 
-**Design principle: fewer well-designed words > many generic ones.** If a word doesn't offer something distinct, classify it as a non-game word and move on.
+### IMPORTANT: Existing DB words use legacy targeting
 
-### MANA COST CALIBRATION
+Most words already in the DB use old-style word-level targeting where all actions share one target. **Do NOT copy their targeting patterns.** Use existing words only for **cost calibration** (how much mana for this power level). For targeting, always design from the word's meaning using per-action targeting patterns — see "Per-Action Targeting" section above.
 
-When setting a word's `cost`, **always check the DB for words with the same primary action** and calibrate proportionally. The cost should reflect the word's power relative to its peers.
+### MANA COST CALIBRATION (0–20 range)
 
-| Cost | Profile | Reference Examples |
-|------|---------|-------------------|
-| 0 | Weak single action (value 1), common word | drip → Water:1, scratch → Damage:1 |
-| 1 | Single action (value 2-3) or weak combo | flame → Burn:2 + Damage:2, axe → Cleave:2 |
-| 2 | Strong single action (value 3-4) or standard combo | machete → Cleave:3 + Bleed:1, saber → Cleave:3 |
-| 3 | Multi-action combo or AoE | tornado → Damage:3 + Scramble:1, machetes → Cleave:3 + Bleed:1 (2 targets) |
-| 4 | Premium multi-action or powerful AoE | supernova → Cataclysm:4 (All), flood → Water:4 + Damage:3 |
-| 5 | Maximum power (3+ actions or devastating AoE) | tsunami → Water:5 + Damage:5 + Push:2 + Scramble:1 |
+The full mana range is **0–20**. Use the ENTIRE range to create meaningful cost curves. Cheap words are common and weak. Expensive words are rare, devastating, and worth saving mana for.
+
+| Cost | Tier | Profile | Reference Examples |
+|------|------|---------|-------------------|
+| 0 | Free | Single weak action (value 1). Common short words. | scratch → Damage:1, drip → Water:1 |
+| 1–2 | Cheap | Single action (value 2–3) or weak 2-action combo | flame → Burn:2, sting → Damage:2 + Poison:1 |
+| 3–4 | Standard | Solid single action (value 4–5) or good 2-action combo | slash → Cleave:3 + Bleed:1, heal → Heal:4 |
+| 5–7 | Strong | Powerful combo (2–3 actions), strong AoE, or impactful debuff | tornado → Damage:4 + Push:2 + Scramble:1 |
+| 8–10 | Premium | Devastating multi-action, wide AoE, or elite summon | earthquake → Damage:6 + Stun:2 (AllEnemies), fortress → Summon:5 |
+| 11–14 | Epic | Massive power with 3–4 high-value actions or game-changing effects | armageddon → Cataclysm:8 (All), tsunami → Water:7 + Damage:7 + Push:3 |
+| 15–20 | Legendary | Ultimate abilities. World-ending damage, full-party effects, or supreme summons. Reserved for long, rare, powerful words. | annihilation → Cataclysm:10 (All) + Fear:3, resurrection → Heal:10 + Purify:5 (AllAlliesAndSelf) |
 
 **Cost modifiers:**
-- AoE targeting (AllEnemies, All): +1 cost over single-target equivalent
-- Self-only beneficial (heal, buff, shield): -1 cost
-- Combo with secondary debuff (Bleed, Burn, status): +1 cost
-- Summon words: base ability cost + 3 (singular), + 6 (plural = dual summon)
-- Items: usually cost 0 (go to inventory, not combat)
+- AoE targeting: +2 cost over single-target
+- Self-only beneficial: -1 cost
+- Combo with secondary debuff: +1 cost
+- Summon words: base ability cost + 3 (singular). Plural = singular cost x2 (double)
+- Items: cost 0
+- Action values above 5: +1 cost per point above 5
 
-**IMPORTANT**: Before assigning a cost, query the DB: `SELECT word, cost FROM word_meta WHERE word IN (SELECT word FROM word_actions WHERE action_name = 'X') ORDER BY cost`. Use the results to ensure your new word fits the existing cost curve.
+**Target distribution by cost tier:**
+- Cost 0–2: mostly SingleEnemy
+- Cost 3–7: mix of SingleEnemy, Self, AllEnemies
+- Cost 8–14: more AllEnemies, All, LowestHealthEnemy, stat-based targets
+- Cost 15–20: All, AllEnemies, AllAlliesAndSelf
+
+**IMPORTANT**: Before assigning a cost, check the DB for words with the same primary action and calibrate proportionally. The goal is a smooth bell curve — most words cost 1–5, some cost 6–10, a few cost 11–15, and legendary words 16–20.
 
 ---
 
 ## QUALITY INVESTIGATION PROTOCOL
 
-Every batch must go through three phases. Do NOT skip phases or combine them.
+Every batch must go through three phases. Do NOT skip or combine them.
 
 ### Phase A — Triage (scan all 100 words)
 
-Quick-scan the entire batch and separate words into two buckets:
-- **Game word candidates**: words with clear combat, RPG, item, or summon meaning
-- **Non-game words**: articles, prepositions, abstract nouns, obscure terms with no RPG relevance
+Quick-scan the entire batch into two buckets:
+- **Game word candidates**: any word a player might plausibly type. This includes common English words (even abstract ones like "achieve", "acid", "able"), verbs, adjectives with emotional/physical connotations, and any word with even a loose RPG interpretation. **Be inclusive** — weak words get weak effects (value 1, cost 0), but they still get classified.
+- **Non-game words**: ONLY truly unusable words — unrecognizable scientific compounds (acetylphenylhydrazine), taxonomic Latin (acanthocephalan), chemical formulas, obscure proper nouns, and pure grammatical suffixes (-ly, -ness, -tion forms of already-classified words).
+
+**Bias toward inclusion.** If a player could conceivably type a word in combat, it should have actions — even if simple. A batch of 100 words should typically yield 10-30 game words, not 1-5. Short common words (3-4 letters) get 1 weak action (cost 0-1). Medium words (5-7) get 1-2 actions (cost 2-5). Long powerful words (8+) get 2-4 actions (cost 5-20).
 
 Do NOT assign any actions during triage. Just categorize.
 
 ### Phase B — Deep Investigation (each game word candidate)
 
-For each game word candidate, work through this checklist:
+For each candidate:
+1. **Word identity**: What RPG archetype does this word evoke?
+2. **Uniqueness check**: Does an existing word already fill this role? If yes, vary the combo (different values, different secondary action, different target). Do NOT skip — synonyms and similar words should still be game words with slightly different profiles.
+3. **Action combo design**: Choose actions that create interesting gameplay, not just "Damage N". Consider multi-action combos, status setups, varied targeting.
+4. **If Summon**: Design a unique battlefield role. Vary passive triggers. No existing summon should have the same trigger+effect combo.
+5. **If Item**: Run slot gap analysis. Design stats for a specific build archetype. No existing item should have the same type+stat profile.
+6. **Tag synergies**: Choose tags that activate existing `on_word_tag` passives. Multiple tags = richer gameplay.
 
-1. **Word identity**: What RPG archetype does this word evoke? (damage spell, healing, buff, summon creature, equipment, interaction)
-2. **Uniqueness check**: Search your memory of recent batches and the DB audit — does an existing word already fill this role with a similar profile? If yes, either design a meaningfully different combo or skip the word.
-3. **Action combo design**: Choose actions that create an interesting gameplay moment, not just "Damage N". Consider:
-   - Multi-action combos that synergize (e.g. Water + Shock, Burn + Push)
-   - Status effects that set up future turns
-   - Targeting that isn't just SingleEnemy
-4. **If Summon**: Design a unique battlefield role. Vary passive triggers (don't default to `on_ally_hit`). Write a 1-sentence design rationale in your working notes. Check that no existing summon has the same trigger+effect combo.
-5. **If Item**: Run slot gap analysis — which `item_type` is underrepresented? Design stats that enable a specific build archetype (glass cannon, tank, spellcaster, etc.). Verify no existing item has the same type + stat profile.
-6. **Tag synergies**: Choose tags that activate existing `on_word_tag` passives. If the word could reasonably have multiple tags, assign them — richer tagging creates richer gameplay.
+### Phase C — Batch Cross-Reference (before inserting)
 
-### Phase C — Batch Cross-Reference (review before inserting)
-
-Before generating the final JSON, review ALL game words in the batch together:
-- **Diversity**: No two game words should have identical action+value+target profiles
-- **Tag spread**: Ensure at least 3 different tags are represented across game words
-- **Targeting variety**: Not all game words should be SingleEnemy — mix in Self, AllEnemies, positional, random, stat-based
+Review ALL game words in the batch together:
+- **Diversity**: No two game words with identical action+value+target profiles
+- **Tag spread**: At least 3 different tags across game words
+- **Targeting variety**: Not all SingleEnemy — mix in Self, AllEnemies, positional, random, stat-based
 - **Summon/item variety**: No two summons share the same passive archetype; no two items share the same slot+stats
-- **Synergy potential**: At least one word should create a new combo with existing words (e.g. applying a status that an existing summon's passive triggers on)
+- **Synergy potential**: At least one word creates a new combo with existing words
 
-Revise any weak entries. It's better to downgrade a borderline game word to non-game than to insert filler.
+Revise entries with identical profiles. But do NOT downgrade borderline words to non-game — give them simple, weak actions instead. A player typing "acerbic" should get SOMETHING, even if it's just Poison:1.
 
 ---
 
 ## CLASSIFICATION GUIDELINES
 
-### CRITICAL: Multiple Actions Per Word
+### Action Count Per Word
 
-**Words should have as many actions as realistically make sense.** This is the core design philosophy — words are realistic representations of what would actually happen. A single action per word is almost always too simplistic. Think about ALL the effects a real-world phenomenon would cause:
+**Words can have 1 to 4+ actions — whatever fits the word.** Not every word needs multiple actions. A simple word with one clear effect is perfectly fine.
 
-- "tsunami" → Water (it's water) + Damage (destructive force) + Push (displacement) + Scramble (chaotic repositioning) = **4 actions**
-- "avalanche" → Damage (crushing) + Push (displacement) + Water (snow/ice) + Freeze (cold) = **4 actions**
-- "inferno" → Fire (elemental) + Burn (ignition) + Damage (heat) + Light (illumination) = **4 actions**
-- "lightning" → Shock (electricity) + Damage (strike) + Light (flash) + Stun (paralyze) = **4 actions**
-- "earthquake" → Damage (destruction) + Scramble (displacement) + Stun (disorientation) = **3 actions**
+| Actions | When to use | Examples |
+|---------|------------|---------|
+| **1 action** | Simple, focused words. Most cheap words. | scratch → Damage:1, heal → Heal:3, burn → Burn:2 |
+| **2 actions** | Standard combos. Most mid-cost words. | slash → Cleave:3 + Bleed:1, shock → Shock:2 + Stun:1 |
+| **3 actions** | Strong words with multiple real-world effects. | tornado → Damage:4 + Push:2 + Scramble:1 |
+| **4+ actions** | Epic/legendary words. Rare, expensive, devastating. | tsunami → Water:7 + Damage:7 + Push:3 + Scramble:2 |
 
-**The more actions that relate to the word's real meaning, the better.** Ask yourself: "What would ACTUALLY happen if this occurred?" Each real consequence should be an action. A word with 1 action should be the exception (simple words like "drip"), not the rule. Most game words should have 2-4 actions.
+**Guideline**: Ask "What would this ACTUALLY do?" Each real consequence = an action. But don't force extra actions on simple words — "punch" is just Damage, and that's fine.
 
-This makes the game richer — typing a powerful word triggers a cascade of realistic effects, making combat feel dynamic and rewarding vocabulary mastery.
-
-- **Word meaning drives effects**: "avalanche" → Damage + Push + Water; "whisper" → Fear; "fortress" → Heal + Shield (Self)
-- **Longer/rarer words = stronger**: 3-4 letter words are weak (1-2 value), 7+ letter words are powerful (4-6 value)
-- **Cost scales with power**: powerful words cost more energy
-- **Range is ignored** (slot system — everything is always in range). Use `0` for all words.
-- **Area is ignored** (slot system — no area expansion). Use `"Single"` for all words. Targeting is handled by the `target` field (e.g. `AllEnemies` for AoE).
-- **Most NLTK words are NOT game words** — articles, prepositions, obscure terms → empty actions array, they still get marked as processed
-- **Quality over quantity** — there is no target percentage. Fewer well-designed words with interesting profiles are better than many generic ones. Only classify a word as a game word if you can articulate what makes it distinct.
-- **Distinctiveness requirement** — before assigning actions, verify no existing word in the DB has the same action+value+target profile. If a near-duplicate exists, redesign the word's combo or skip it.
-- **Summon design rationale** — every summon must have a 1-sentence explanation (in your working notes, not in JSON) of its unique battlefield role. If you can't explain why it's different from existing summons, don't add it.
-- **Item ecosystem fit** — before creating an item, check which equipment slots are underrepresented (via `audit.py`). Verify the item's stat profile doesn't duplicate an existing item. Items should fill gaps, not stack duplicates.
+### General rules
+- **Word meaning drives effects**: "avalanche" → Damage + Push + Water; "whisper" → Fear
+- **Longer/rarer words = stronger**: 3-4 letter = weak (value 1-2, cost 0-1), 5-7 letter = moderate (value 2-5, cost 2-7), 8+ letter = powerful (value 4-10, cost 5-20)
+- **Cost scales with power** across the full 0-20 range. Use the whole range.
+- **Range**: always `0` (slot system, everything in range)
+- **Area**: always `"Single"` (targeting via `target` field)
+- **Scientific/taxonomic words are NOT game words** — chemistry compounds, Latin taxonomy, medical jargon with no common usage get empty actions
+- **Common words ARE game words** — if a player might type it, give it actions. Short/weak words get value 1, cost 0. Quality matters for STRONG words; weak words just need a reasonable effect
+- **Synonyms are welcome** — similar words can share the same primary action with different secondary effects, values, or targets. The player vocabulary should be RICH, not sparse
+- **Summon rationale**: every summon needs a 1-sentence explanation of its unique role
+- **Item ecosystem fit**: check which slots are underrepresented via audit.py
 - **Mix targeting types**: don't make every word SingleEnemy
-- **Use specific stat buffs/debuffs**: use `BuffStrength`, `DebuffPhysicalDefense`, etc. instead of generic `Buff`. Match the stat to the word's meaning (e.g. "fortify" → `BuffPhysicalDefense`, "weaken" → `DebuffStrength`)
-- **Per-action targeting**: if a word's actions target different things, add `target`/`range`/`area` to individual actions (e.g. "absorb" damages enemy + heals self)
-- **Duplicate actions**: a word CAN have the same action multiple times (e.g. "barrage" → Damage×2). Each instance executes separately. Example:
-  ```json
-  {"word": "barrage", "actions": [{"action": "Damage", "value": 2}, {"action": "Damage", "value": 2}]}
-  ```
-- **Structure words**: Defensive/building words ("fortress", "barricade", "wall", "totem", "bunker") → `Summon` action, target `Self`, tags `DEFENSIVE`/`SUPPORT`. Offensive structure words ("turret", "cannon", "sentry") → `Summon` action, target `Self`, tags `OFFENSIVE`/`PHYSICAL`. These are units with high HP, passives, and few/no active attacks — the passive system handles their effects automatically.
-- **Item/equipment words**: Nouns that are wearable/holdable gear → `Item` action, target `Self`, cost `0`. Include `"item"` field with `item_type`, stats, and optional passives. Weapons have ammo via `assoc_word`. Consumables have ammo via `assoc_word` (ammo words trigger Heal, Drunk, buffs, etc.) and durability = number of uses. Examples: "crown" → head, "cloak" → wear, "ring" → accessory, "beer" → consumable (ammo: "sip" with Heal+Drunk actions), "sword" → weapon.
-- **Balance tags**: ensure good coverage across all categories
+- **Use specific stat buffs/debuffs**: match stat to word meaning (e.g. "fortify" → BuffPhysicalDefense)
+- **Per-action targeting is encouraged**: Every action can target independently — Burn(Self), Drunk(Enemy), Shield(AllAllies) + Damage(AllEnemies), Heal(AllAllies) + Damage(Self), anything goes. When a word's meaning suggests different targets for different effects, USE per-action targeting. This creates the most interesting words. See the "Per-Action Targeting" section for patterns and examples. The word-level `target` is just for UI display
+- **Duplicate actions**: a word CAN have the same action multiple times (e.g. "barrage" → Damage×2)
+- **Structure words**: Defensive → Summon, Self, DEFENSIVE/SUPPORT. Offensive → Summon, Self, OFFENSIVE
+- **Item words**: Wearable/holdable → Item action, Self, cost 0. Include `"item"` field.
+
+### Interaction actions
+These are for **event encounters** (non-combat: inns, shrines, chests). They do NOT deal damage. Value always 1, target usually SingleEnemy. See `context.py` output for the full list (Enter, Talk, Steal, Search, Pray, Rest, Open, Trade, Recruit, Leave).
+
+**When to classify as interaction**: Words whose primary meaning is social/exploration (not combat). Do NOT give interaction actions to combat words.
 
 ---
 
 ## DIVERSITY RULES
 
-Before each batch: run `stats.py` AND `audit.py` — review action distribution, tag coverage, unit diversity, item slot coverage, and duplicate profiles.
+Before each batch: run `context.py`, `stats.py`, `audit.py` — review distribution data.
 
 - Don't assign the same action combination to more than ~5% of game words
-- Mix targeting types — if recent batches are >60% SingleEnemy, use more AllEnemies, RandomEnemy, etc.
+- Mix targeting types — if >60% SingleEnemy, use more AllEnemies, Random, etc.
+- **Use per-action targeting often** — at least 20% of multi-action words should have actions with different targets. Check `context.py` "Words with per-action targeting" stat and grow it
 - Vary tag combinations — don't always pair OFFENSIVE+PHYSICAL
-- Summon words should be ~2-3% of game words
-- **Summon unit diversity**: vary passive triggers — don't make every structure `on_ally_hit`
-- At least 20% of summons should use parameterized triggers (`on_word_length`, `on_word_tag`, `apply_status`)
+- Summon words: ~2-3% of game words. Vary passive triggers. At least 20% use parameterized triggers.
 - Structures: 0-1 unit actions, 1-3 passives. Enemies: 1-2 unit actions, 0-1 passive.
-- Words can (and should) have multiple tags — e.g. "grove" → `["NATURE", "RESTORATION"]`. Tags enable `on_word_tag` passives to fire, so diverse tagging creates richer synergies.
+- Words can (and should) have multiple tags for richer synergies.
+- After 5000+ words: check for actions <1%, tags <3%, and boost them.
+- Synonyms should vary their secondary actions, values, or targets — but having the same PRIMARY action is fine. Many words should deal Damage, many should Heal, etc.
 
-### After 5000+ words
-Run `stats.py` and check for:
-- Actions used by <1% of words → create more words using those actions
-- Tags with <3% coverage → assign those tags to appropriate words
-- Summon words all with same unit type → create more diverse unit types
-- If any stat buff/debuff has <2% usage, intentionally add words using it
-
-### Similarity prevention
-- Don't create words with identical action+value+target as existing words
-- If a word has the same meaning as an existing word (synonym), vary the action values or add different secondary effects
-- Check recent 3 batches for patterns — if you've been assigning too much Damage, shift to other effects
-
-### Quality checkpoints
-
-Before inserting any game words, review the batch as a whole:
-- **Filler check**: Remove any game word that exists only because it vaguely relates to combat — if you can't articulate why it's interesting, it's filler
-- **Summon diversity**: No two summons in the same batch should have the same passive trigger+effect combo
-- **Item diversity**: No two items in the same batch should have the same item_type + stat profile
-- **Profile uniqueness**: For each game word, mentally compare its action+value+target against the last 3 batches — if it's a duplicate profile, redesign or skip it
-- **Synergy audit**: At least 1 game word per batch should create a NEW synergy with existing words (e.g. a word that benefits from a status no existing word applied, or a summon that triggers on an underused tag)
+### Quality checkpoints (before inserting)
+- **Filler check**: Only remove words that are truly unplayable (scientific jargon). Weak-but-real words (ache, able, acid) keep their simple actions
+- **Summon diversity**: No two summons in the batch with same passive trigger+effect
+- **Item diversity**: No two items in the batch with same type+stat profile
+- **Profile uniqueness**: Compare each game word against recent batches
+- **Synergy audit**: At least 1 game word per batch creates a NEW synergy
 
 ---
 
 ## RULES
 
 - Use the Python pipeline (batch_next → classify → batch_insert) — do NOT edit C# files
-- Every game word MUST have at least one action mapping and at least one tag
-- Non-game words get empty actions and tags — they're just marked processed
-- Values must be 1-10 (enforced by DB constraint)
-- Cost must be 0-10
-- Range 0 = unlimited
+- Every game word MUST have at least one action and at least one tag
+- Non-game words get empty actions and tags — just marked processed
+- Values: 1-10, Cost: 0-20, Range: always 0
 - Each iteration processes one batch (~100 words)
-- Summon words MUST have cost >= 1 (enforced by batch_insert.py). Summoning always costs mana.
-- Item words (equipping) have cost 0 — equipping an item is free. Use `Item` action (not `Weapon`).
-- Weapon-type items use `assoc_word` on the action to link ammo words.
+- Summon words MUST have cost >= 1
+- Item words have cost 0
+- Weapon-type items use `assoc_word` to link ammo
+- **Run `context.py` at the start of each iteration** to get valid actions, targets, tags, triggers, effects, word families, and current DB distribution

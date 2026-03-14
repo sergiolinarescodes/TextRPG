@@ -52,7 +52,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             RebuildAll(); RunDamageGroup();
             RebuildAll(); RunHealGroup();
             RebuildAll(); RunStatusEffectGroup();
-            RebuildAll(); RunEventActionGroup();
             RebuildAll(); RunShockGroup();
             RebuildAll(); RunSummonGroup();
             RebuildAll(); RunStatModifierGroup();
@@ -102,6 +101,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             RebuildAll(); RunCombustGroup();
             RebuildAll(); RunCataclysmGroup();
             RebuildAll(); RunCleaveGroup();
+            RebuildAll(); RunSunderGroup();
+            RebuildAll(); RunSilenceGroup();
+            RebuildAll(); RunCauterizeGroup();
 
             BuildUI();
         }
@@ -333,27 +335,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 "Enemy_a does not have Stun");
         }
 
-        // ── Group 4: Event-based Actions ──────────────────────────────
-
-        private void RunEventActionGroup()
-        {
-            int pushValue = -1;
-            EntityId pushTarget = default;
-            _subscriptions.Add(_eventBus.Subscribe<PushActionEvent>(e =>
-            {
-                pushValue = e.Value;
-                pushTarget = e.Target;
-            }));
-            _resolver.RegisterWord("test_push",
-                new List<WordActionMapping> { new("Push", 2) },
-                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
-            Exec("test_push");
-            Check("Push: PushActionEvent with correct value and target",
-                pushValue == 2 && pushTarget.Equals(_enemyA),
-                $"Value={pushValue}(exp 2), target={pushTarget.Value}(exp enemy_a)");
-        }
-
-        // ── Group 5: Shock ──────────────────────────────────────────
+        // ── Group 4: Shock ──────────────────────────────────────────
 
         private void RunShockGroup()
         {
@@ -2413,6 +2395,139 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             Check("Cataclysm: hits allies too",
                 HP(_allyA) == hpBeforeAlly - expectedDmgAlly,
                 $"AllyHP={HP(_allyA)}(exp {hpBeforeAlly - expectedDmgAlly})");
+        }
+
+        // ── Group: Sunder ──────────────────────────────────────────
+
+        private void RunSunderGroup()
+        {
+            // Sunder(2) → strips up to 2 positive effects + deals 1 damage per buff removed
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Shielded, 3, _enemyA);
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Buffed, 3, _enemyA);
+            int hpBefore = HP(_enemyA);
+
+            _resolver.RegisterWord("test_sunder",
+                new List<WordActionMapping> { new("Sunder", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_sunder");
+
+            Check("Sunder: Shielded removed",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Shielded),
+                "Shielded still present");
+            Check("Sunder: Buffed removed",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Buffed),
+                "Buffed still present");
+            Check("Sunder: 2 damage dealt (1 per buff removed)",
+                HP(_enemyA) == hpBefore - 2,
+                $"HP={HP(_enemyA)}(exp {hpBefore - 2})");
+
+            SoftReset();
+
+            // Sunder on unbuffed target: no damage
+            int hpBefore2 = HP(_enemyA);
+            _resolver.RegisterWord("test_sunder_empty",
+                new List<WordActionMapping> { new("Sunder", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_sunder_empty");
+
+            Check("Sunder: no buffs = no damage",
+                HP(_enemyA) == hpBefore2,
+                $"HP={HP(_enemyA)}(exp {hpBefore2})");
+
+            SoftReset();
+
+            // Sunder(3) with only 1 buff: removes 1, deals 1 damage
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Growing, 3, _enemyA);
+            int hpBefore3 = HP(_enemyA);
+            _resolver.RegisterWord("test_sunder_partial",
+                new List<WordActionMapping> { new("Sunder", 3) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_sunder_partial");
+
+            Check("Sunder: partial strip (1 buff, value 3) = 1 damage",
+                HP(_enemyA) == hpBefore3 - 1,
+                $"HP={HP(_enemyA)}(exp {hpBefore3 - 1})");
+            Check("Sunder: Growing removed",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Growing),
+                "Growing still present");
+        }
+
+        // ── Group: Silence ──────────────────────────────────────────
+
+        private void RunSilenceGroup()
+        {
+            // Silence(2) → applies Silenced status
+            _resolver.RegisterWord("test_silence",
+                new List<WordActionMapping> { new("Silence", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_silence");
+
+            Check("Silence: enemy has Silenced effect",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Silenced),
+                "Silenced not applied");
+
+            // While Silenced, new status effects are blocked
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Burning, 3, _hero);
+            Check("Silence: blocks Burning while Silenced",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Burning),
+                "Burning was applied despite Silenced");
+
+            // Silenced can be refreshed (doesn't block itself)
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Silenced, 5, _hero);
+            Check("Silence: Silenced refreshes own duration",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Silenced),
+                "Silenced was removed by self-application");
+        }
+
+        // ── Group: Cauterize ───────────────────────────────────────
+
+        private void RunCauterizeGroup()
+        {
+            // Cauterize(1) + Damage(2) → removes Bleeding + deals damage
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Bleeding, 999, _hero);
+            Check("Cauterize setup: Bleeding applied",
+                _statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding),
+                "Bleeding not applied");
+
+            _resolver.RegisterWord("test_cauterize",
+                new List<WordActionMapping> { new("Cauterize", 1), new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_cauterize");
+
+            int expectedDmg = ExpDmg(2, 12, 4);
+            Check("Cauterize: Bleeding removed from target",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding),
+                $"HasBleeding={_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding)}");
+            Check("Cauterize: damage dealt correctly",
+                HP(_enemyA) == 80 - expectedDmg,
+                $"HP={HP(_enemyA)}(exp {80 - expectedDmg})");
+
+            SoftReset();
+
+            // Cauterize on target without Bleeding — should not error
+            _resolver.RegisterWord("test_cauterize_no_bleed",
+                new List<WordActionMapping> { new("Cauterize", 1), new("Damage", 2) },
+                new WordMeta("SingleEnemy", 0, 0, AreaShape.Single));
+            Exec("test_cauterize_no_bleed");
+            Check("Cauterize no-bleed: damage still dealt",
+                HP(_enemyA) == 80 - expectedDmg,
+                $"HP={HP(_enemyA)}(exp {80 - expectedDmg})");
+
+            SoftReset();
+
+            // Cauterize AllEnemies — removes Bleeding from all
+            _statusEffects.ApplyEffect(_enemyA, StatusEffectType.Bleeding, 999, _hero);
+            _statusEffects.ApplyEffect(_enemyB, StatusEffectType.Bleeding, 999, _hero);
+            _statusEffects.ApplyEffect(_enemyC, StatusEffectType.Bleeding, 999, _hero);
+            _resolver.RegisterWord("test_cauterize_aoe",
+                new List<WordActionMapping> { new("Cauterize", 1) },
+                new WordMeta("AllEnemies", 0, 0, AreaShape.Single));
+            Exec("test_cauterize_aoe");
+            Check("Cauterize AoE: Bleeding removed from all enemies",
+                !_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding) &&
+                !_statusEffects.HasEffect(_enemyB, StatusEffectType.Bleeding) &&
+                !_statusEffects.HasEffect(_enemyC, StatusEffectType.Bleeding),
+                $"A={_statusEffects.HasEffect(_enemyA, StatusEffectType.Bleeding)} B={_statusEffects.HasEffect(_enemyB, StatusEffectType.Bleeding)} C={_statusEffects.HasEffect(_enemyC, StatusEffectType.Bleeding)}");
         }
 
         // ── UI ──────────────────────────────────────────────────────

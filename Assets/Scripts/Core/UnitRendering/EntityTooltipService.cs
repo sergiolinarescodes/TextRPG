@@ -10,6 +10,7 @@ using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.Passive;
 using TextRPG.Core.StatusEffect;
+using TextRPG.Core.Scroll;
 using TextRPG.Core.Weapon;
 using TextRPG.Core.WordAction;
 using Unidad.Core.EventBus;
@@ -47,6 +48,8 @@ namespace TextRPG.Core.UnitRendering
         private IItemRegistry _itemRegistry;
         private IEntityStatsService _entityStats;
         private IInventoryService _inventoryService;
+        private ISpellService _spellService;
+        private IWordResolver _baseWordResolver;
         private InventoryId _playerInventoryId;
         private EntityId _playerId;
 
@@ -119,6 +122,12 @@ namespace TextRPG.Core.UnitRendering
         public void SetEventEncounterService(IEventEncounterService service)
         {
             _eventEncounterService = service;
+        }
+
+        public void SetSpellService(ISpellService service, IWordResolver baseWordResolver = null)
+        {
+            _spellService = service;
+            _baseWordResolver = baseWordResolver;
         }
 
         private void RegisterHoverCallbacks()
@@ -318,6 +327,30 @@ namespace TextRPG.Core.UnitRendering
             if (slot.IsEmpty) return;
 
             var itemWord = slot.ItemId.Value;
+
+            // Scroll items — show spell info tooltip
+            if (_spellService != null && _spellService.TryGetScrollItem(itemWord, out var scrollDef))
+            {
+                var captured = scrollDef;
+                var content = TooltipContent.FromCustom(() =>
+                {
+                    var root = new VisualElement();
+                    root.pickingMode = PickingMode.Ignore;
+                    root.Add(TooltipContentBuilder.BuildHeader(captured.DisplayName, captured.Color, "SCROLL — Click to learn"));
+                    root.Add(TooltipContentBuilder.BuildScrollContent(captured));
+
+                    var wordResolver = _baseWordResolver ?? _ammoResolver;
+                    var actions = wordResolver.Resolve(captured.OriginalWord);
+                    if (actions.Count > 0)
+                        TooltipContentBuilder.AddAbilitiesSection(root,
+                            new[] { captured.OriginalWord }, wordResolver, _actionRegistry, _handlerRegistry);
+                    return root;
+                });
+                _currentHandle = _tooltipService.Show(content, TooltipAnchor.FromElement(cell),
+                    TooltipPlacement.Auto, TooltipStyles.EntityTooltip);
+                return;
+            }
+
             if (!_itemRegistry.TryGet(itemWord, out var item)) return;
 
             var allActions = new List<WordActionMapping>();
@@ -328,10 +361,10 @@ namespace TextRPG.Core.UnitRendering
             var capturedItem = item;
             var slotTypeName = SlotTypeName((int)item.SlotType);
 
-            TooltipContent content;
+            TooltipContent itemContent;
             if (item.SlotType == EquipmentSlotType.Weapon || item.SlotType == EquipmentSlotType.Consumable)
             {
-                content = TooltipContent.FromCustom(() =>
+                itemContent = TooltipContent.FromCustom(() =>
                 {
                     var root = new VisualElement();
                     root.pickingMode = PickingMode.Ignore;
@@ -351,7 +384,7 @@ namespace TextRPG.Core.UnitRendering
             }
             else
             {
-                content = TooltipContent.FromCustom(() =>
+                itemContent = TooltipContent.FromCustom(() =>
                 {
                     var root = new VisualElement();
                     root.pickingMode = PickingMode.Ignore;
@@ -371,9 +404,9 @@ namespace TextRPG.Core.UnitRendering
 
             var subTooltips = _keywordProvider.DetectKeywords(allActions);
             if (subTooltips.Count > 0)
-                content = content.WithSubTooltips(subTooltips);
+                itemContent = itemContent.WithSubTooltips(subTooltips);
 
-            _currentHandle = _tooltipService.Show(content, TooltipAnchor.FromElement(cell),
+            _currentHandle = _tooltipService.Show(itemContent, TooltipAnchor.FromElement(cell),
                 TooltipPlacement.Auto, TooltipStyles.EntityTooltip);
         }
 
@@ -421,6 +454,8 @@ namespace TextRPG.Core.UnitRendering
             _itemRegistry = null;
             _entityStats = null;
             _inventoryService = null;
+            _spellService = null;
+            _baseWordResolver = null;
 
             base.Dispose();
         }

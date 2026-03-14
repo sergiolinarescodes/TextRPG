@@ -12,6 +12,7 @@ namespace TextRPG.Core.WordInput.Scenarios
         private readonly Dictionary<EntityId, EntityDefinition> _definitions = new();
         private readonly HashSet<EntityId> _dead = new();
         private bool _active;
+        private bool _autoEndOnAllDead = true;
         private EntityId _player;
         private IEventBus _eventBus;
 
@@ -21,6 +22,7 @@ namespace TextRPG.Core.WordInput.Scenarios
 
         public void SetPlayer(EntityId player) => _player = player;
         public void SetEventBus(IEventBus eventBus) => _eventBus = eventBus;
+        public void SetAutoEndOnAllDead(bool value) => _autoEndOnAllDead = value;
 
         public void Activate() => _active = true;
 
@@ -37,7 +39,7 @@ namespace TextRPG.Core.WordInput.Scenarios
         {
             _dead.Add(id);
 
-            if (_active && _enemies.All(e => _dead.Contains(e)))
+            if (_active && _autoEndOnAllDead && _enemies.All(e => _dead.Contains(e)))
             {
                 _active = false;
                 _eventBus?.Publish(new EncounterEndedEvent("scenario", true));

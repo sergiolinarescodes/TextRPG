@@ -11,7 +11,6 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
-using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.LetterChallenge;
 using TextRPG.Core.LetterReserve;
 using TextRPG.Core.Lockpick;
@@ -148,6 +147,25 @@ namespace TextRPG.Core.Services
                 lockpick.SetEncounterService(null);
 
             ReactionService?.ClearReactions();
+
+            // Remove all enemies and summons from run-lifetime services before reinitializing slots
+            var enemies = SlotService.GetAllEnemies();
+            var allies = SlotService.GetAllAllies();
+            foreach (var eid in enemies)
+            {
+                StatusEffects.RemoveAllEffects(eid);
+                PassiveService.RemovePassives(eid);
+                EntityStats.RemoveEntity(eid);
+                UnitService.RemoveUnit(new UnitId(eid.Value));
+            }
+            foreach (var eid in allies)
+            {
+                StatusEffects.RemoveAllEffects(eid);
+                PassiveService.RemovePassives(eid);
+                EntityStats.RemoveEntity(eid);
+                UnitService.RemoveUnit(new UnitId(eid.Value));
+            }
+
             SlotService.Initialize();
             (EnemyResolver as EnemyWordResolver)?.Clear();
             ((CombatContext)CombatContext).SetEnemies(Array.Empty<EntityId>());

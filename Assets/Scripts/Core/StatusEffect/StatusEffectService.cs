@@ -38,6 +38,12 @@ namespace TextRPG.Core.StatusEffect
 
         public void ApplyEffect(EntityId target, StatusEffectType type, int duration, EntityId source)
         {
+            if (type != StatusEffectType.Silenced && HasEffect(target, StatusEffectType.Silenced))
+            {
+                Publish(new StatusEffectBlockedEvent(target, type, source));
+                return;
+            }
+
             var definition = StatusEffectDefinitions.Get(type);
 
             if (!_effects.TryGetValue(target, out var list))

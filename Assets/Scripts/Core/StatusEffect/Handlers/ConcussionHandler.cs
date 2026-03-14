@@ -19,8 +19,6 @@ namespace TextRPG.Core.StatusEffect.Handlers
                 ctx.EntityStats.ApplyDamage(target, 1);
                 ctx.StatusEffects.ApplyEffect(target, StatusEffectType.Stun, 1, instance.Source);
             }
-
-            instance.StackCount = Math.Max(0, instance.StackCount - 1);
         }
     }
 }

@@ -31,6 +31,8 @@ namespace TextRPG.Core.EventEncounter
         public IEnumerable<ITestScenario> GetScenarios()
         {
             yield return new Scenarios.EventEncounterScenario();
+            yield return new Scenarios.EventEncounterLoopScenario();
+            yield return new Scenarios.EventEncounterLiveScenario();
         }
     }
 }

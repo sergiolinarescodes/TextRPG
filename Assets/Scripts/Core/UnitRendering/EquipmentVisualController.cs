@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using TextRPG.Core.Consumable;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EntityStats;
+using TextRPG.Core.Scroll;
 using TextRPG.Core.Weapon;
 using Unidad.Core.EventBus;
 using Unidad.Core.Inventory;
@@ -20,6 +21,7 @@ namespace TextRPG.Core.UnitRendering
         private readonly IItemRegistry _itemRegistry;
         private readonly IWeaponService _weaponService;
         private readonly IConsumableService _consumableService;
+        private readonly ISpellService _spellService;
         private readonly InventoryId _playerInventoryId;
         private readonly EntityId _playerId;
         private readonly VisualElement _rootElement;
@@ -35,6 +37,10 @@ namespace TextRPG.Core.UnitRendering
         private string _dragItemWord;
         private int _dragSourceSlot = -1;
         private bool _dragFromEquipment;
+        private bool _pointerDown;
+        private bool _dragStarted;
+        private Vector2 _pointerDownPos;
+        private const float DragThreshold = 8f;
 
         public EquipmentBarVisual LeftBar { get; private set; }
         public EquipmentBarVisual RightBar { get; private set; }
@@ -43,7 +49,7 @@ namespace TextRPG.Core.UnitRendering
             IInventoryService inventoryService, IItemRegistry itemRegistry,
             IWeaponService weaponService, IConsumableService consumableService,
             InventoryId playerInventoryId, EntityId playerId,
-            VisualElement rootElement)
+            VisualElement rootElement, ISpellService spellService = null)
         {
             _eventBus = eventBus;
             _equipmentService = equipmentService;
@@ -51,6 +57,7 @@ namespace TextRPG.Core.UnitRendering
             _itemRegistry = itemRegistry;
             _weaponService = weaponService;
             _consumableService = consumableService;
+            _spellService = spellService;
             _playerInventoryId = playerInventoryId;
             _playerId = playerId;
             _rootElement = rootElement;
@@ -83,6 +90,7 @@ namespace TextRPG.Core.UnitRendering
 
         public Action FireWeaponAction { get; set; }
         public Action UseConsumableAction { get; set; }
+        public Action<string> UseInventoryItemAction { get; set; }
 
         private void SetupWeaponSlot()
         {
@@ -98,7 +106,7 @@ namespace TextRPG.Core.UnitRendering
             _weaponDurabilityLabel.style.bottom = 2;
             _weaponDurabilityLabel.style.left = 4;
 
-            _weaponSlot.RegisterCallback<ClickEvent>(_ => FireWeaponAction?.Invoke());
+            // Use action handled via PointerUp (no drag movement) in SetupDragAndDrop
         }
 
         private void SetupConsumableSlot()
@@ -115,7 +123,7 @@ namespace TextRPG.Core.UnitRendering
             _consumableDurabilityLabel.style.bottom = 2;
             _consumableDurabilityLabel.style.left = 4;
 
-            _consumableSlot.RegisterCallback<ClickEvent>(_ => UseConsumableAction?.Invoke());
+            // Use action handled via PointerUp (no drag movement) in SetupDragAndDrop
         }
 
         private void SubscribeToEvents()
@@ -170,7 +178,9 @@ namespace TextRPG.Core.UnitRendering
                 else
                 {
                     var itemWord = evt.NewSlot.ItemId.Value;
-                    if (_itemRegistry.TryGet(itemWord, out var itemDef))
+                    if (_spellService != null && _spellService.IsScrollItem(itemWord))
+                        LeftBar?.SetSlotContent(evt.SlotIndex, itemWord.Replace("scroll_", "").ToUpperInvariant(), ScrollDefinition.ScrollPurple);
+                    else if (_itemRegistry.TryGet(itemWord, out var itemDef))
                         LeftBar?.SetSlotContent(evt.SlotIndex, itemDef.DisplayName, itemDef.Color);
                     else
                         LeftBar?.SetSlotContent(evt.SlotIndex, itemWord.ToUpperInvariant(), Color.white);
@@ -197,19 +207,51 @@ namespace TextRPG.Core.UnitRendering
 
             _rootElement.RegisterCallback<PointerMoveEvent>(evt =>
             {
-                if (_dragElement == null) return;
-                UpdateDragPosition(evt.position);
+                if (!_pointerDown || _dragItemWord == null) return;
+
+                if (!_dragStarted)
+                {
+                    var delta = (Vector2)evt.position - _pointerDownPos;
+                    if (delta.magnitude < DragThreshold) return;
+                    if (_dragFromEquipment && !_equipmentService.CanUnequipInBattle())
+                    {
+                        CancelDrag();
+                        return;
+                    }
+                    _dragStarted = true;
+                    StartDrag(evt.position);
+                }
+                else
+                {
+                    UpdateDragPosition(evt.position);
+                }
             });
             _rootElement.RegisterCallback<PointerUpEvent>(evt =>
             {
-                if (_dragElement == null || _dragItemWord == null) return;
+                if (!_pointerDown) return;
 
-                bool handled;
-                if (_dragFromEquipment)
-                    handled = _equipmentService.UnequipToInventory(
-                        _playerId, (EquipmentSlotType)_dragSourceSlot, _inventoryService, _playerInventoryId);
-                else
-                    handled = TryDropToEquipmentSlot(evt.position);
+                if (_dragStarted && _dragItemWord != null)
+                {
+                    // Drag completed — equip/unequip
+                    if (_dragFromEquipment)
+                        _equipmentService.UnequipToInventory(
+                            _playerId, (EquipmentSlotType)_dragSourceSlot, _inventoryService, _playerInventoryId);
+                    else
+                        TryDropToEquipmentSlot(evt.position);
+                }
+                else if (_dragItemWord != null && _dragFromEquipment)
+                {
+                    // Click (no drag movement) on equipment slot — use weapon/consumable
+                    if (_dragSourceSlot == 4)
+                        FireWeaponAction?.Invoke();
+                    else if (_dragSourceSlot == 3)
+                        UseConsumableAction?.Invoke();
+                }
+                else if (_dragItemWord != null && !_dragFromEquipment)
+                {
+                    // Click (no drag movement) on inventory slot — use scroll or other usable
+                    UseInventoryItemAction?.Invoke(_dragItemWord);
+                }
 
                 CancelDrag();
             });
@@ -235,13 +277,14 @@ namespace TextRPG.Core.UnitRendering
             _dragItemWord = slot.ItemId.Value;
             _dragSourceSlot = slotIndex;
             _dragFromEquipment = false;
-            StartDrag(evt.position);
+            _pointerDown = true;
+            _dragStarted = false;
+            _pointerDownPos = evt.position;
             evt.StopPropagation();
         }
 
         private void OnEquipmentSlotPointerDown(PointerDownEvent evt, int slotIndex)
         {
-            if (!_equipmentService.CanUnequipInBattle()) return;
             var slotType = (EquipmentSlotType)slotIndex;
             var equipped = _equipmentService.GetEquipped(_playerId, slotType);
             if (equipped == null) return;
@@ -249,7 +292,9 @@ namespace TextRPG.Core.UnitRendering
             _dragItemWord = equipped.ItemWord;
             _dragSourceSlot = slotIndex;
             _dragFromEquipment = true;
-            StartDrag(evt.position);
+            _pointerDown = true;
+            _dragStarted = false;
+            _pointerDownPos = evt.position;
             evt.StopPropagation();
         }
 
@@ -317,6 +362,8 @@ namespace TextRPG.Core.UnitRendering
             _dragItemWord = null;
             _dragSourceSlot = -1;
             _dragFromEquipment = false;
+            _pointerDown = false;
+            _dragStarted = false;
         }
 
         public void Dispose()

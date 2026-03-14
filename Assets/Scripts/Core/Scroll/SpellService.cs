@@ -15,6 +15,7 @@ namespace TextRPG.Core.Scroll
         private readonly IWordTagResolver _tagResolver;
         private readonly HashSet<string> _learnedSpells = new();
         private readonly HashSet<string> _offeredOriginals = new();
+        private readonly Dictionary<string, ScrollDefinition> _scrollItems = new();
 
         public IReadOnlyCollection<string> LearnedSpells => _learnedSpells;
         public IReadOnlyCollection<string> OfferedOriginals => _offeredOriginals;
@@ -54,6 +55,22 @@ namespace TextRPG.Core.Scroll
         public bool IsSpell(string word)
         {
             return word != null && _learnedSpells.Contains(word);
+        }
+
+        public void RegisterScrollItem(string itemKey, ScrollDefinition scroll)
+        {
+            _scrollItems[itemKey] = scroll;
+            _offeredOriginals.Add(scroll.OriginalWord);
+        }
+
+        public bool TryGetScrollItem(string itemKey, out ScrollDefinition scroll)
+        {
+            return _scrollItems.TryGetValue(itemKey, out scroll);
+        }
+
+        public bool IsScrollItem(string itemKey)
+        {
+            return itemKey != null && _scrollItems.ContainsKey(itemKey);
         }
     }
 }

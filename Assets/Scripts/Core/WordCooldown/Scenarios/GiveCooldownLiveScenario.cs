@@ -2,16 +2,19 @@ using System;
 using System.Collections.Generic;
 using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
+using TextRPG.Core.CombatAI;
+using TextRPG.Core.CombatLoop;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.Equipment;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.EventEncounter.Reactions.Tags;
-using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
+using TextRPG.Core.TurnSystem;
 using TextRPG.Core.UnitRendering;
+using TextRPG.Core.WordInput.Scenarios;
 using Unidad.Core.Abstractions;
 using Unidad.Core.EventBus;
 using Unidad.Core.Inventory;
@@ -34,7 +37,9 @@ namespace TextRPG.Core.WordCooldown.Scenarios
 
         private RunSession _session;
         private IEventEncounterService _encounterService;
-        private IEventEncounterLoopService _loopService;
+        private ICombatLoopService _combatLoop;
+        private ICombatAIService _combatAI;
+        private ScenarioEncounterAdapter _encounterAdapter;
 
         // Controllers
         private WordInputController _wordInput;
@@ -87,10 +92,16 @@ namespace TextRPG.Core.WordCooldown.Scenarios
                 new ItemId("silver_bar"), "SILVER BAR", 99));
             s.InventoryService.Add(s.PlayerInventoryId, new ItemId("silver_bar"), 3);
 
-            // Event encounter services (created outside session's scope system)
+            // Event encounter services
             _encounterService = new EventEncounterService(
                 s.EventBus, s.EntityStats, s.SlotService, s.CombatContext, s.ReactionService);
             s.ReactionContext.EncounterService = _encounterService;
+
+            // Encounter adapter (no auto-end — lifecycle managed by EventEncounterService)
+            _encounterAdapter = new ScenarioEncounterAdapter();
+            _encounterAdapter.SetPlayer(playerId);
+            _encounterAdapter.SetEventBus(s.EventBus);
+            _encounterAdapter.SetAutoEndOnAllDead(false);
 
             // Build encounter: mercenary + flammable barrel
             var encounterDef = BuildTestEncounter();
@@ -108,6 +119,19 @@ namespace TextRPG.Core.WordCooldown.Scenarios
             // Start encounter
             _encounterService.StartEncounter(encounterDef, playerId);
 
+            // Register interactables as enemies in adapter
+            for (int i = 0; i < encounterDef.Interactables.Length; i++)
+            {
+                var def = encounterDef.Interactables[i];
+                var entityId = _encounterService.InteractableEntities[i];
+                var entityDef = new EntityDefinition(
+                    def.Name, def.MaxHealth, 0, 0, 0, 0, 0, def.Color,
+                    Array.Empty<string>(), 0, "interactable", def.Passives,
+                    def.Tags, def.Description, def.DeathReward, def.DeathRewardValue);
+                _encounterAdapter.RegisterEnemy(entityId, entityDef);
+            }
+            _encounterAdapter.Activate();
+
             // Register interactable passives
             for (int i = 0; i < encounterDef.Interactables.Length; i++)
             {
@@ -119,12 +143,29 @@ namespace TextRPG.Core.WordCooldown.Scenarios
                 }
             }
 
-            // Event encounter loop with cooldown + combat context for "give" prefix
-            _loopService = new EventEncounterLoopService(
-                s.EventBus, s.EntityStats, s.WordResolver, _encounterService, playerId,
-                reservedWordHandler: null, combatContext: s.CombatContext, wordCooldown: s.WordCooldown,
-                giveValidator: s.GiveValidator);
-            ((EventEncounterLoopService)_loopService).Start();
+            // CombatAI (interactables auto-pass since empty abilities)
+            var scorers = CombatAISystemInstaller.CreateScorerRegistry(s.StatusEffects);
+            _combatAI = new CombatAIService(s.EventBus, _encounterAdapter, s.EntityStats,
+                s.TurnService, s.SlotService, s.CombatContext, s.ActionExecution, scorers,
+                s.EnemyResolver as EnemyWordResolver, s.AllUnits, statusEffects: s.StatusEffects);
+
+            // Turn order: player first, then interactables
+            var turnOrder = new List<EntityId> { playerId };
+            turnOrder.AddRange(_encounterService.InteractableEntities);
+            s.TurnService.SetTurnOrder(turnOrder);
+
+            // CombatLoopService (unified loop) with cooldown + combat context for "give" prefix
+            _combatLoop = new CombatLoopService(
+                s.EventBus, s.TurnService, s.EntityStats, s.WordResolver, s.WeaponService, playerId,
+                s.ConsumableService, combatContext: s.CombatContext, wordCooldown: s.WordCooldown,
+                giveValidator: s.GiveValidator, statusEffects: s.StatusEffects);
+            ((CombatLoopService)_combatLoop).Start();
+
+            // No max turns for live scenario
+
+            // Mark dead entities in adapter
+            _subscriptions.Add(s.EventBus.Subscribe<EntityDiedEvent>(evt =>
+                _encounterAdapter.MarkDead(evt.EntityId)));
 
             // --- Build UI layout ---
             var root = RootVisualElement;
@@ -259,8 +300,8 @@ namespace TextRPG.Core.WordCooldown.Scenarios
             _loot = new LootOverlayController(s.EventBus, s.LootRewardService,
                 _equipment.RightBar, root, enabled => _wordInput.SetInputEnabled(enabled));
 
-            // Wire input to event loop
-            _wordInput.SetEventLoop(_loopService);
+            // Wire input to unified combat loop
+            _wordInput.SetCombatLoop(_combatLoop);
             _wordInput.SetInputEnabled(true);
 
             // Recruitment event
@@ -319,8 +360,8 @@ namespace TextRPG.Core.WordCooldown.Scenarios
                     _wordInput?.CodeField != null ? null : "Code field is null"),
                 new("Event encounter active", _encounterService?.IsEncounterActive == true,
                     _encounterService?.IsEncounterActive == true ? null : "Encounter not active"),
-                new("Loop service active", _loopService?.IsActive == true,
-                    _loopService?.IsActive == true ? null : "Loop not active"),
+                new("Combat loop active", _combatLoop != null && !_combatLoop.IsGameOver,
+                    _combatLoop != null && !_combatLoop.IsGameOver ? null : "Combat loop not active"),
                 new("Word cooldown service created", _session?.WordCooldown != null,
                     _session?.WordCooldown != null ? null : "WordCooldownService is null"),
             };
@@ -351,10 +392,14 @@ namespace TextRPG.Core.WordCooldown.Scenarios
             _playerStatsBar?.Dispose();
             _playerStatsBar = null;
 
-            (_loopService as IDisposable)?.Dispose();
-            _loopService = null;
+            (_combatLoop as IDisposable)?.Dispose();
+            _combatLoop = null;
+            (_combatAI as IDisposable)?.Dispose();
+            _combatAI = null;
             (_encounterService as IDisposable)?.Dispose();
             _encounterService = null;
+            _encounterAdapter?.EndEncounter();
+            _encounterAdapter = null;
 
             _session?.Dispose();
             _session = null;

@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_word ON word_actions(word);
 CREATE TABLE IF NOT EXISTS word_meta (
     word   TEXT PRIMARY KEY COLLATE NOCASE,
     target TEXT NOT NULL DEFAULT 'SingleEnemy',
-    cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 10),
+    cost   INTEGER NOT NULL DEFAULT 0 CHECK(cost BETWEEN 0 AND 20),
     range  INTEGER NOT NULL DEFAULT 0,
     area   TEXT NOT NULL DEFAULT 'Single',
     status TEXT DEFAULT NULL
@@ -159,12 +159,12 @@ SEED_ACTIONS = [
     # Water words
     ("drip",       "Water", 1, None, None, None, "", 0),
     ("splash",     "Water", 2, None, None, None, "", 0),  ("splash",     "Damage", 1, None, None, None, "", 0),
-    ("wave",       "Water", 3, None, None, None, "", 0),  ("wave",       "Push", 2, None, None, None, "", 0),  ("wave",       "Damage", 2, None, None, None, "", 0),
+    ("wave",       "Water", 3, None, None, None, "", 0),  ("wave",       "Damage", 2, None, None, None, "", 0),
     ("stream",     "Water", 2, None, None, None, "", 0),  ("stream",     "Damage", 1, None, None, None, "", 0),
-    ("torrent",    "Water", 4, None, None, None, "", 0),  ("torrent",    "Damage", 3, None, None, None, "", 0),  ("torrent",    "Push", 2, None, None, None, "", 0),
-    ("tsunami",    "Water", 5, None, None, None, "", 0),  ("tsunami",    "Damage", 5, None, None, None, "", 0),  ("tsunami",    "Push", 2, None, None, None, "", 0),  ("tsunami",    "Scramble", 1, None, None, None, "", 0),
+    ("torrent",    "Water", 4, None, None, None, "", 0),  ("torrent",    "Damage", 3, None, None, None, "", 0),  ("torrent",    "Scramble", 1, None, None, None, "", 0),
+    ("tsunami",    "Water", 7, None, None, None, "", 0),  ("tsunami",    "Damage", 7, None, None, None, "", 0),  ("tsunami",    "Scramble", 1, None, None, None, "", 0),
     ("ocean",      "Water", 3, None, None, None, "", 0),  ("ocean",      "Damage", 2, None, None, None, "", 0),
-    ("flood",      "Water", 4, None, None, None, "", 0),  ("flood",      "Damage", 3, None, None, None, "", 0),
+    ("flood",      "Water", 4, None, None, None, "", 0),  ("flood",      "Damage", 2, None, None, None, "", 0),
     ("deluge",     "Water", 5, None, None, None, "", 0),  ("deluge",     "Damage", 4, None, None, None, "", 0),
     ("rain",       "Water", 1, None, None, None, "", 0),  ("rain",       "Slow", 1, None, None, None, "", 0),
 
@@ -173,15 +173,22 @@ SEED_ACTIONS = [
     ("spark",      "Burn", 1, None, None, None, "", 0),   ("spark",      "Light", 1, None, None, None, "", 0),  ("spark",      "Damage", 1, None, None, None, "", 0),
     ("flame",      "Burn", 2, None, None, None, "", 0),   ("flame",      "Damage", 2, None, None, None, "", 0),
     ("blaze",      "Burn", 3, None, None, None, "", 0),   ("blaze",      "Damage", 3, None, None, None, "", 0),
-    ("inferno",    "Burn", 4, None, None, None, "", 0),   ("inferno",    "Damage", 4, None, None, None, "", 0),  ("inferno", "Light", 2, None, None, None, "", 0),
+    ("inferno",    "Burn", 5, None, None, None, "", 0),   ("inferno",    "Damage", 5, None, None, None, "", 0),  ("inferno", "Light", 2, None, None, None, "", 0),
     ("torch",      "Burn", 1, None, None, None, "", 0),   ("torch",      "Damage", 1, None, None, None, "", 0),
     ("scorch",     "Burn", 3, None, None, None, "", 0),   ("scorch",     "Damage", 2, None, None, None, "", 0),
+    ("boil",       "Burn", 5, None, None, None, "", 0),   ("boil",       "Water", 3, None, None, None, "", 0),  ("boil",       "Damage", 3, None, None, None, "", 0),
 
-    # Push / Wind words
-    ("shove",      "Push", 2, None, None, None, "", 0),   ("shove",      "Damage", 1, None, None, None, "", 0),
-    ("thrust",     "Push", 3, None, None, None, "", 0),   ("thrust",     "Damage", 2, None, None, None, "", 0),
-    ("gust",       "Wind", 2, None, None, None, "", 0),   ("gust",       "Push", 2, None, None, None, "", 0),
-    ("hurricane",  "Wind", 5, None, None, None, "", 0),   ("hurricane",  "Push", 4, None, None, None, "", 0),   ("hurricane",  "Damage", 4, None, None, None, "", 0),
+    # Cauterize words
+    ("cautery",    "Cauterize", 1, None, None, None, "", 0),  ("cautery",    "Damage", 2, None, None, None, "", 0),
+
+    # Scramble / Wind words
+    ("shove",      "Scramble", 1, None, None, None, "", 0),   ("shove",      "Damage", 1, None, None, None, "", 0),
+    ("thrust",     "Scramble", 1, None, None, None, "", 0),   ("thrust",     "Damage", 2, None, None, None, "", 0),
+    ("gust",       "Scramble", 1, None, None, None, "", 0),
+    ("hurricane",  "Scramble", 1, None, None, None, "", 0),   ("hurricane",  "Damage", 4, None, None, None, "", 0),
+
+    # Scramble + Damage + Attune words
+    ("flutter",    "Scramble", 1, "AllEnemies", None, None, "", 0),  ("flutter",    "Damage", 2, "AllEnemies", None, None, "", 1),  ("flutter",    "Attune", 1, "Self", None, None, "", 2),
 
     # Physical words
     ("scratch",    "Damage", 1, None, None, None, "", 0),
@@ -191,12 +198,15 @@ SEED_ACTIONS = [
     ("obliterate", "Damage", 5, None, None, None, "", 0), ("obliterate", "Heavy", 3, None, None, None, "", 0),
     ("crush",      "Damage", 3, None, None, None, "", 0), ("crush",      "Heavy", 3, None, None, None, "", 0),
 
+    # Visceral words
+    ("viscerous",  "Damage", 4, None, None, None, "", 0),  ("viscerous",  "Bleed", 2, None, None, None, "", 0),
+
     # Healing words
     ("bandage",    "Heal", 2, None, None, None, "", 0),
     ("mend",       "Heal", 3, None, None, None, "", 0),
     ("restore",    "Heal", 4, None, None, None, "", 0),   ("restore",    "BuffStrength", 1, None, None, None, "", 0),
-    ("rejuvenate", "Heal", 5, None, None, None, "", 0),   ("rejuvenate", "BuffStrength", 2, None, None, None, "", 0),
-    ("resurrect",  "Heal", 5, None, None, None, "", 0),   ("resurrect",  "Light", 2, None, None, None, "", 0),  ("resurrect",  "BuffStrength", 3, None, None, None, "", 0),
+    ("rejuvenate", "Heal", 5, None, None, None, "", 0),   ("rejuvenate", "BuffStrength", 1, None, None, None, "", 0),
+    ("resurrect",  "Heal", 6, None, None, None, "", 0),   ("resurrect",  "Light", 2, None, None, None, "", 0),  ("resurrect",  "BuffStrength", 3, None, None, None, "", 0),
 
     # Light words
     ("glow",       "Light", 1, None, None, None, "", 0),
@@ -208,19 +218,22 @@ SEED_ACTIONS = [
     # Dark words
     ("shadow",     "Dark", 2, None, None, None, "", 0),   ("shadow",     "Curse", 1, None, None, None, "", 0),
     ("gloom",      "Dark", 1, None, None, None, "", 0),   ("gloom",      "Slow", 1, None, None, None, "", 0),
-    ("void",       "Dark", 4, None, None, None, "", 0),   ("void",       "Damage", 3, None, None, None, "", 0),
-    ("eclipse",    "Dark", 3, None, None, None, "", 0),   ("eclipse",    "Curse", 2, None, None, None, "", 0),
+    ("void",       "Dark", 4, None, None, None, "", 0),   ("void",       "Damage", 2, None, None, None, "", 0),
+    ("eclipse",    "Dark", 4, None, None, None, "", 0),   ("eclipse",    "Curse", 2, None, None, None, "", 0),
     ("abyss",      "Dark", 5, None, None, None, "", 0),   ("abyss",      "Damage", 3, None, None, None, "", 0),
 
-    # Per-action targeting example
+    # Per-action targeting examples (actions target different things)
     ("absorb",     "Damage", 1, "SingleEnemy", 3, "Single", "", 0),  ("absorb", "Heal", 1, "Self", 0, "Single", "", 0),
+    ("sacrifice",  "Damage", 5, "SingleEnemy", None, None, "", 0),   ("sacrifice", "Damage", 5, "Self", None, None, "", 1),
+    ("martyr",     "Heal", 3, "AllAllies", None, None, "", 0),       ("martyr", "Damage", 3, "Self", None, None, "", 1),
+    ("rampage",    "Damage", 3, "AllEnemies", None, None, "", 0),    ("rampage", "BuffStrength", 2, "Self", None, None, "", 0),
 
     # Former movement words (movement removed, combat actions retained)
-    ("charge",     "Damage", 3, None, None, None, "", 0),
+    ("charge",     "Damage", 3, None, None, None, "", 0),  ("charge",     "BuffStrength", 1, "Self", None, None, "", 1),
     ("engage",     "Damage", 2, None, None, None, "", 0),
     ("flank",      "Damage", 4, None, None, None, "", 0),
     ("retreat",    "Shield", 2, None, None, None, "", 0),
-    ("rush",       "Damage", 5, None, None, None, "", 0),
+    ("rush",       "Damage", 4, None, None, None, "", 0),
 
     # Enemy ability words
     ("shout",      "Fear", 2, None, None, None, "", 0),
@@ -275,6 +288,11 @@ SEED_ACTIONS = [
     ("sentinel",   "Summon", 4, "Self", None, None, "", 0),
     ("pyre",       "Summon", 3, "Self", None, None, "", 0),
     ("predator",   "Summon", 4, "Self", None, None, "", 0),
+
+    # Forger summon words
+    ("forger",     "Summon", 1, "Self", None, None, "", 0),
+    ("forgers",    "Summon", 1, "Self", None, None, "forger", 0),
+    ("forgers",    "Summon", 1, "Self", None, None, "forger", 1),
 
     # Duplicate-action words
     ("barrage",    "Damage", 2, None, None, None, "", 0),  ("barrage",    "Damage", 2, None, None, None, "", 1),
@@ -346,21 +364,24 @@ SEED_ACTIONS = [
     ("exit",       "Leave", 1, "SingleEnemy", None, None, "", 0),
     ("depart",     "Leave", 1, "SingleEnemy", None, None, "", 0),
 
+    # Anneal — forger ability (burn self + buff allies, per-action targeting)
+    ("anneal",     "Burn", 1, "Self", None, None, "", 0),  ("anneal", "BuffStrength", 2, "AllAllies", None, None, "", 0),
+
     # Peck words (damage + bleed)
     ("peck",       "Peck", 2, "SingleEnemy", None, None, "", 0),
     ("pecks",      "Peck", 2, "SingleEnemy", None, None, "", 0),
 
     # Purify showcase (family words are pre-registered as drafts in the DB)
-    ("purify",     "Purify", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("purify",     "Purify", 1, "AllAlliesAndSelf", None, None, "", 0),
 
     # Awaken showcase (family words are pre-registered as drafts in the DB)
     ("awaken",     "Awaken", 1, "AllAlliesAndSelf", None, None, "", 0),
 
     # Dawning/Dawn (combo: purify + buff + awaken — premium cost)
-    ("dawning",    "Purify", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("dawning",    "Purify", 3, "AllAlliesAndSelf", None, None, "", 0),
     ("dawning",    "BuffMagicDefense", 1, "Self", None, None, "", 1),
     ("dawning",    "Awaken", 1, "AllAlliesAndSelf", None, None, "", 2),
-    ("dawn",       "Purify", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("dawn",       "Purify", 3, "AllAlliesAndSelf", None, None, "", 0),
     ("dawn",       "BuffMagicDefense", 1, "Self", None, None, "", 1),
     ("dawn",       "Awaken", 1, "AllAlliesAndSelf", None, None, "", 2),
 
@@ -378,10 +399,10 @@ SEED_ACTIONS = [
     ("siphon",     "Siphon", 1, "SingleEnemy", None, None, "", 0),
 
     # Deceive showcase (family words are pre-registered as drafts in the DB)
-    ("deceive",    "Deceive", 2, "SingleEnemy", None, None, "", 0),
+    ("deceive",    "Deceive", 1, "SingleEnemy", None, None, "", 0),
 
     # Overcharge showcase (family words are pre-registered as drafts in the DB)
-    ("thundering", "Shock", 3, "SingleEnemy", None, None, "", 0),
+    ("thundering", "Shock", 2, "SingleEnemy", None, None, "", 0),
     ("thundering", "Overcharge", 2, "Self", None, None, "", 1),
 
     # Lounge summon word
@@ -390,7 +411,7 @@ SEED_ACTIONS = [
     ("lounges",    "Summon", 1, "Self", None, None, "lounge", 1),
 
     # Lounge unit ability words (AI uses these)
-    ("recuperate", "Recuperate", 2, "AllAlliesAndSelf", None, None, "", 0),
+    ("recuperate", "Recuperate", 1, "AllAlliesAndSelf", None, None, "", 0),
     ("invigorate", "BuffManaRegen", 1, "Self", None, None, "", 0),
     ("comfort",    "Comfort", 1, "Self", None, None, "", 0),
 
@@ -418,7 +439,7 @@ SEED_ACTIONS = [
     ("firemasters", "Summon", 1, "Self", None, None, "firemaster", 0),
     ("firemasters", "Summon", 1, "Self", None, None, "firemaster", 1),
     ("ignite",      "Ignite", 2, "SingleEnemy", None, None, "", 0),
-    ("combust",     "Combust", 2, "SingleEnemy", None, None, "", 0),
+    ("combust",     "Combust", 1, "SingleEnemy", None, None, "", 0),
 
     # Mercenary unit words
     ("mercenary",   "Summon", 1, "Self", None, None, "", 0),
@@ -426,8 +447,8 @@ SEED_ACTIONS = [
     ("mercenaries", "Summon", 1, "Self", None, None, "mercenary", 1),
 
     # Cataclysm showcase
-    ("supernova",   "Cataclysm", 4, "All", None, None, "", 0),
-    ("supernovas",  "Cataclysm", 4, "All", None, None, "", 0),
+    ("supernova",   "Cataclysm", 3, "All", None, None, "", 0),
+    ("supernovas",  "Cataclysm", 3, "All", None, None, "", 0),
 
     # Cleave showcase
     ("machete",     "Cleave", 3, None, None, None, "", 0),     ("machete",     "Bleed", 1, None, None, None, "", 0),
@@ -447,110 +468,134 @@ SEED_ACTIONS = [
     ("lockpick",    "Lockpick", 1, "RandomEnemy", None, None, "", 8),
     ("jimmy",       "Lockpick", 1, "RandomEnemy", None, None, "", 0),
     ("picklock",    "Lockpick", 1, "RandomEnemy", None, None, "", 0),
+
+    # Sunder + Silence (anti-buff)
+    ("revoke",      "Sunder",  2, None, None, None, "", 0),
+    ("revoke",      "Silence", 2, None, None, None, "", 1),
+    ("revokes",     "Sunder",  2, None, None, None, "", 0),
+    ("revokes",     "Silence", 2, None, None, None, "", 1),
+
+    # Ironback summon words
+    ("ironback",    "Summon", 1, "Self", None, None, "", 0),
+    ("ironbacks",   "Summon", 1, "Self", None, None, "ironback", 0),
+    ("ironbacks",   "Summon", 1, "Self", None, None, "ironback", 1),
+    # Ironback ability words
+    ("shell",       "Hardening", 2, "Self", None, None, "", 0),
+    ("spike",       "Thorns",    2, "Self", None, None, "", 0),
 ]
 
 # (word, target, cost, range, area)
 SEED_META = [
     ("drip",        "SingleEnemy",  0, 3, "Single"),
-    ("splash",      "SingleEnemy",  0, 3, "Single"),
-    ("wave",        "Melee",        2, 2, "Cross"),
-    ("stream",      "SingleEnemy",  0, 4, "Single"),
-    ("torrent",     "SingleEnemy",  2, 4, "Line3"),
-    ("tsunami",     "AreaAll",      6, 0, "Diamond2"),
-    ("ocean",       "AreaEnemies",  3, 0, "Square3x3"),
-    ("flood",       "AreaAll",      4, 0, "Diamond2"),
-    ("deluge",      "AreaAll",      5, 0, "Square3x3"),
+    ("splash",      "SingleEnemy",  1, 3, "Single"),
+    ("wave",        "Melee",        3, 2, "Cross"),
+    ("stream",      "SingleEnemy",  1, 4, "Single"),
+    ("torrent",     "SingleEnemy",  5, 4, "Line3"),
+    ("tsunami",     "AreaAll",      12, 0, "Diamond2"),
+    ("ocean",       "AreaEnemies",  4, 0, "Square3x3"),
+    ("flood",       "AreaAll",      6, 0, "Diamond2"),
+    ("deluge",      "AreaAll",      7, 0, "Square3x3"),
     ("rain",        "AreaEnemies",  1, 0, "VerticalLine"),
     ("ember",       "SingleEnemy",  0, 3, "Single"),
-    ("spark",       "SingleEnemy",  0, 3, "Single"),
-    ("flame",       "SingleEnemy",  1, 3, "Single"),
-    ("blaze",       "SingleEnemy",  2, 4, "Cross"),
-    ("inferno",     "AreaEnemies",  5, 0, "Square3x3"),
-    ("torch",       "SingleEnemy",  1, 2, "Single"),
+    ("spark",       "SingleEnemy",  2, 3, "Single"),
+    ("flame",       "SingleEnemy",  2, 3, "Single"),
+    ("blaze",       "SingleEnemy",  3, 4, "Cross"),
+    ("inferno",     "AreaEnemies",  9, 0, "Square3x3"),
+    ("torch",       "SingleEnemy",  0, 2, "Single"),
     ("scorch",      "SingleEnemy",  2, 3, "Single"),
+    ("boil",        "SingleEnemy",  5, 0, "Single"),
+    ("cautery",     "SingleEnemy",  1, 0, "Single"),
     ("shove",       "Melee",        0, 1, "Single"),
     ("thrust",      "Melee",        1, 1, "Single"),
     ("gust",        "SingleEnemy",  0, 4, "Single"),
-    ("hurricane",   "AreaAll",      5, 0, "Diamond2"),
+    ("hurricane",   "AreaAll",      4, 0, "Diamond2"),
+    ("flutter",     "AllEnemies",   3, 0, "Single"),
     ("scratch",     "Melee",        0, 1, "Single"),
     ("hit",         "Melee",        0, 1, "Single"),
-    ("strike",      "Melee",        1, 1, "Single"),
-    ("smash",       "Melee",        2, 1, "Cross"),
-    ("obliterate",  "AreaEnemies",  4, 0, "Square3x3"),
-    ("crush",       "Melee",        2, 1, "Single"),
+    ("strike",      "Melee",        2, 1, "Single"),
+    ("smash",       "Melee",        3, 1, "Cross"),
+    ("obliterate",  "AreaEnemies",  7, 0, "Square3x3"),
+    ("crush",       "Melee",        3, 1, "Single"),
+    ("viscerous",   "Melee",        3, 0, "Single"),
     ("bandage",     "Self",         0, 0, "Single"),
     ("mend",        "Self",         1, 0, "Single"),
-    ("restore",     "AllAlliesAndSelf", 2, 0, "Single"),
-    ("rejuvenate",  "AllAlliesAndSelf", 3, 0, "Single"),
-    ("resurrect",   "AllAlliesAndSelf", 5, 0, "Single"),
+    ("restore",     "AllAlliesAndSelf", 4, 0, "Single"),
+    ("rejuvenate",  "AllAlliesAndSelf", 6, 0, "Single"),
+    ("resurrect",   "AllAlliesAndSelf", 9, 0, "Single"),
     ("glow",        "Self",         0, 0, "Single"),
     ("shine",       "Self",         0, 0, "Single"),
-    ("radiance",    "AllAlliesAndSelf", 1, 0, "Cross"),
+    ("radiance",    "AllAlliesAndSelf", 3, 0, "Cross"),
     ("beacon",      "AllAlliesAndSelf", 1, 0, "Single"),
-    ("flash",       "AreaEnemies",  1, 0, "Cross"),
+    ("flash",       "AreaEnemies",  5, 0, "Cross"),
     ("shadow",      "SingleEnemy",  1, 4, "Single"),
     ("gloom",       "AreaEnemies",  1, 0, "Single"),
-    ("void",        "AreaAll",      3, 0, "Diamond2"),
-    ("eclipse",     "AreaAll",      3, 0, "Square3x3"),
-    ("abyss",       "AreaAll",      4, 0, "Diamond2"),
+    ("void",        "AreaAll",      6, 0, "Diamond2"),
+    ("eclipse",     "AreaAll",      4, 0, "Square3x3"),
+    ("abyss",       "AreaAll",      7, 0, "Diamond2"),
     ("absorb",      "SingleEnemy",  0, 3, "Single"),
-    ("charge",      "SingleEnemy",  3, 0, "Single"),
-    ("engage",      "SingleEnemy",  3, 0, "Single"),
-    ("flank",       "SingleEnemy",  4, 0, "Single"),
-    ("retreat",     "Self",         2, 0, "Single"),
-    ("rush",        "SingleEnemy",  2, 0, "Single"),
+    ("sacrifice",   "SingleEnemy",  2, 0, "Single"),
+    ("martyr",      "AllAllies",    5, 0, "Single"),
+    ("rampage",     "AllEnemies",   4, 0, "Single"),
+    ("charge",      "SingleEnemy",  1, 0, "Single"),
+    ("engage",      "SingleEnemy",  0, 0, "Single"),
+    ("flank",       "SingleEnemy",  2, 0, "Single"),
+    ("retreat",     "Self",         1, 0, "Single"),
+    ("forger",      "Self",         6, 0, "Single"),
+    ("forgers",     "Self",        12, 0, "Single"),
+    ("anneal",      "Self",         1, 0, "Single"),
+    ("rush",        "SingleEnemy",  3, 0, "Single"),
     # Enemy ability meta
-    ("shout",       "AreaEnemies",  2, 0, "Single"),
+    ("shout",       "AreaEnemies",  1, 0, "Single"),
     ("mace",        "Melee",        0, 1, "Single"),
     ("raise",       "Self",         2, 0, "Single"),
     # New enemy ability meta
     ("screech",     "AllEnemies",   1, 0, "Single"),
     ("peck",        "SingleEnemy",  0, 0, "Single"),
     ("pecks",       "SingleEnemy",  0, 0, "Single"),
-    ("purify",      "AllAlliesAndSelf", 2, 0, "Single"),
-    ("awaken",      "AllAlliesAndSelf", 2, 0, "Single"),
-    ("dawning",     "AllAlliesAndSelf", 4, 0, "Single"),
-    ("dawn",        "AllAlliesAndSelf", 4, 0, "Single"),
+    ("purify",      "AllAlliesAndSelf", 1, 0, "Single"),
+    ("awaken",      "AllAlliesAndSelf", 1, 0, "Single"),
+    ("dawning",     "AllAlliesAndSelf", 3, 0, "Single"),
+    ("dawn",        "AllAlliesAndSelf", 3, 0, "Single"),
     ("raven",       "Self",         6, 0, "Single"),
-    ("ravens",      "Self",         10, 0, "Single"),
+    ("ravens",      "Self",         12, 0, "Single"),
     ("treasonist",  "Self",         6, 0, "Single"),
-    ("treasonists", "Self",         10, 0, "Single"),
+    ("treasonists", "Self",         12, 0, "Single"),
     ("siphon",      "SingleEnemy",  1, 0, "Single"),
-    ("deceive",     "SingleEnemy",  2, 0, "Single"),
-    ("thundering",  "SingleEnemy",  3, 0, "Single"),
+    ("deceive",     "SingleEnemy",  1, 0, "Single"),
+    ("thundering",  "SingleEnemy",  2, 0, "Single"),
     # Lounge summon meta
     ("lounge",      "Self",         5, 0, "Single"),
     ("lounges",     "Self",         10, 0, "Single"),
     # Lounge unit ability meta
-    ("recuperate",  "AllAlliesAndSelf", 2, 0, "Single"),
+    ("recuperate",  "AllAlliesAndSelf", 1, 0, "Single"),
     ("invigorate",  "Self",         1, 0, "Single"),
     ("comfort",     "Self",         1, 0, "Single"),
     ("slam",        "SingleEnemy",  0, 0, "Single"),
     ("pounce",      "SingleEnemy",  2, 0, "Single"),
-    ("hex",         "SingleEnemy",  0, 0, "Single"),
+    ("hex",         "SingleEnemy",  1, 0, "Single"),
     ("drain",       "SingleEnemy",  3, 0, "Single"),
     # Concentrate meta
     ("focus",       "Self",         0, 0, "Single"),
     ("meditate",    "Self",         1, 0, "Single"),
     ("channel",     "Self",         1, 0, "Single"),
     # Poison meta
-    ("venom",       "SingleEnemy",  1, 3, "Single"),
+    ("venom",       "SingleEnemy",  2, 3, "Single"),
     ("toxin",       "SingleEnemy",  0, 3, "Single"),
-    ("plague",      "AreaEnemies",  3, 0, "Single"),
+    ("plague",      "AreaEnemies",  5, 0, "Single"),
     # Bleed meta
-    ("lacerate",    "SingleEnemy",  1, 1, "Single"),
-    ("gash",        "Melee",        0, 1, "Single"),
+    ("lacerate",    "SingleEnemy",  2, 1, "Single"),
+    ("gash",        "Melee",        2, 1, "Single"),
     # Grow meta
     ("flourish",    "Self",         1, 0, "Single"),
-    ("bloom",       "Self",         0, 0, "Single"),
+    ("bloom",       "Self",         1, 0, "Single"),
     ("regenerate",  "Self",         2, 0, "Single"),
     # Thorns meta
     ("thorns",      "Self",         1, 0, "Single"),
     ("bramble",     "Self",         1, 0, "Single"),
     ("barbs",       "Self",         2, 0, "Single"),
     # Reflect meta
-    ("reflect",     "Self",         1, 0, "Single"),
-    ("mirror",      "Self",         2, 0, "Single"),
+    ("reflect",     "Self",         0, 0, "Single"),
+    ("mirror",      "Self",         1, 0, "Single"),
     ("deflect",     "Self",         1, 0, "Single"),
     # Hardening meta
     ("harden",      "Self",         1, 0, "Single"),
@@ -586,11 +631,11 @@ SEED_META = [
     ("beer",        "Self",         0, 0, "Single"),
     ("sip",         "Self",         0, 0, "Single"),
     # Melt meta
-    ("laser",       "SingleEnemy",  2, 3, "Single"),
-    ("forge",       "SingleEnemy",  1, 2, "Single"),
-    ("furnace",     "SingleEnemy",  2, 2, "Single"),
-    ("smelt",       "SingleEnemy",  1, 2, "Single"),
-    ("thaw",        "SingleEnemy",  0, 3, "Single"),
+    ("laser",       "SingleEnemy",  3, 3, "Single"),
+    ("forge",       "SingleEnemy",  2, 2, "Single"),
+    ("furnace",     "SingleEnemy",  3, 2, "Single"),
+    ("smelt",       "SingleEnemy",  2, 2, "Single"),
+    ("thaw",        "SingleEnemy",  1, 3, "Single"),
     # Charm meta
     ("charm",       "SingleEnemy",  0, 0, "Single"),
     ("flatter",     "SingleEnemy",  0, 0, "Single"),
@@ -631,21 +676,21 @@ SEED_META = [
     ("cannonade",   "AllEnemies",   2, 0, "Single"),
     ("crewmate",    "Self",         2, 0, "Single"),
     # Pirate ability meta
-    ("plunder",     "SingleEnemy",  1, 0, "Single"),
+    ("plunder",     "SingleEnemy",  0, 0, "Single"),
     ("grog",        "Self",         0, 0, "Single"),
     # Attune showcase meta
-    ("attune",      "Self",         2, 0, "Single"),
+    ("attune",      "Self",         1, 0, "Single"),
     # Firemaster unit meta
     ("firemaster",  "SingleEnemy",  5, 0, "Single"),
     ("firemasters", "SingleEnemy",  10, 0, "Single"),
-    ("ignite",      "SingleEnemy",  1, 0, "Single"),
-    ("combust",     "SingleEnemy",  2, 0, "Single"),
+    ("ignite",      "SingleEnemy",  0, 0, "Single"),
+    ("combust",     "SingleEnemy",  1, 0, "Single"),
     # Mercenary unit meta
     ("mercenary",   "SingleEnemy",  5, 0, "Single"),
     ("mercenaries", "SingleEnemy",  10, 0, "Single"),
     # Cataclysm showcase meta
-    ("supernova",   "All",          4, 0, "Single"),
-    ("supernovas",  "All",          4, 0, "Single"),
+    ("supernova",   "All",          3, 0, "Single"),
+    ("supernovas",  "All",          3, 0, "Single"),
     # Cleave showcase meta
     ("machete",     "SingleEnemy",  2, 0, "Single"),
     ("machetes",    "TwoRandomEnemies", 3, 0, "Single"),
@@ -657,6 +702,14 @@ SEED_META = [
     ("pick",        "RandomEnemy",  0, 0, "Single"),
     ("jimmy",       "SingleEnemy",  8, 0, "Single"),
     ("picklock",    "SingleEnemy",  8, 0, "Single"),
+    # Sunder + Silence meta
+    ("revoke",      "SingleEnemy",      2, 0, "Single"),
+    ("revokes",     "TwoRandomEnemies", 3, 0, "Single"),
+    # Ironback summon + ability meta
+    ("ironback",    "Self",         6, 0, "Single"),
+    ("ironbacks",   "Self",        13, 0, "Single"),
+    ("shell",       "Self",         0, 0, "Single"),
+    ("spike",       "Self",         0, 0, "Single"),
 ]
 
 # (word, tag)
@@ -678,16 +731,20 @@ SEED_TAGS = [
     ("inferno", "ELEMENTAL"), ("inferno", "OFFENSIVE"), ("inferno", "FIRE"),
     ("torch", "ELEMENTAL"), ("torch", "OFFENSIVE"), ("torch", "FIRE"),
     ("scorch", "ELEMENTAL"), ("scorch", "OFFENSIVE"), ("scorch", "FIRE"),
+    ("boil", "FIRE"), ("boil", "ELEMENTAL"), ("boil", "OFFENSIVE"), ("boil", "DEBUFF"),
+    ("cautery", "FIRE"), ("cautery", "OFFENSIVE"), ("cautery", "RESTORATION"), ("cautery", "MEDICAL"),
     ("shove", "PHYSICAL"), ("shove", "OFFENSIVE"), ("shove", "MELEE"),
     ("thrust", "PHYSICAL"), ("thrust", "OFFENSIVE"), ("thrust", "MELEE"),
-    ("gust", "ELEMENTAL"), ("gust", "NATURE"),
-    ("hurricane", "ELEMENTAL"), ("hurricane", "NATURE"), ("hurricane", "OFFENSIVE"),
+    ("gust", "ELEMENTAL"), ("gust", "NATURE"), ("gust", "AIR"),
+    ("hurricane", "ELEMENTAL"), ("hurricane", "NATURE"), ("hurricane", "OFFENSIVE"), ("hurricane", "AIR"), ("hurricane", "WEATHER"),
+    ("flutter", "OFFENSIVE"), ("flutter", "CONTROL"), ("flutter", "WEATHER"), ("flutter", "AIR"),
     ("scratch", "PHYSICAL"), ("scratch", "OFFENSIVE"), ("scratch", "MELEE"),
     ("hit", "PHYSICAL"), ("hit", "OFFENSIVE"), ("hit", "MELEE"),
     ("strike", "PHYSICAL"), ("strike", "OFFENSIVE"), ("strike", "MELEE"),
     ("smash", "PHYSICAL"), ("smash", "OFFENSIVE"), ("smash", "MELEE"),
     ("obliterate", "PHYSICAL"), ("obliterate", "OFFENSIVE"), ("obliterate", "MELEE"),
     ("crush", "PHYSICAL"), ("crush", "OFFENSIVE"), ("crush", "MELEE"),
+    ("viscerous", "PHYSICAL"), ("viscerous", "OFFENSIVE"), ("viscerous", "MELEE"), ("viscerous", "DEBUFF"),
     ("bandage", "RESTORATION"),
     ("mend", "RESTORATION"),
     ("restore", "RESTORATION"), ("restore", "SUPPORT"),
@@ -704,6 +761,12 @@ SEED_TAGS = [
     ("eclipse", "SHADOW"), ("eclipse", "OFFENSIVE"),
     ("abyss", "SHADOW"), ("abyss", "OFFENSIVE"),
     ("absorb", "SHADOW"), ("absorb", "RESTORATION"),
+    ("sacrifice", "SHADOW"), ("sacrifice", "OFFENSIVE"),
+    ("martyr", "HOLY"), ("martyr", "SUPPORT"),
+    ("rampage", "OFFENSIVE"), ("rampage", "MELEE"), ("rampage", "PHYSICAL"),
+    ("forger", "PHYSICAL"), ("forger", "FIRE"), ("forger", "OFFENSIVE"), ("forger", "SUPPORT"), ("forger", "CRAFT"),
+    ("forgers", "PHYSICAL"), ("forgers", "FIRE"), ("forgers", "OFFENSIVE"), ("forgers", "SUPPORT"), ("forgers", "CRAFT"),
+    ("anneal", "FIRE"), ("anneal", "SUPPORT"), ("anneal", "CRAFT"),
     ("charge", "PHYSICAL"), ("charge", "OFFENSIVE"), ("charge", "MELEE"),
     ("engage", "PHYSICAL"), ("engage", "OFFENSIVE"), ("engage", "MELEE"),
     ("flank", "PHYSICAL"), ("flank", "OFFENSIVE"), ("flank", "MELEE"),
@@ -835,6 +898,14 @@ SEED_TAGS = [
     ("pick",        "TOOL"),
     ("jimmy",       "TOOL"), ("jimmy", "STEALTH"),
     ("picklock",    "TOOL"), ("picklock", "STEALTH"),
+    # Sunder + Silence tags
+    ("revoke",  "OFFENSIVE"), ("revoke",  "DEBUFF"), ("revoke",  "PSYCHIC"), ("revoke",  "NULLIFY"), ("revoke",  "CONTROL"),
+    ("revokes", "OFFENSIVE"), ("revokes", "DEBUFF"), ("revokes", "PSYCHIC"), ("revokes", "NULLIFY"), ("revokes", "CONTROL"),
+    # Ironback tags
+    ("ironback",  "BEAST"), ("ironback",  "DEFENSIVE"), ("ironback",  "PHYSICAL"), ("ironback",  "NATURE"), ("ironback",  "TANK"),
+    ("ironbacks", "BEAST"), ("ironbacks", "DEFENSIVE"), ("ironbacks", "PHYSICAL"), ("ironbacks", "NATURE"), ("ironbacks", "TANK"),
+    ("shell",     "DEFENSIVE"), ("shell", "TANK"),
+    ("spike",     "DEFENSIVE"), ("spike", "PHYSICAL"),
 ]
 
 # (unit_id, display_name, unit_type, max_health, strength, magic_power, phys_defense, magic_defense, luck, starting_shield, color_r, color_g, color_b, tier, dexterity, constitution)
@@ -874,6 +945,10 @@ SEED_UNITS = [
     ("firemaster", "FIREMASTER", "enemy",   14, 0, 7, 1, 4, 1, 0, 0.9, 0.4, 0.1, 0, 0, 0),
     # Summons (tier 1) — mercenary (recruitable via mercenary unit_tag)
     ("mercenary", "MERCENARY", "enemy",     12, 6, 0, 3, 1, 2, 0, 0.8, 0.65, 0.2, 1, 2, 0),
+    # Structures (tier 0) — ironback (tanky taunt wall)
+    ("ironback", "IRONBACK", "structure", 18, 2, 0, 6, 2, 0, 0, 0.45, 0.45, 0.5, 0, 0, 0),
+    # Structures (tier 0) — forger (blacksmith, heats up over time)
+    ("forger", "FORGER", "structure", 15, 4, 0, 3, 1, 0, 0, 0.8, 0.5, 0.2, 0, 0, 0),
 ]
 
 # (unit_id, word)
@@ -898,6 +973,8 @@ SEED_UNIT_ABILITIES = [
     ("pirate", "plunder"), ("pirate", "grog"),
     ("firemaster", "ignite"), ("firemaster", "combust"),
     ("mercenary", "plunder"), ("mercenary", "scratch"),
+    ("ironback", "shell"), ("ironback", "spike"),
+    ("forger", "anneal"), ("forger", "smash"),
 ]
 
 # (unit_id, trigger_id, trigger_param, effect_id, effect_param, value, target, seq)
@@ -920,6 +997,8 @@ SEED_UNIT_PASSIVES = [
     ("firemaster", "on_word_tag",  "FIRE", "apply_status", "Burning", 2, "AllEnemies",    0),
     ("mercenary",  "on_damage_dealt", None, "mana",         None,      1, "AllAllies",    0),
     ("mercenary",  "on_damage_dealt", None, "gold",         None,      1, "AllAllies",    1),
+    ("ironback",   "taunt",          None, "",              None,      0, "Self",          0),
+    ("forger",     "on_weapon_fire", None, "damage_per_round", None,  1, "AllEnemies",    0),
 ]
 
 # (unit_id, tag) — material/property tags for tag-based reactions
@@ -940,6 +1019,7 @@ SEED_UNIT_TAGS = [
     ("firemaster", "flammable"),
     ("mercenary", "mercenary"),
     ("mercenary", "humanoid"),
+    ("forger", "meltable"),
 ]
 
 # (item_id, display_name, item_type, durability, strength, magic_power, phys_defense, magic_defense, luck, max_health, max_mana, color_r, color_g, color_b)

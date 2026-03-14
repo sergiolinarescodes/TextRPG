@@ -32,7 +32,7 @@ namespace TextRPG.Core.Experience.Scenarios
         {
             var tier = ResolveParam<int>(overrides, "enemyTier");
             _eventBus = new EventBus();
-            _service = new ExperienceService(_eventBus, null);
+            _service = new ExperienceService(_eventBus);
 
             var adapter = new MockEncounterAdapter();
             var enemyId = new EntityId("test_enemy_0");

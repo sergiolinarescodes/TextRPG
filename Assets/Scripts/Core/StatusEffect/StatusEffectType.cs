@@ -26,6 +26,7 @@ namespace TextRPG.Core.StatusEffect
         Tired,
         Sleep,
         Anxiety,
-        Awakened
+        Awakened,
+        Silenced
     }
 }

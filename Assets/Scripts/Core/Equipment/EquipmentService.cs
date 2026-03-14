@@ -80,6 +80,10 @@ namespace TextRPG.Core.Equipment
             if (slots.ContainsKey(slot)) return false;
 
             var modifierIds = ApplyStatModifiers(entity, itemDef);
+            if (itemDef.Stats.MaxHealth > 0)
+                _entityStats.AdjustCurrentHealth(entity, itemDef.Stats.MaxHealth);
+            if (itemDef.Stats.MaxMana > 0)
+                _entityStats.AdjustCurrentMana(entity, itemDef.Stats.MaxMana);
             slots[slot] = new EquipmentEntry(itemDef, modifierIds);
 
             if (itemDef.Passives != null && itemDef.Passives.Length > 0)
@@ -104,6 +108,10 @@ namespace TextRPG.Core.Equipment
             if (!slots.TryGetValue(slot, out var entry)) return false;
 
             RemoveStatModifiers(entity, entry.ModifierIds);
+            if (entry.Item.Stats.MaxHealth > 0)
+                _entityStats.AdjustCurrentHealth(entity, -entry.Item.Stats.MaxHealth);
+            if (entry.Item.Stats.MaxMana > 0)
+                _entityStats.AdjustCurrentMana(entity, -entry.Item.Stats.MaxMana);
             slots.Remove(slot);
 
             if (entry.Item.Passives != null && entry.Item.Passives.Length > 0)

@@ -17,6 +17,7 @@ namespace TextRPG.Core.Passive
             ["steal_stat"] = new Color(0.6f, 0.2f, 0.8f),
             ["gold"] = new Color(0.8f, 0.65f, 0.2f),
             ["buff_stat"] = new Color(0.4f, 0.9f, 0.4f),
+            ["damage_per_round"] = new Color(1f, 0.4f, 0.2f),
         };
 
         private static readonly Dictionary<string, string> TriggerNames = new()
@@ -35,6 +36,7 @@ namespace TextRPG.Core.Passive
             ["on_death"] = "On death",
             ["on_damage_dealt"] = "On damage dealt",
             ["on_letter_in_word"] = "On letter match",
+            ["on_weapon_fire"] = "On weapon fire",
             [PassiveConstants.Taunt] = "Taunt",
         };
 
@@ -48,6 +50,7 @@ namespace TextRPG.Core.Passive
             ["steal_stat"] = "steal stat",
             ["gold"] = "earn gold",
             ["buff_stat"] = "buff stat",
+            ["damage_per_round"] = "damage (scales with round)",
         };
 
         private static readonly Dictionary<string, string> TargetNames = new()

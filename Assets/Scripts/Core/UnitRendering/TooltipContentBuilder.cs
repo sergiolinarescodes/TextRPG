@@ -110,6 +110,7 @@ namespace TextRPG.Core.UnitRendering
                         descLabel.style.fontSize = FontSmall;
                         descLabel.style.marginLeft = 4;
                         descLabel.style.marginBottom = 2;
+                        descLabel.style.whiteSpace = WhiteSpace.Normal;
                         descLabel.pickingMode = PickingMode.Ignore;
                         root.Add(descLabel);
                     }
@@ -189,6 +190,7 @@ namespace TextRPG.Core.UnitRendering
                 var sub = new Label(subtitle);
                 sub.style.color = Dim;
                 sub.style.fontSize = FontSmall;
+                sub.style.whiteSpace = WhiteSpace.Normal;
                 sub.pickingMode = PickingMode.Ignore;
                 container.Add(sub);
             }
@@ -208,22 +210,23 @@ namespace TextRPG.Core.UnitRendering
 
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
+            row.style.flexWrap = Wrap.Wrap;
             row.style.marginBottom = 2;
             row.pickingMode = PickingMode.Ignore;
 
-            AddStatChip(row, $"{hp}/{maxHp}", Color.green);
-            AddStatChip(row, $"STR {str}", new Color(1f, 0.6f, 0.3f));
-            AddStatChip(row, $"DEF {def}", new Color(0.6f, 0.7f, 0.8f));
-            if (mag > 0) AddStatChip(row, $"MAG {mag}", new Color(0.6f, 0.4f, 1f));
+            AddStatChip(row, $"{hp}/{maxHp}", Color.white);
+            AddStatChip(row, $"STR {str}", Color.white);
+            AddStatChip(row, $"DEF {def}", Color.white);
+            if (mag > 0) AddStatChip(row, $"MAG {mag}", Color.white);
 
             int mana = stats.GetCurrentMana(entityId);
             int maxMana = stats.GetStat(entityId, StatType.MaxMana);
             if (maxMana > 0)
-                AddStatChip(row, $"MP {mana}/{maxMana}", new Color(0.3f, 0.5f, 1f));
+                AddStatChip(row, $"MP {mana}/{maxMana}", Color.white);
 
             int luck = stats.GetStat(entityId, StatType.Luck);
             if (luck > 0)
-                AddStatChip(row, $"LCK {luck}", new Color(1f, 0.85f, 0.2f));
+                AddStatChip(row, $"LCK {luck}", Color.white);
 
             parent.Add(row);
         }
@@ -255,6 +258,7 @@ namespace TextRPG.Core.UnitRendering
             label.style.color = StatGreen;
             label.style.fontSize = FontBase;
             label.style.marginBottom = 2;
+            label.style.whiteSpace = WhiteSpace.Normal;
             label.pickingMode = PickingMode.Ignore;
             parent.Add(label);
         }
@@ -275,8 +279,6 @@ namespace TextRPG.Core.UnitRendering
         {
             if (abilityWords == null || abilityWords.Length == 0) return;
 
-            AddDivider(parent);
-
             foreach (var word in abilityWords)
             {
                 var actions = resolver.Resolve(word);
@@ -290,8 +292,6 @@ namespace TextRPG.Core.UnitRendering
         {
             if (ammoWords == null || ammoWords.Count == 0) return;
 
-            AddDivider(parent);
-
             foreach (var word in ammoWords)
             {
                 var actions = resolver.Resolve(word);
@@ -304,8 +304,6 @@ namespace TextRPG.Core.UnitRendering
         {
             if (passives == null || passives.Count == 0) return;
 
-            AddDivider(parent);
-
             foreach (var entry in passives)
             {
                 var pDef = PassiveDefinitions.Generate(entry);
@@ -313,6 +311,7 @@ namespace TextRPG.Core.UnitRendering
                 label.style.color = pDef.DisplayColor;
                 label.style.fontSize = FontSmall;
                 label.style.marginBottom = 1;
+                label.style.whiteSpace = WhiteSpace.Normal;
                 label.pickingMode = PickingMode.Ignore;
                 parent.Add(label);
             }
@@ -322,43 +321,70 @@ namespace TextRPG.Core.UnitRendering
         {
             if (effects == null || effects.Count == 0) return;
 
-            AddDivider(parent);
-
             foreach (var instance in effects)
             {
                 var def = StatusEffectDefinitions.Get(instance.Type);
 
-                var row = new VisualElement();
-                row.style.flexDirection = FlexDirection.Row;
-                row.style.marginBottom = 1;
-                row.pickingMode = PickingMode.Ignore;
+                var block = new VisualElement();
+                block.style.marginBottom = 4;
+                block.pickingMode = PickingMode.Ignore;
 
-                var name = new Label(def.DisplayName);
+                var nameText = BuildStatusNameWithNumber(def, instance);
+                var name = new Label(nameText);
                 name.style.color = def.DisplayColor;
                 name.style.fontSize = FontSmall;
                 name.style.unityFontStyleAndWeight = FontStyle.Bold;
-                name.style.marginRight = 6;
                 name.pickingMode = PickingMode.Ignore;
-                row.Add(name);
+                block.Add(name);
 
-                var infoText = instance.IsPermanent
-                    ? $"x{instance.StackCount}"
-                    : $"{instance.RemainingDuration}t x{instance.StackCount}";
-                var info = new Label(infoText);
-                info.style.color = Dim;
-                info.style.fontSize = FontSmall;
-                info.pickingMode = PickingMode.Ignore;
-                row.Add(info);
+                var desc = new Label(def.Description);
+                desc.style.color = Color.white;
+                desc.style.fontSize = FontSmall;
+                desc.style.whiteSpace = WhiteSpace.Normal;
+                desc.pickingMode = PickingMode.Ignore;
+                block.Add(desc);
 
-                parent.Add(row);
+                parent.Add(block);
             }
+        }
+
+        public static VisualElement BuildStatusEffectTooltipContent(StatusEffectInstance instance)
+        {
+            var def = StatusEffectDefinitions.Get(instance.Type);
+
+            var root = new VisualElement();
+
+            var nameText = BuildStatusNameWithNumber(def, instance);
+            var name = new Label(nameText);
+            name.style.color = def.DisplayColor;
+            name.style.fontSize = FontBase;
+            name.style.unityFontStyleAndWeight = FontStyle.Bold;
+            name.pickingMode = PickingMode.Ignore;
+            root.Add(name);
+
+            var desc = new Label(def.Description);
+            desc.style.color = Color.white;
+            desc.style.fontSize = FontSmall;
+            desc.style.whiteSpace = WhiteSpace.Normal;
+            desc.pickingMode = PickingMode.Ignore;
+            desc.style.marginTop = 2;
+            root.Add(desc);
+
+            return root;
+        }
+
+        private static string BuildStatusNameWithNumber(StatusEffectDefinition def, StatusEffectInstance instance)
+        {
+            if (instance.StackCount > 1)
+                return $"{def.DisplayName} {instance.StackCount}";
+            if (!instance.IsPermanent)
+                return $"{def.DisplayName} {instance.RemainingDuration}";
+            return def.DisplayName;
         }
 
         public static void AddTagsSection(VisualElement parent, string[] tags)
         {
             if (tags == null || tags.Length == 0) return;
-
-            AddDivider(parent);
 
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;

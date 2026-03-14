@@ -10,6 +10,7 @@ namespace TextRPG.Core.StatusEffect
         StatModifierEntry[] StatModifiers,
         bool GrantsExtraTurn,
         Color DisplayColor = default,
-        string Description = ""
+        string Description = "",
+        bool IsPositive = false
     );
 }

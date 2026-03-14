@@ -15,7 +15,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
-            _entityStats.ApplyMana(context.Source, context.Value);
+            for (int i = 0; i < context.Targets.Count; i++)
+                _entityStats.ApplyMana(context.Targets[i], context.Value);
         }
     }
 }

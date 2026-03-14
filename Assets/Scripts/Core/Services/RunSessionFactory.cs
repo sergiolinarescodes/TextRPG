@@ -202,11 +202,12 @@ namespace TextRPG.Core.Services
                 inventoryService, playerInventoryId, playerId, spellService, wordResolver);
 
             // Experience service
-            var experienceService = new ExperienceService(eventBus, lootRewardService);
+            var experienceService = new ExperienceService(eventBus);
 
             // Class service (needs SpellService for Mage, ExperienceService for Rogue)
             var classService = new ClassService(eventBus, selectedClass, playerId,
-                wordTagResolver, spellService, wordResolver, resourceService, experienceService);
+                wordTagResolver, spellService, wordResolver, resourceService, experienceService,
+                inventoryService, playerInventoryId);
 
             // Register Merchant composable passives
             if (classDef.Passives is { Length: > 0 })

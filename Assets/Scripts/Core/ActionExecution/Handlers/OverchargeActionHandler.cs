@@ -19,12 +19,16 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
-            var buffId = $"overcharge_mgc_{_nextId++}";
-            _entityStats.AddModifier(context.Source, StatType.MagicPower,
-                new StatBuffModifier(buffId, context.Value));
+            for (int i = 0; i < context.Targets.Count; i++)
+            {
+                var target = context.Targets[i];
+                var buffId = $"overcharge_mgc_{_nextId++}";
+                _entityStats.AddModifier(target, StatType.MagicPower,
+                    new StatBuffModifier(buffId, context.Value));
 
-            _statusEffects.ApplyEffect(context.Source, StatusEffectType.Energetic,
-                context.Value, context.Source);
+                _statusEffects.ApplyEffect(target, StatusEffectType.Energetic,
+                    context.Value, context.Source);
+            }
         }
     }
 }

@@ -179,16 +179,16 @@ Both tag definitions and outcomes require a **parameterless constructor**. `Asse
 | `Assets/Scripts/Core/EventEncounter/Reactions/TagReactionRegistry.cs` | Auto-scan registry |
 | `Assets/Scripts/Core/Services/AutoScanAttribute.cs` | The `[AutoScan]` attribute |
 
-## Updating ralph-prompt.md
+## Updating pipeline reference data
 
-**New tag definition**: No ralph-prompt.md changes needed (tags are assigned via DB, not word classification).
+**New tag definition**: No pipeline changes needed (tags are assigned via DB, not word classification).
 
-**New outcome**: No ralph-prompt.md changes needed (outcomes are wired via `interactable_reactions` DB rows, not word classification).
+**New outcome**: No pipeline changes needed (outcomes are wired via `interactable_reactions` DB rows, not word classification).
 
 **New interaction action** (e.g., adding "Bribe" alongside Enter/Talk/Steal/etc.):
 1. Add to `ActionNames.InteractionActions` array in C#
-2. Add row to `ralph-prompt.md` INTERACTION ACTIONS table with ActionId, Usage, and Example words
-3. Add to `ralph-prompt.md` "When to classify as interaction action" guidelines
+2. Add to `VALID_ACTIONS` in `Tools/WordAction/batch_insert.py`
+3. Add entry to `ACTION_DESCRIPTIONS` in `Tools/WordAction/context.py`
 
 ## Checklist
 
@@ -196,4 +196,4 @@ Both tag definitions and outcomes require a **parameterless constructor**. `Asse
 - [ ] Implement `ITagDefinition` or `IInteractionOutcome`
 - [ ] Mark with `[AutoScan]` attribute
 - [ ] Add DB rows (`unit_tags` for tags, `interactable_reactions` for entity reactions)
-- [ ] If new interaction action: update `ActionNames.InteractionActions` + `ralph-prompt.md` INTERACTION ACTIONS table
+- [ ] If new interaction action: update `ActionNames.InteractionActions` + `batch_insert.py` VALID_ACTIONS + `context.py` ACTION_DESCRIPTIONS

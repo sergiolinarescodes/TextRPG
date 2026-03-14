@@ -42,6 +42,12 @@ namespace TextRPG.Core.UnitRendering
                 GameMessages?.Spawn(new Vector2(pos.x, pos.y),
                     $"Learned: {evt.ScrambledWord.ToUpperInvariant()}", ScrollDefinition.ScrollPurple);
             }));
+            _subscriptions.Add(eventBus.Subscribe<ScrollAcquiredEvent>(evt =>
+            {
+                var pos = _positionProvider?.Invoke(playerId) ?? Vector3.zero;
+                GameMessages?.Spawn(new Vector2(pos.x, pos.y),
+                    $"Scroll: {evt.Scroll.DisplayName}", ScrollDefinition.ScrollPurple);
+            }));
         }
 
         public VisualElement CreateOverlay()

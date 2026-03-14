@@ -6,7 +6,6 @@ namespace TextRPG.Core.ActionExecution.Handlers
     {
         private readonly IStatusEffectService _statusEffects;
         private readonly StatusEffectType _effectType;
-        private readonly bool _applySelf;
         private readonly DurationMode _durationMode;
 
         public string ActionId { get; }
@@ -19,7 +18,6 @@ namespace TextRPG.Core.ActionExecution.Handlers
             ActionId = actionId;
             _statusEffects = ctx.StatusEffects;
             _effectType = effectType;
-            _applySelf = applySelf;
             _durationMode = durationMode;
         }
 
@@ -27,8 +25,9 @@ namespace TextRPG.Core.ActionExecution.Handlers
         {
             if (_durationMode == DurationMode.StackByValue)
             {
-                for (int i = 0; i < context.Value; i++)
-                    _statusEffects.ApplyEffect(context.Source, _effectType, StatusEffectInstance.PermanentDuration, context.Source);
+                for (int t = 0; t < context.Targets.Count; t++)
+                    for (int i = 0; i < context.Value; i++)
+                        _statusEffects.ApplyEffect(context.Targets[t], _effectType, StatusEffectInstance.PermanentDuration, context.Source);
                 return;
             }
 
@@ -36,15 +35,8 @@ namespace TextRPG.Core.ActionExecution.Handlers
                 ? StatusEffectInstance.PermanentDuration
                 : context.Value;
 
-            if (_applySelf)
-            {
-                _statusEffects.ApplyEffect(context.Source, _effectType, duration, context.Source);
-            }
-            else
-            {
-                for (int i = 0; i < context.Targets.Count; i++)
-                    _statusEffects.ApplyEffect(context.Targets[i], _effectType, duration, context.Source);
-            }
+            for (int i = 0; i < context.Targets.Count; i++)
+                _statusEffects.ApplyEffect(context.Targets[i], _effectType, duration, context.Source);
         }
     }
 }

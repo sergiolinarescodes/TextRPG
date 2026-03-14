@@ -24,7 +24,6 @@ namespace TextRPG.Core.WordAction
         {
             var registry = new ActionRegistry();
             registry.Register("Water", new ActionDefinition("Water", "Water", new Color(0.2f, 0.5f, 1f)));
-            registry.Register("Push", new ActionDefinition("Push", "Push", new Color(0.8f, 0.8f, 0.2f)));
             registry.Register("Damage", new ActionDefinition("Damage", "Damage", new Color(1f, 0.2f, 0.2f)));
             registry.Register("Heal", new ActionDefinition("Heal", "Heal", new Color(0.2f, 0.9f, 0.3f)));
             registry.Register("Burn", new ActionDefinition("Burn", "Burn", new Color(1f, 0.5f, 0.2f)));
@@ -50,7 +49,6 @@ namespace TextRPG.Core.WordAction
                 {
                     new WordActionMapping("Water", 5),
                     new WordActionMapping("Damage", 5),
-                    new WordActionMapping("Push", 2),
                 },
                 ["ember"] = new()
                 {

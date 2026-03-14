@@ -148,10 +148,10 @@ namespace TextRPG.Core.Run
         private void OnEventEncounterEnded(EventEncounterEndedEvent evt)
         {
             if (!IsRunActive) return;
-            _awaitingAdvance = true;
 
             if (CurrentNode != null)
                 Publish(new RunNodeCompletedEvent(_currentNodeIndex, CurrentNode.NodeType, true));
+            AdvanceToNextNode();
         }
 
         private void OnCombatModeChanged(CombatModeChangedEvent evt)

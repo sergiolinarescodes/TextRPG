@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
+using TextRPG.Core.CombatLoop;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
@@ -27,6 +28,9 @@ namespace TextRPG.Core.EventEncounter
         private string _activeEncounterId;
         private EntityId _player;
 
+        private int _maxPlayerTurns;
+        private int _playerTurnCount;
+
         public bool IsEncounterActive => _activeEncounterId != null;
         public IReadOnlyList<EntityId> InteractableEntities => _interactableEntities;
         public EntityId PlayerEntity => _player;
@@ -45,7 +49,11 @@ namespace TextRPG.Core.EventEncounter
 
             Subscribe<EntityDiedEvent>(OnEntityDied);
             Subscribe<EntityRecruitedEvent>(OnEntityRecruited);
+            Subscribe<PlayerTurnEndedEvent>(_ => OnPlayerTurnEnded());
+            Subscribe<ActionAnimationCompletedEvent>(_ => OnAnimationCompleted());
         }
+
+        public void SetMaxPlayerTurns(int max) => _maxPlayerTurns = max;
 
         public void StartEncounter(EventEncounterDefinition encounter, EntityId player)
         {
@@ -54,6 +62,7 @@ namespace TextRPG.Core.EventEncounter
 
             _activeEncounterId = encounter.Id;
             _player = player;
+            _playerTurnCount = 0;
             _interactableEntities.Clear();
             _definitions.Clear();
             _entityDefinitions.Clear();
@@ -94,12 +103,6 @@ namespace TextRPG.Core.EventEncounter
 
             var id = _activeEncounterId;
             _activeEncounterId = null;
-
-            foreach (var entityId in _interactableEntities)
-            {
-                if (_entityStats.HasEntity(entityId))
-                    _entityStats.RemoveEntity(entityId);
-            }
 
             _interactableEntities.Clear();
             _definitions.Clear();
@@ -147,6 +150,27 @@ namespace TextRPG.Core.EventEncounter
             _entityDefinitions.Remove(e.EntityId);
             _slotService.RemoveEntity(e.EntityId);
             _reactionService.ClearReactions(e.EntityId);
+
+            // Don't end immediately — wait for OnAnimationCompleted to avoid
+            // cleaning up entities while projectile callbacks are still in-flight.
+        }
+
+        private void OnPlayerTurnEnded()
+        {
+            if (!IsEncounterActive) return;
+            _playerTurnCount++;
+        }
+
+        private void OnAnimationCompleted()
+        {
+            if (!IsEncounterActive) return;
+            if (_interactableEntities.Count == 0)
+            {
+                EndEncounter();
+                return;
+            }
+            if (_maxPlayerTurns > 0 && _playerTurnCount >= _maxPlayerTurns)
+                EndEncounter();
         }
     }
 }

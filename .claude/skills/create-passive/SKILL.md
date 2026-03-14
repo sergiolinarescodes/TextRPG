@@ -217,19 +217,18 @@ VALUES ('ring', 'on_self_hit', 'shield', 1, 'Self');
 
 ---
 
-## Updating ralph-prompt.md
+## Updating pipeline reference data
 
-When adding a new **trigger**, update these sections in `ralph-prompt.md`:
-1. **Available triggers table** (under UNIT PASSIVES) — add row with Trigger, trigger_param, and "When it fires" description
-2. **Passive design archetypes table** — add a row showing example usage if relevant
+When adding a new **trigger**:
+1. Add to `VALID_TRIGGERS` in `Tools/WordAction/batch_insert.py`
+2. Add a row to the passive design archetypes table in `ralph-prompt.md` if relevant
 
-When adding a new **effect**, update these sections:
-1. **Available effects table** (under UNIT PASSIVES) — add row with Effect, effect_param, and "What it does" description
-2. If the effect uses `effect_param`, document valid values (e.g., status names for `apply_status`)
+When adding a new **effect**:
+1. Add to `VALID_EFFECTS` in `Tools/WordAction/batch_insert.py`
 
-When adding a new **target string**, update:
-1. **Available passive targets table** — add row with Target and "Resolves to" description
-2. `PassiveTargetResolver.cs` — add resolution logic
+When adding a new **target string**:
+1. Add to `VALID_PASSIVE_TARGETS` in `Tools/WordAction/batch_insert.py`
+2. Add resolution logic in `PassiveTargetResolver.cs`
 
 ## Key Files
 
@@ -254,5 +253,5 @@ When adding a new **target string**, update:
 - [ ] Add entity/alive guards in handlers
 - [ ] Add display mapping in `PassiveDefinitions.cs`
 - [ ] Add DB rows (`unit_passives` or `item_passives`) with SQL INSERT
-- [ ] Update `ralph-prompt.md` — add to Available triggers/effects table + passive design archetypes
+- [ ] Update `batch_insert.py` VALID_TRIGGERS/VALID_EFFECTS + passive design archetypes in `ralph-prompt.md` if relevant
 - [ ] Add verification checks in `PassiveVerificationScenario`

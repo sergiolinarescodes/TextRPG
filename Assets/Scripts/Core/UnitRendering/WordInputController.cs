@@ -4,7 +4,7 @@ using TextRPG.Core.ActionExecution;
 using TextRPG.Core.CombatLoop;
 using TextRPG.Core.Consumable;
 using TextRPG.Core.EntityStats;
-using TextRPG.Core.EventEncounterLoop;
+
 using TextRPG.Core.LetterReserve;
 using TextRPG.Core.StatusEffect;
 using TextRPG.Core.Weapon;
@@ -39,7 +39,6 @@ namespace TextRPG.Core.UnitRendering
         private readonly List<IDisposable> _subscriptions = new();
 
         private ICombatLoopService _combatLoop;
-        private IEventEncounterLoopService _eventLoop;
         private string _lastMatchedWord = "";
         private bool _givePrefixDetected;
         private IVisualElementScheduledItem _drunkWobbleSchedule;
@@ -82,7 +81,6 @@ namespace TextRPG.Core.UnitRendering
         }
 
         public void SetCombatLoop(ICombatLoopService combatLoop) => _combatLoop = combatLoop;
-        public void SetEventLoop(IEventEncounterLoopService eventLoop) => _eventLoop = eventLoop;
 
         public VisualElement BuildInputArea(float vibrationAmplitude)
         {
@@ -152,9 +150,7 @@ namespace TextRPG.Core.UnitRendering
 
         public void UseConsumable()
         {
-            bool used = _combatLoop?.UseConsumable() == true
-                     || _eventLoop?.UseConsumable() == true;
-            if (!used) return;
+            if (_combatLoop?.UseConsumable() != true) return;
             ClearAfterSubmit();
         }
 
@@ -309,13 +305,8 @@ namespace TextRPG.Core.UnitRendering
             var word = _wordInputService.CurrentWord?.Trim() ?? "";
             if (word.Length == 0) return;
 
-            WordSubmitResult result;
-            if (_combatLoop != null)
-                result = _combatLoop.SubmitWord(word);
-            else if (_eventLoop != null)
-                result = _eventLoop.SubmitWord(word);
-            else
-                return;
+            if (_combatLoop == null) return;
+            var result = _combatLoop.SubmitWord(word);
 
             if (result == WordSubmitResult.InsufficientMana || result == WordSubmitResult.WordOnCooldown || result == WordSubmitResult.NoItemToGive)
             {
@@ -545,7 +536,6 @@ namespace TextRPG.Core.UnitRendering
             _attunePulseSchedule?.Pause();
             _attunePulseSchedule = null;
             _combatLoop = null;
-            _eventLoop = null;
             CodeField = null;
             MainTextPanel = null;
             _linesContainer = null;

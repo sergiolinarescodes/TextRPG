@@ -8,7 +8,7 @@ namespace TextRPG.Core.ActionExecution
         public const string Heal = "Heal";
         public const string Shield = "Shield";
         public const string Shock = "Shock";
-        public const string Push = "Push";
+
         public const string Burn = "Burn";
         public const string Water = "Water";
         public const string Fear = "Fear";
@@ -54,6 +54,9 @@ namespace TextRPG.Core.ActionExecution
         public const string Cataclysm = "Cataclysm";
         public const string Cleave = "Cleave";
         public const string Lockpick = "Lockpick";
+        public const string Sunder = "Sunder";
+        public const string Silence = "Silence";
+        public const string Cauterize = "Cauterize";
 
         public static readonly string[] InteractionActions =
         {

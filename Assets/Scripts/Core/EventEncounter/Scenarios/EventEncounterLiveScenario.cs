@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
+using TextRPG.Core.CombatAI;
+using TextRPG.Core.CombatLoop;
 using TextRPG.Core.CombatSlot;
 using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
-using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
 using TextRPG.Core.Services;
 using TextRPG.Core.StatusEffect;
+using TextRPG.Core.TurnSystem;
 using TextRPG.Core.UnitRendering;
 using TextRPG.Core.WordInput.Scenarios;
 using Unidad.Core.Abstractions;
@@ -20,7 +22,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
 
-namespace TextRPG.Core.EventEncounterLoop.Scenarios
+namespace TextRPG.Core.EventEncounter.Scenarios
 {
     internal sealed class EventEncounterLiveScenario : DataDrivenScenario
     {
@@ -35,7 +37,9 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
 
         private RunSession _session;
         private IEventEncounterService _encounterService;
-        private IEventEncounterLoopService _loopService;
+        private ICombatLoopService _combatLoop;
+        private ICombatAIService _combatAI;
+        private ScenarioEncounterAdapter _encounterAdapter;
 
         // Controllers
         private WordInputController _wordInput;
@@ -57,7 +61,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             "event-encounter-live",
             "Event Encounter (Live)",
             "Live interactive event encounter — type interaction words (pray, open, talk, search), " +
-            "see reactions fire, interactable renders in a slot. Free-form input, no turns.",
+            "see reactions fire, interactable turns pass silently via CombatLoop.",
             new[] { VibrationAmplitudeParam, FontScaleFactorParam, EncounterIndexParam }
         )) { }
 
@@ -73,7 +77,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _session = RunSessionFactory.Create(playerId, SceneRoot, new LiveAnimationResolver());
             var s = _session;
 
-            // --- Event encounter services (created outside RunSession scope) ---
+            // --- Event encounter services ---
             var encounterService = new EventEncounterService(
                 s.EventBus, s.EntityStats, s.SlotService, s.CombatContext, s.ReactionService);
             s.ReactionContext.EncounterService = encounterService;
@@ -82,11 +86,11 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             if (s.LockpickService is Lockpick.LockpickService lockpick)
                 lockpick.SetEncounterService(encounterService);
 
-            // Use an encounter adapter for passives (event encounters don't have a real IEncounterService)
-            var encounterAdapter = new ScenarioEncounterAdapter();
-            encounterAdapter.SetPlayer(playerId);
-            encounterAdapter.SetEventBus(s.EventBus);
-            encounterAdapter.Activate();
+            // Encounter adapter (no auto-end — lifecycle managed by EventEncounterService)
+            _encounterAdapter = new ScenarioEncounterAdapter();
+            _encounterAdapter.SetPlayer(playerId);
+            _encounterAdapter.SetEventBus(s.EventBus);
+            _encounterAdapter.SetAutoEndOnAllDead(false);
 
             // Load encounter from provider registry
             var providerRegistry = EventEncounterSystemInstaller.CreateProviderRegistry();
@@ -108,6 +112,19 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             // Start encounter
             _encounterService.StartEncounter(encounterDef, playerId);
 
+            // Register interactables as enemies in adapter
+            for (int i = 0; i < encounterDef.Interactables.Length; i++)
+            {
+                var def = encounterDef.Interactables[i];
+                var entityId = _encounterService.InteractableEntities[i];
+                var entityDef = new EntityDefinition(
+                    def.Name, def.MaxHealth, 0, 0, 0, 0, 0, def.Color,
+                    Array.Empty<string>(), 0, "interactable", def.Passives,
+                    def.Tags, def.Description, def.DeathReward, def.DeathRewardValue);
+                _encounterAdapter.RegisterEnemy(entityId, entityDef);
+            }
+            _encounterAdapter.Activate();
+
             // Register interactable passives
             for (int i = 0; i < encounterDef.Interactables.Length; i++)
             {
@@ -119,13 +136,29 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
                 }
             }
 
-            // Event encounter loop (free-form, no turns)
-            var loopService = new EventEncounterLoopService(
-                s.EventBus, s.EntityStats, s.WordResolver, _encounterService, playerId,
-                combatContext: s.CombatContext, wordCooldown: s.WordCooldown, giveValidator: s.GiveValidator,
-                consumableService: s.ConsumableService);
-            _loopService = loopService;
-            _loopService.Start();
+            // CombatAI (interactables auto-pass since empty abilities)
+            var scorers = CombatAISystemInstaller.CreateScorerRegistry(s.StatusEffects);
+            _combatAI = new CombatAIService(s.EventBus, _encounterAdapter, s.EntityStats,
+                s.TurnService, s.SlotService, s.CombatContext, s.ActionExecution, scorers,
+                s.EnemyResolver as EnemyWordResolver, s.AllUnits, statusEffects: s.StatusEffects);
+
+            // Turn order: player first, then interactables
+            var turnOrder = new List<EntityId> { playerId };
+            turnOrder.AddRange(_encounterService.InteractableEntities);
+            s.TurnService.SetTurnOrder(turnOrder);
+
+            // CombatLoopService (unified loop)
+            _combatLoop = new CombatLoopService(
+                s.EventBus, s.TurnService, s.EntityStats, s.WordResolver, s.WeaponService, playerId,
+                s.ConsumableService, combatContext: s.CombatContext, wordCooldown: s.WordCooldown,
+                giveValidator: s.GiveValidator, statusEffects: s.StatusEffects);
+            ((CombatLoopService)_combatLoop).Start();
+
+            // No max turns for live scenario (unlimited interactions for testing)
+
+            // Mark dead entities in adapter
+            _subscriptions.Add(s.EventBus.Subscribe<EntityDiedEvent>(evt =>
+                _encounterAdapter.MarkDead(evt.EntityId)));
 
             // --- Build UI layout ---
             var root = RootVisualElement;
@@ -251,7 +284,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
                 _equipment.LeftBar.GetAllSlotElements(),
                 _frameworkTooltipService,
                 s.SlotService, s.StatusEffects, s.UnitService, s.PassiveService,
-                encounterAdapter, s.ActionRegistry, s.HandlerRegistry, s.EnemyResolver,
+                _encounterAdapter, s.ActionRegistry, s.HandlerRegistry, s.EnemyResolver,
                 s.AmmoResolver, s.WeaponService, s.ConsumableService, s.EquipmentService,
                 s.ItemRegistry, s.EntityStats, s.InventoryService, s.PlayerInventoryId, playerId,
                 _encounterService);
@@ -261,8 +294,8 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _loot = new LootOverlayController(s.EventBus, s.LootRewardService,
                 _equipment.RightBar, root, enabled => _wordInput.SetInputEnabled(enabled));
 
-            // --- Input handling: submit goes to event loop only ---
-            _wordInput.SetEventLoop(_loopService);
+            // --- Input handling: unified combat loop ---
+            _wordInput.SetCombatLoop(_combatLoop);
             _wordInput.SetInputEnabled(true);
 
             // --- Event-encounter-specific subscriptions ---
@@ -301,8 +334,8 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
                     _wordInput?.CodeField != null ? null : "Code field is null"),
                 new("Event encounter active", _encounterService?.IsEncounterActive == true,
                     _encounterService?.IsEncounterActive == true ? null : "Encounter not active"),
-                new("Loop service active", _loopService?.IsActive == true,
-                    _loopService?.IsActive == true ? null : "Loop not active"),
+                new("Combat loop active", _combatLoop != null && !_combatLoop.IsGameOver,
+                    _combatLoop != null && !_combatLoop.IsGameOver ? null : "Combat loop not active"),
             };
             return new ScenarioVerificationResult(checks);
         }
@@ -331,10 +364,14 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _playerStatsBar?.Dispose();
             _playerStatsBar = null;
 
-            (_loopService as IDisposable)?.Dispose();
-            _loopService = null;
+            (_combatLoop as IDisposable)?.Dispose();
+            _combatLoop = null;
+            (_combatAI as IDisposable)?.Dispose();
+            _combatAI = null;
             (_encounterService as IDisposable)?.Dispose();
             _encounterService = null;
+            _encounterAdapter?.EndEncounter();
+            _encounterAdapter = null;
 
             _session?.Dispose();
             _session = null;

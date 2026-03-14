@@ -26,6 +26,9 @@ namespace TextRPG.Core.EntityStats
         void ApplyMana(EntityId id, int amount);
         bool TrySpendMana(EntityId id, int cost);
 
+        void AdjustCurrentHealth(EntityId id, int delta);
+        void AdjustCurrentMana(EntityId id, int delta);
+
         void AddModifier(EntityId id, StatType stat, IModifier<int> modifier);
         bool RemoveModifier(EntityId id, StatType stat, string modifierId);
         void ClearAllModifiers(EntityId id);

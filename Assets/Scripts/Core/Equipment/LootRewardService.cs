@@ -95,7 +95,12 @@ namespace TextRPG.Core.Equipment
 
             if (option.IsScroll)
             {
-                _spellService?.LearnSpell(option.Scroll);
+                var scroll = option.Scroll;
+                var itemKey = $"scroll_{scroll.ScrambledWord}";
+                _spellService?.RegisterScrollItem(itemKey, scroll);
+                _inventoryService.DefineItem(new ItemDefinition(new ItemId(itemKey), scroll.DisplayName, 1));
+                _inventoryService.Add(_playerInventoryId, new ItemId(itemKey));
+                Publish(new ScrollAcquiredEvent(itemKey, scroll));
             }
             else
             {

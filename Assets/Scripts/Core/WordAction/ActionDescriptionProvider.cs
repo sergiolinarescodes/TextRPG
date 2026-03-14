@@ -18,7 +18,7 @@ namespace TextRPG.Core.WordAction
             ["Stun"] = "Stuns the target, preventing action for a duration",
             ["Freeze"] = "Encases the target in ice, slowing or immobilizing them",
             ["Concussion"] = "Dazes the target, reducing accuracy",
-            ["Push"] = "Pushes the target back",
+
             ["Poison"] = "Poisons the target, dealing damage over time",
             ["Bleed"] = "Causes bleeding, dealing damage each turn",
             ["Drunk"] = "Scrambles keyboard input letters",
@@ -43,6 +43,9 @@ namespace TextRPG.Core.WordAction
             ["Mana"] = "Restores mana points",
             ["Ignite"] = "Scorches the target with fire, inflicting burns",
             ["Combust"] = "Detonates burning status for massive fire damage",
+            ["Sunder"] = "Strips positive effects from the target, dealing damage per buff removed",
+            ["Silence"] = "Prevents the target from receiving new status effects",
+            ["Smash"] = "Heavy physical damage, crushes defenses",
         };
 
         public static string Get(string actionId) =>

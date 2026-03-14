@@ -40,7 +40,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
         private readonly List<DamageTakenEvent> _damageEvents = new();
         private readonly List<HealedEvent> _healEvents = new();
         private readonly List<StatusEffectAppliedEvent> _statusApplied = new();
-        private readonly List<PushActionEvent> _pushEvents = new();
+
         private bool _summonDetected;
         private readonly List<IDisposable> _subscriptions = new();
 
@@ -76,7 +76,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             _damageEvents.Clear();
             _healEvents.Clear();
             _statusApplied.Clear();
-            _pushEvents.Clear();
+
             _summonDetected = false;
         }
 
@@ -164,9 +164,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Damage", 2), new("Burn", 3) },
                 new WordMeta("AreaEnemies", 0, 0, AreaShape.Single));
 
-            // 4. deluge — Water(4)+Damage(2)+Push(2), AreaAll, Cross
+            // 4. deluge — Water(4)+Damage(2), AreaAll, Cross
             resolver.RegisterWord("deluge",
-                new List<WordActionMapping> { new("Water", 4), new("Damage", 2), new("Push", 2) },
+                new List<WordActionMapping> { new("Water", 4), new("Damage", 2) },
                 new WordMeta("AreaAll", 0, 0, AreaShape.Cross));
 
             // 5. strike — Damage(4)+Stun(2), Melee, Single
@@ -209,9 +209,9 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new List<WordActionMapping> { new("Summon", 4) },
                 new WordMeta("Self", 0, 0, AreaShape.Single));
 
-            // 13. barrage — Damage(2)+Push(1), TwoRandomEnemies, Square3x3
+            // 13. barrage — Damage(2)+Damage(2), TwoRandomEnemies, Square3x3
             resolver.RegisterWord("barrage",
-                new List<WordActionMapping> { new("Damage", 2), new("Push", 1) },
+                new List<WordActionMapping> { new("Damage", 2), new("Damage", 2) },
                 new WordMeta("TwoRandomEnemies", 0, 0, AreaShape.Square3x3));
         }
 
@@ -249,12 +249,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             {
                 _statusApplied.Add(e);
                 Debug.Log($"[CompositionScenario] Status: {e.Type} on {e.Target.Value} {(e.Duration < 0 ? "permanently" : $"for {e.Duration} turns")}");
-            }));
-
-            _subscriptions.Add(_eventBus.Subscribe<PushActionEvent>(e =>
-            {
-                _pushEvents.Add(e);
-                Debug.Log($"[CompositionScenario] Push: {e.Source.Value} -> {e.Target.Value} (force={e.Value})");
             }));
 
             _subscriptions.Add(_eventBus.Subscribe<EntityRegisteredEvent>(e =>
@@ -307,7 +301,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
             AddInfoRow(root, "Damage Events", _damageEvents.Count.ToString(), new Color(1f, 0.3f, 0.3f));
             AddInfoRow(root, "Heal Events", _healEvents.Count.ToString(), new Color(0.2f, 0.8f, 0.2f));
             AddInfoRow(root, "Status Applied", _statusApplied.Count.ToString(), new Color(0.8f, 0.6f, 0.2f));
-            AddInfoRow(root, "Push Events", _pushEvents.Count.ToString(), new Color(0.5f, 0.7f, 1f));
+
         }
 
         private void AddEntityRow(VisualElement parent, string name, EntityId id)
@@ -378,8 +372,6 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                     HasHandler("Burn") ? null : "Burn handler not invoked"),
                 new("Water handler invoked", HasHandler("Water"),
                     HasHandler("Water") ? null : "Water handler not invoked"),
-                new("Push handler invoked", HasHandler("Push"),
-                    HasHandler("Push") ? null : "Push handler not invoked"),
                 new("Shock handler invoked", HasHandler("Shock"),
                     HasHandler("Shock") ? null : "Shock handler not invoked"),
                 new("Fear handler invoked", HasHandler("Fear"),
@@ -405,9 +397,7 @@ namespace TextRPG.Core.ActionExecution.Scenarios
                 new("Status effects applied", _statusApplied.Count > 0,
                     _statusApplied.Count > 0 ? null : "No status effects applied"),
 
-                // 18. Push events
-                new("Push events published", _pushEvents.Count > 0,
-                    _pushEvents.Count > 0 ? null : "No push events"),
+
 
                 // 20. Summon entity detected
                 new("Summon entity detected", _summonDetected,

@@ -1,25 +1,29 @@
 using System;
 using System.Collections.Generic;
+using TextRPG.Core.ActionAnimation;
 using TextRPG.Core.ActionExecution;
+using TextRPG.Core.CombatAI;
 using TextRPG.Core.CombatLoop;
 using TextRPG.Core.CombatSlot;
+using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
-using TextRPG.Core.EventEncounter;
 using TextRPG.Core.EventEncounter.Reactions;
+using TextRPG.Core.TurnSystem;
 using TextRPG.Core.WordAction;
 using TextRPG.Core.WordInput;
+using TextRPG.Core.WordInput.Scenarios;
 using Unidad.Core.EventBus;
 using Unidad.Core.Testing;
 using UnityEngine;
 using UnityEngine.UIElements;
 using EntityId = TextRPG.Core.EntityStats.EntityId;
 
-namespace TextRPG.Core.EventEncounterLoop.Scenarios
+namespace TextRPG.Core.EventEncounter.Scenarios
 {
     internal sealed class EventEncounterLoopScenario : DataDrivenScenario
     {
         private IEventBus _eventBus;
-        private IEventEncounterLoopService _loopService;
+        private ICombatLoopService _combatLoop;
         private IEventEncounterService _encounterService;
         private IEntityStatsService _entityStats;
         private EntityId _playerId;
@@ -32,11 +36,13 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
 
         private readonly List<IDisposable> _subscriptions = new();
         private readonly List<string> _eventLog = new();
+        private IDisposable _combatAIDisposable;
 
         public EventEncounterLoopScenario() : base(new TestScenarioDefinition(
             "event-encounter-loop",
-            "Event Encounter Loop",
-            "Tests event encounter loop: start, submit valid word, reject invalid word, animation-wait flag.",
+            "Event Encounter Loop (Unified)",
+            "Tests unified combat loop with event encounter entities: " +
+            "start, submit valid word, reject invalid word, animation-wait flag, interactable turns pass.",
             Array.Empty<ScenarioParameter>()
         )) { }
 
@@ -49,6 +55,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _entityStats = new EntityStatsService(_eventBus);
             var slotService = new CombatSlotService(_eventBus);
             var combatContext = new CombatContext();
+            var turnService = new TurnService(_eventBus);
 
             var outcomeRegistry = EventEncounterSystemInstaller.CreateOutcomeRegistry(null);
             var tagReactions = EventEncounterSystemInstaller.CreateTagReactionRegistry();
@@ -63,9 +70,46 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _playerId = new EntityId("player");
             PlayerDefaults.Register(_entityStats, _playerId);
 
-            var loopService = new EventEncounterLoopService(
-                _eventBus, _entityStats, wordData.Resolver, _encounterService, _playerId);
-            _loopService = loopService;
+            // Encounter adapter (no auto-end)
+            var encounterAdapter = new ScenarioEncounterAdapter();
+            encounterAdapter.SetPlayer(_playerId);
+            encounterAdapter.SetEventBus(_eventBus);
+            encounterAdapter.SetAutoEndOnAllDead(false);
+
+            // Start encounter
+            var encounter = new EventEncounterDefinition("test_room", "Test Room", new[]
+            {
+                new InteractableDefinition("Door", 5, Color.white, Array.Empty<InteractionReaction>()),
+            });
+            _encounterService.StartEncounter(encounter, _playerId);
+
+            // Register interactables as enemies in adapter
+            for (int i = 0; i < encounter.Interactables.Length; i++)
+            {
+                var def = encounter.Interactables[i];
+                var entityId = _encounterService.InteractableEntities[i];
+                var entityDef = new EntityDefinition(
+                    def.Name, def.MaxHealth, 0, 0, 0, 0, 0, def.Color,
+                    Array.Empty<string>());
+                encounterAdapter.RegisterEnemy(entityId, entityDef);
+            }
+            encounterAdapter.Activate();
+
+            // CombatAI (interactables auto-pass since empty abilities)
+            var scorers = CombatAISystemInstaller.CreateScorerRegistry(null);
+            var combatAI = new CombatAIService(_eventBus, encounterAdapter, _entityStats,
+                turnService, slotService, combatContext, null, scorers, null);
+            _combatAIDisposable = combatAI;
+
+            // Turn order
+            var turnOrder = new List<EntityId> { _playerId };
+            turnOrder.AddRange(_encounterService.InteractableEntities);
+            turnService.SetTurnOrder(turnOrder);
+
+            // CombatLoopService (unified)
+            var loopService = new CombatLoopService(
+                _eventBus, turnService, _entityStats, wordData.Resolver, null, _playerId);
+            _combatLoop = loopService;
 
             _subscriptions.Add(_eventBus.Subscribe<WordSubmittedEvent>(evt =>
             {
@@ -73,30 +117,26 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
                 Debug.Log($"[EventEncounterLoopScenario] Word submitted: {evt.Word}");
             }));
 
-            // Start encounter + loop
-            var encounter = new EventEncounterDefinition("test_room", "Test Room", new[]
-            {
-                new InteractableDefinition("Door", 5, Color.white, Array.Empty<InteractionReaction>()),
-            });
-            _encounterService.StartEncounter(encounter, _playerId);
-            _loopService.Start();
-            _loopStarted = _loopService.IsActive;
+            // Start loop
+            loopService.Start();
+            _loopStarted = _combatLoop.IsPlayerTurn;
 
             // Submit invalid word
-            _invalidWordResult = _loopService.SubmitWord("zzzznotaword");
+            _invalidWordResult = _combatLoop.SubmitWord("zzzznotaword");
 
-            // Submit a valid word (from test data — need a word that exists in the resolver)
+            // Submit a valid word (from test data)
             var testWord = GetFirstTestWord(wordData.Resolver);
             if (testWord != null)
             {
-                _validWordResult = _loopService.SubmitWord(testWord);
-                _loopActiveAfterSubmit = _loopService.IsActive;
+                _validWordResult = _combatLoop.SubmitWord(testWord);
+                _loopActiveAfterSubmit = !_combatLoop.IsGameOver;
 
                 // While waiting for animation, another submit should be rejected
-                _duringAnimationResult = _loopService.SubmitWord(testWord);
+                // (not player turn — turn advanced to interactable)
+                _duringAnimationResult = _combatLoop.SubmitWord(testWord);
 
-                // Simulate animation completed
-                _eventBus.Publish(new ActionAnimation.ActionAnimationCompletedEvent(testWord));
+                // Simulate animation completed — triggers turn advance through interactables back to player
+                _eventBus.Publish(new ActionAnimationCompletedEvent(testWord));
             }
             else
             {
@@ -110,7 +150,6 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
 
         private static string GetFirstTestWord(IWordResolver resolver)
         {
-            // WordActionTestFactory creates test data with known words — try common ones
             string[] candidates = { "ember", "bandage", "spark", "tsunami", "inferno", "abyss", "absorb" };
             foreach (var word in candidates)
             {
@@ -130,7 +169,7 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             root.style.paddingTop = 20;
             root.style.paddingLeft = 20;
 
-            var title = new Label("Event Encounter Loop");
+            var title = new Label("Event Encounter Loop (Unified)");
             title.style.fontSize = 24;
             title.style.color = Color.white;
             title.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -153,8 +192,8 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             {
                 new("Scene root created", SceneRoot != null,
                     SceneRoot != null ? null : "No scene root"),
-                new("Loop started", _loopStarted,
-                    _loopStarted ? null : "Loop did not start"),
+                new("Loop started (player turn)", _loopStarted,
+                    _loopStarted ? null : "Loop did not start — not player turn"),
                 new("Invalid word rejected", _invalidWordResult == WordSubmitResult.InvalidWord,
                     _invalidWordResult == WordSubmitResult.InvalidWord
                         ? null : $"Expected InvalidWord, got {_invalidWordResult}"),
@@ -177,10 +216,12 @@ namespace TextRPG.Core.EventEncounterLoop.Scenarios
             _subscriptions.Clear();
             _eventLog.Clear();
 
-            (_loopService as IDisposable)?.Dispose();
+            (_combatLoop as IDisposable)?.Dispose();
+            _combatAIDisposable?.Dispose();
             (_encounterService as IDisposable)?.Dispose();
             (_entityStats as IDisposable)?.Dispose();
-            _loopService = null;
+            _combatLoop = null;
+            _combatAIDisposable = null;
             _encounterService = null;
             _entityStats = null;
             _eventBus?.ClearAllSubscriptions();

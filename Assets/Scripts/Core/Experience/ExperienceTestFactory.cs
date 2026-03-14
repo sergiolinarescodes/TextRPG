@@ -10,7 +10,7 @@ namespace TextRPG.Core.Experience
 
         public object CreateForTesting(TestDependencies deps)
         {
-            return new ExperienceService(deps.EventBus, null);
+            return new ExperienceService(deps.EventBus);
         }
 
         public IEnumerable<ITestScenario> GetScenarios()

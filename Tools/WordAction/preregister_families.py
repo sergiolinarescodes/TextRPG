@@ -222,7 +222,7 @@ FAMILIES = [
      "actions": [{"action": "Damage", "value": 3}, {"action": "Scramble", "value": 1}]},
     {"word": "cyclone",    "target": "AllEnemies",  "cost": 3, "range": 0, "area": "Single",
      "tags": ["ELEMENTAL", "OFFENSIVE", "WEATHER", "NATURE"],
-     "actions": [{"action": "Damage", "value": 2}, {"action": "Push", "value": 2}]},
+     "actions": [{"action": "Damage", "value": 2}, {"action": "Scramble", "value": 2}]},
 
     # --- Cannonade family (multi-hit random targeting) ---
     {"word": "volley",      "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
@@ -331,12 +331,32 @@ FAMILIES = [
     {"word": "singe",       "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
      "tags": ["ELEMENTAL", "OFFENSIVE", "FIRE"],
      "actions": [{"action": "Ignite", "value": 1}]},
-    {"word": "cauterize",   "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
-     "tags": ["ELEMENTAL", "OFFENSIVE", "FIRE"],
-     "actions": [{"action": "Ignite", "value": 2}]},
+    {"word": "cauterize",   "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["FIRE", "OFFENSIVE", "RESTORATION", "MEDICAL"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Damage", "value": 2}]},
     {"word": "incinerate",  "target": "SingleEnemy", "cost": 3, "range": 0, "area": "Single",
      "tags": ["ELEMENTAL", "OFFENSIVE", "FIRE"],
      "actions": [{"action": "Ignite", "value": 3}]},
+
+    # --- Boil family (burn + water + damage combo) ---
+    {"word": "steam",      "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["FIRE", "ELEMENTAL", "OFFENSIVE"],
+     "actions": [{"action": "Burn", "value": 1}, {"action": "Water", "value": 2}, {"action": "Damage", "value": 2}]},
+    {"word": "geyser",     "target": "AllEnemies",  "cost": 4, "range": 0, "area": "Single",
+     "tags": ["FIRE", "ELEMENTAL", "OFFENSIVE", "NATURE"],
+     "actions": [{"action": "Burn", "value": 2}, {"action": "Water", "value": 3}, {"action": "Damage", "value": 2}]},
+    {"word": "simmer",     "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["FIRE", "ELEMENTAL"],
+     "actions": [{"action": "Burn", "value": 1}, {"action": "Water", "value": 1}]},
+    {"word": "seethe",     "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["FIRE", "ELEMENTAL", "OFFENSIVE", "DEBUFF"],
+     "actions": [{"action": "Burn", "value": 2}, {"action": "Water", "value": 2}, {"action": "Damage", "value": 2}]},
+    {"word": "blister",    "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["FIRE", "OFFENSIVE", "DEBUFF"],
+     "actions": [{"action": "Burn", "value": 2}, {"action": "Damage", "value": 2}]},
+    {"word": "stew",       "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["FIRE", "ELEMENTAL"],
+     "actions": [{"action": "Burn", "value": 1}, {"action": "Water", "value": 2}, {"action": "Damage", "value": 1}]},
 
     # --- Combust family (detonate burning) ---
     {"word": "detonate",    "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
@@ -357,6 +377,58 @@ FAMILIES = [
     {"word": "implode",     "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
      "tags": ["ELEMENTAL", "OFFENSIVE", "FIRE"],
      "actions": [{"action": "Combust", "value": 2}]},
+
+    # --- Cauterize family (remove bleeding) ---
+    {"word": "tourniquet",  "target": "Self",        "cost": 1, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "SUPPORT", "DEFENSIVE"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Shield", "value": 1}]},
+    {"word": "compress",    "target": "Self",        "cost": 1, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "RESTORATION", "SUPPORT"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Heal", "value": 1}]},
+    {"word": "staunch",     "target": "Self",        "cost": 0, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "SUPPORT"],
+     "actions": [{"action": "Cauterize", "value": 1}]},
+    {"word": "suture",      "target": "Self",        "cost": 1, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "RESTORATION"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Heal", "value": 2}]},
+    {"word": "styptic",     "target": "Self",        "cost": 0, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "SUPPORT"],
+     "actions": [{"action": "Cauterize", "value": 1}]},
+    {"word": "clot",        "target": "Self",        "cost": 0, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "NATURE"],
+     "actions": [{"action": "Cauterize", "value": 1}]},
+    {"word": "coagulate",   "target": "Self",        "cost": 1, "range": 0, "area": "Single",
+     "tags": ["MEDICAL", "SUPPORT", "DEFENSIVE"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Shield", "value": 1}]},
+    {"word": "brand",       "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["FIRE", "OFFENSIVE", "MEDICAL"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Burn", "value": 1}, {"action": "Damage", "value": 1}]},
+    {"word": "scald",       "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["FIRE", "OFFENSIVE", "MEDICAL"],
+     "actions": [{"action": "Cauterize", "value": 1}, {"action": "Burn", "value": 2}]},
+
+    # --- Visceral family (heavy damage + bleed) ---
+    {"word": "gore",        "target": "Melee",       "cost": 1, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "DEBUFF"],
+     "actions": [{"action": "Damage", "value": 3}, {"action": "Bleed", "value": 1}]},
+    {"word": "maul",        "target": "Melee",       "cost": 2, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "DEBUFF"],
+     "actions": [{"action": "Damage", "value": 4}, {"action": "Bleed", "value": 1}]},
+    {"word": "mutilate",    "target": "Melee",       "cost": 2, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "DEBUFF"],
+     "actions": [{"action": "Damage", "value": 3}, {"action": "Bleed", "value": 3}]},
+    {"word": "savage",      "target": "Melee",       "cost": 2, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "BEAST"],
+     "actions": [{"action": "Damage", "value": 4}, {"action": "Bleed", "value": 2}]},
+    {"word": "ravage",      "target": "Melee",       "cost": 2, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "DEBUFF"],
+     "actions": [{"action": "Damage", "value": 4}, {"action": "Bleed", "value": 2}]},
+    {"word": "rend",        "target": "Melee",       "cost": 1, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "DEBUFF"],
+     "actions": [{"action": "Damage", "value": 3}, {"action": "Bleed", "value": 2}]},
+    {"word": "disembowel",  "target": "Melee",       "cost": 3, "range": 0, "area": "Single",
+     "tags": ["PHYSICAL", "OFFENSIVE", "MELEE", "DEBUFF"],
+     "actions": [{"action": "Damage", "value": 5}, {"action": "Bleed", "value": 3}]},
 
     # --- Mercenary family (summon recruitable melee fighter) ---
     {"word": "soldier",     "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
@@ -569,6 +641,226 @@ FAMILIES = [
     {"word": "pin",          "target": "SingleEnemy", "cost": 8, "range": 0, "area": "Single",
      "tags": ["TOOL", "STEALTH"],
      "actions": [{"action": "Lockpick", "value": 1}]},
+
+    # --- Sunder family (strip positive effects + damage) ---
+    {"word": "cancel",      "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF"],
+     "actions": [{"action": "Sunder", "value": 1}]},
+    {"word": "annul",       "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF"],
+     "actions": [{"action": "Sunder", "value": 1}]},
+    {"word": "nullify",     "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF", "PSYCHIC"],
+     "actions": [{"action": "Sunder", "value": 2}]},
+    {"word": "dispel",      "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF"],
+     "actions": [{"action": "Sunder", "value": 2}]},
+    {"word": "rescind",     "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF"],
+     "actions": [{"action": "Sunder", "value": 2}]},
+    {"word": "abolish",     "target": "AllEnemies",  "cost": 3, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF", "OFFENSIVE"],
+     "actions": [{"action": "Sunder", "value": 1}]},
+    {"word": "negate",      "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF"],
+     "actions": [{"action": "Sunder", "value": 2}]},
+    {"word": "repeal",      "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF"],
+     "actions": [{"action": "Sunder", "value": 1}]},
+    {"word": "invalidate",  "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["NULLIFY", "DEBUFF", "PSYCHIC"],
+     "actions": [{"action": "Sunder", "value": 2}, {"action": "Silence", "value": 1}]},
+    # --- Silence family (prevent new status effects) ---
+    {"word": "mute",        "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF"],
+     "actions": [{"action": "Silence", "value": 2}]},
+    {"word": "hush",        "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF"],
+     "actions": [{"action": "Silence", "value": 2}]},
+    {"word": "gag",         "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF", "PHYSICAL"],
+     "actions": [{"action": "Silence", "value": 1}]},
+    {"word": "censor",      "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF", "PSYCHIC"],
+     "actions": [{"action": "Silence", "value": 3}]},
+    {"word": "suppress",    "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF", "PSYCHIC"],
+     "actions": [{"action": "Silence", "value": 2}, {"action": "Sunder", "value": 1}]},
+    {"word": "muffle",      "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF"],
+     "actions": [{"action": "Silence", "value": 2}]},
+    {"word": "squelch",     "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF"],
+     "actions": [{"action": "Silence", "value": 2}]},
+    {"word": "stifle",      "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CONTROL", "DEBUFF"],
+     "actions": [{"action": "Silence", "value": 1}]},
+
+    # --- Vampiric family (damage enemy + heal self, per-action targeting) ---
+    {"word": "leech",       "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["SHADOW", "OFFENSIVE", "RESTORATION"],
+     "actions": [
+         {"action": "Damage", "value": 2, "target": "SingleEnemy"},
+         {"action": "Heal", "value": 1, "target": "Self"}
+     ]},
+    {"word": "devour",      "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["SHADOW", "OFFENSIVE", "BEAST"],
+     "actions": [
+         {"action": "Damage", "value": 3, "target": "SingleEnemy"},
+         {"action": "Heal", "value": 2, "target": "Self"}
+     ]},
+    {"word": "siphon",      "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["SHADOW", "OFFENSIVE", "ARCANE"],
+     "actions": [
+         {"action": "MagicDamage", "value": 3, "target": "SingleEnemy"},
+         {"action": "Heal", "value": 2, "target": "Self"}
+     ]},
+    {"word": "consume",     "target": "SingleEnemy", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["SHADOW", "OFFENSIVE"],
+     "actions": [
+         {"action": "Damage", "value": 3, "target": "SingleEnemy"},
+         {"action": "Heal", "value": 1, "target": "Self"}
+     ]},
+
+    # --- Sacrifice family (high damage + self-harm, per-action targeting) ---
+    {"word": "immolate",    "target": "SingleEnemy", "cost": 3, "range": 0, "area": "Single",
+     "tags": ["FIRE", "OFFENSIVE", "SHADOW"],
+     "actions": [
+         {"action": "Burn", "value": 3, "target": "SingleEnemy"},
+         {"action": "Burn", "value": 1, "target": "Self"}
+     ]},
+    {"word": "kamikaze",    "target": "AllEnemies", "cost": 3, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "SHADOW"],
+     "actions": [
+         {"action": "Damage", "value": 4, "target": "AllEnemies"},
+         {"action": "Damage", "value": 3, "target": "Self"}
+     ]},
+    {"word": "offering",    "target": "AllAllies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["HOLY", "SUPPORT", "SHADOW"],
+     "actions": [
+         {"action": "Heal", "value": 2, "target": "AllAllies"},
+         {"action": "Damage", "value": 2, "target": "Self"}
+     ]},
+    {"word": "bloodpact",   "target": "Self", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["SHADOW", "SUPPORT"],
+     "actions": [
+         {"action": "BuffStrength", "value": 3, "target": "Self"},
+         {"action": "Damage", "value": 2, "target": "Self"}
+     ]},
+
+    # --- Rally family (buff allies + debuff enemies, per-action targeting) ---
+    {"word": "rally",       "target": "AllAlliesAndSelf", "cost": 3, "range": 0, "area": "Single",
+     "tags": ["SUPPORT", "SOCIAL"],
+     "actions": [
+         {"action": "BuffStrength", "value": 1, "target": "AllAlliesAndSelf"},
+         {"action": "Fear", "value": 1, "target": "AllEnemies"}
+     ]},
+    {"word": "inspire",     "target": "AllAlliesAndSelf", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["SUPPORT", "SOCIAL"],
+     "actions": [
+         {"action": "BuffStrength", "value": 1, "target": "AllAlliesAndSelf"},
+         {"action": "Heal", "value": 1, "target": "AllAllies"}
+     ]},
+    {"word": "intimidate",  "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "SOCIAL", "DEBUFF"],
+     "actions": [
+         {"action": "Fear", "value": 2, "target": "AllEnemies"},
+         {"action": "DebuffStrength", "value": 1, "target": "AllEnemies"}
+     ]},
+
+    # --- Flutter family (Scramble + Damage + Attune, AoE disruption) ---
+    {"word": "flurry",   "target": "AllEnemies", "cost": 3, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "CONTROL", "AIR"],
+     "actions": [
+         {"action": "Scramble", "value": 1, "target": "AllEnemies"},
+         {"action": "Damage", "value": 2, "target": "AllEnemies"},
+         {"action": "Attune", "value": 1, "target": "Self"}
+     ]},
+    {"word": "whirl",    "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "CONTROL", "AIR"],
+     "actions": [
+         {"action": "Scramble", "value": 1, "target": "AllEnemies"},
+         {"action": "Damage", "value": 1, "target": "AllEnemies"}
+     ]},
+    {"word": "swirl",    "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "CONTROL", "AIR", "ELEMENTAL"],
+     "actions": [
+         {"action": "Scramble", "value": 1, "target": "AllEnemies"},
+         {"action": "Damage", "value": 1, "target": "AllEnemies"}
+     ]},
+    {"word": "flit",     "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "AIR"],
+     "actions": [
+         {"action": "Damage", "value": 1},
+         {"action": "Scramble", "value": 1}
+     ]},
+    {"word": "scatter",  "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "CONTROL", "AIR"],
+     "actions": [
+         {"action": "Scramble", "value": 1, "target": "AllEnemies"},
+         {"action": "Scramble", "value": 1, "target": "AllEnemies"}
+     ]},
+    {"word": "flicker",  "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "AIR", "LIGHT"],
+     "actions": [
+         {"action": "Damage", "value": 1},
+         {"action": "Scramble", "value": 1}
+     ]},
+    {"word": "tumble",   "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["OFFENSIVE", "PHYSICAL", "AIR"],
+     "actions": [
+         {"action": "Damage", "value": 2},
+         {"action": "Scramble", "value": 1}
+     ]},
+    {"word": "breeze",   "target": "AllEnemies", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["AIR", "NATURE", "ELEMENTAL"],
+     "actions": [
+         {"action": "Scramble", "value": 1, "target": "AllEnemies"}
+     ]},
+    {"word": "zephyr",   "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["AIR", "NATURE", "ELEMENTAL", "SUPPORT"],
+     "actions": [
+         {"action": "Scramble", "value": 2, "target": "AllEnemies"},
+         {"action": "Attune", "value": 1, "target": "Self"}
+     ]},
+    {"word": "updraft",  "target": "AllEnemies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["AIR", "NATURE", "OFFENSIVE"],
+     "actions": [
+         {"action": "Scramble", "value": 3, "target": "AllEnemies"},
+         {"action": "Damage", "value": 1, "target": "AllEnemies"}
+     ]},
+
+    # --- Forge/Craft family (per-action targeting, sacrifice pattern) ---
+    {"word": "anvil",       "target": "Self", "cost": 5, "range": 0, "area": "Single",
+     "tags": ["CRAFT", "PHYSICAL", "SUPPORT"],
+     "actions": [{"action": "Summon", "value": 3}]},
+    {"word": "smith",       "target": "AllAllies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["CRAFT", "PHYSICAL", "SUPPORT"],
+     "actions": [
+         {"action": "BuffStrength", "value": 1, "target": "AllAllies"},
+         {"action": "BuffPhysicalDefense", "value": 1, "target": "AllAllies"}
+     ]},
+    {"word": "temper",      "target": "Self", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["CRAFT", "FIRE", "DEFENSIVE"],
+     "actions": [
+         {"action": "Hardening", "value": 2, "target": "Self"},
+         {"action": "Burn", "value": 1, "target": "Self"}
+     ]},
+    {"word": "weld",        "target": "Self", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CRAFT", "FIRE", "SUPPORT"],
+     "actions": [
+         {"action": "Shield", "value": 2, "target": "Self"},
+         {"action": "Burn", "value": 1, "target": "Self"}
+     ]},
+    {"word": "hammer",      "target": "SingleEnemy", "cost": 1, "range": 0, "area": "Single",
+     "tags": ["CRAFT", "PHYSICAL", "OFFENSIVE", "MELEE"],
+     "actions": [{"action": "Smash", "value": 3}]},
+    {"word": "bellows",     "target": "AllAllies", "cost": 2, "range": 0, "area": "Single",
+     "tags": ["CRAFT", "FIRE", "SUPPORT"],
+     "actions": [
+         {"action": "BuffStrength", "value": 2, "target": "AllAllies"},
+         {"action": "Burn", "value": 1, "target": "Self"}
+     ]},
 ]
 
 

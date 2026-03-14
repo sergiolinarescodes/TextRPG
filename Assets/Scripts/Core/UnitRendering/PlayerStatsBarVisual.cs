@@ -35,6 +35,7 @@ namespace TextRPG.Core.UnitRendering
         private readonly Dictionary<StatType, Label> _statLabels = new();
         private readonly List<IDisposable> _subscriptions = new();
 
+        private readonly List<IDisposable> _statusTooltipHandles = new();
         private VisualElement _statusRow;
         private VisualElement _statusEffectsContainer;
         private Label _goldLabel;
@@ -169,6 +170,8 @@ namespace TextRPG.Core.UnitRendering
         {
             foreach (var sub in _subscriptions) sub.Dispose();
             _subscriptions.Clear();
+            foreach (var h in _statusTooltipHandles) h.Dispose();
+            _statusTooltipHandles.Clear();
             _statLabels.Clear();
             _statusEffectsContainer = null;
             _statusRow = null;
@@ -432,6 +435,9 @@ namespace TextRPG.Core.UnitRendering
         private void UpdateStatusEffects()
         {
             if (_statusEffectsContainer == null || _statusRow == null) return;
+
+            foreach (var h in _statusTooltipHandles) h.Dispose();
+            _statusTooltipHandles.Clear();
             _statusEffectsContainer.Clear();
 
             var effects = _statusEffects.GetEffects(_playerId);
@@ -457,12 +463,26 @@ namespace TextRPG.Core.UnitRendering
 
                 var eff = effects[i];
                 var def = StatusEffectDefinitions.Get(eff.Type);
-                string text = eff.StackCount > 1 ? $"{def.DisplayName}({eff.StackCount})" : def.DisplayName;
-                var label = new Label(text);
+                var displayText = eff.StackCount > 1
+                    ? $"{def.DisplayName} {eff.StackCount}"
+                    : !eff.IsPermanent
+                        ? $"{def.DisplayName} {eff.RemainingDuration}"
+                        : def.DisplayName;
+                var label = new Label(displayText);
                 label.style.fontSize = 22;
                 label.style.unityFontStyleAndWeight = FontStyle.Bold;
                 label.style.color = def.DisplayColor;
                 col.Add(label);
+
+                if (_tooltipService != null)
+                {
+                    var instance = eff;
+                    var content = TooltipContent.FromCustom(() =>
+                        TooltipContentBuilder.BuildStatusEffectTooltipContent(instance));
+                    var handle = _tooltipService.RegisterHover(
+                        label, content, TooltipPlacement.Bottom, TooltipStyles.EntityTooltip);
+                    _statusTooltipHandles.Add(handle);
+                }
             }
         }
     }

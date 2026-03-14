@@ -146,6 +146,24 @@ namespace TextRPG.Core.EntityStats
             return true;
         }
 
+        public void AdjustCurrentHealth(EntityId id, int delta)
+        {
+            var entry = GetEntry(id);
+            if (entry.CurrentHealth <= 0) return;
+            var maxHealth = GetStat(id, StatType.MaxHealth);
+            entry.CurrentHealth = Math.Clamp(entry.CurrentHealth + delta, 1, maxHealth);
+        }
+
+        public void AdjustCurrentMana(EntityId id, int delta)
+        {
+            var entry = GetEntry(id);
+            var maxMana = GetStat(id, StatType.MaxMana);
+            var previous = entry.CurrentMana;
+            entry.CurrentMana = Math.Clamp(entry.CurrentMana + delta, 0, maxMana);
+            if (entry.CurrentMana != previous)
+                Publish(new ManaChangedEvent(id, entry.CurrentMana, previous));
+        }
+
         public void AddModifier(EntityId id, StatType stat, IModifier<int> modifier)
         {
             var entry = GetEntry(id);

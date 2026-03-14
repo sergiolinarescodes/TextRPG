@@ -18,10 +18,14 @@ namespace TextRPG.Core.ActionExecution.Handlers
 
         public void Execute(ActionContext context)
         {
-            var sourceMagic = _entityStats.GetStat(context.Source, StatType.MagicPower);
-            var manaGain = StatScaling.SupportScale(context.Value, sourceMagic, StatScaling.WeakDivisor);
-            _entityStats.ApplyMana(context.Source, manaGain);
-            _statusEffects.ApplyEffect(context.Source, StatusEffectType.Concentrated, 2, context.Source);
+            for (int i = 0; i < context.Targets.Count; i++)
+            {
+                var target = context.Targets[i];
+                var magic = _entityStats.GetStat(target, StatType.MagicPower);
+                var manaGain = StatScaling.SupportScale(context.Value, magic, StatScaling.WeakDivisor);
+                _entityStats.ApplyMana(target, manaGain);
+                _statusEffects.ApplyEffect(target, StatusEffectType.Concentrated, 2, context.Source);
+            }
         }
     }
 }

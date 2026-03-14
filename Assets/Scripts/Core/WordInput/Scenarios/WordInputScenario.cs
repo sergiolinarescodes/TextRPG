@@ -9,7 +9,6 @@ using TextRPG.Core.Encounter;
 using TextRPG.Core.EntityStats;
 using TextRPG.Core.EventEncounter;
 using TextRPG.Core.Experience;
-using TextRPG.Core.EventEncounterLoop;
 using TextRPG.Core.Passive;
 using TextRPG.Core.PlayerClass;
 using TextRPG.Core.Run;
@@ -21,6 +20,7 @@ using TextRPG.Core.WordAction;
 using TextRPG.Core.WordCooldown;
 using Unidad.Core.Abstractions;
 using Unidad.Core.EventBus;
+using Unidad.Core.Inventory;
 using Unidad.Core.Testing;
 using Unidad.Core.UI.TextAnimation.ElementAnimation;
 using Unidad.Core.UI.Tooltip;
@@ -132,7 +132,7 @@ namespace TextRPG.Core.WordInput.Scenarios
             // Equipment controller (builds left + right bars)
             _equipment = new EquipmentVisualController(s.EventBus, s.EquipmentService,
                 s.InventoryService, s.ItemRegistry, s.WeaponService, s.ConsumableService,
-                s.PlayerInventoryId, playerId, root);
+                s.PlayerInventoryId, playerId, root, s.SpellService);
             _equipment.BuildBars(middleArea);
 
             // Word input controller (builds main text panel)
@@ -144,9 +144,17 @@ namespace TextRPG.Core.WordInput.Scenarios
             var mainTextPanel = _wordInput.BuildInputArea(vibrationAmplitude);
             middleArea.Insert(1, mainTextPanel); // between left and right bars
 
-            // Wire weapon/consumable click actions
+            // Wire weapon/consumable/scroll click actions
             _equipment.FireWeaponAction = () => _wordInput.FireWeapon();
             _equipment.UseConsumableAction = () => _wordInput.UseConsumable();
+            _equipment.UseInventoryItemAction = itemKey =>
+            {
+                if (s.SpellService != null && s.SpellService.TryGetScrollItem(itemKey, out var scroll))
+                {
+                    s.SpellService.LearnSpell(scroll);
+                    s.InventoryService.TryRemove(s.PlayerInventoryId, new ItemId(itemKey));
+                }
+            };
 
             // Letter challenge visual (bottom-right corner)
             _letterChallenge = new LetterChallenge.LetterChallengeVisual(s.EventBus, root, playerId);
@@ -234,9 +242,10 @@ namespace TextRPG.Core.WordInput.Scenarios
                 _equipment.LeftBar.GetAllSlotElements(),
                 _frameworkTooltipService,
                 s.SlotService, s.StatusEffects, s.UnitService, s.PassiveService,
-                _encounterAdapter, s.ActionRegistry, s.HandlerRegistry, s.EnemyResolver,
+                null, s.ActionRegistry, s.HandlerRegistry, s.EnemyResolver,
                 s.AmmoResolver, s.WeaponService, s.ConsumableService, s.EquipmentService,
                 s.ItemRegistry, s.EntityStats, s.InventoryService, s.PlayerInventoryId, playerId);
+            _tooltipService.SetSpellService(s.SpellService, s.WordResolver);
 
             // Loot overlay controller
             _loot = new LootOverlayController(s.EventBus, s.LootRewardService,
@@ -336,9 +345,11 @@ namespace TextRPG.Core.WordInput.Scenarios
         private void StartEventNode(EventEncounterDefinition encounter)
         {
             _eventScope = _session.StartEvent(encounter);
+            _encounterAdapter = _eventScope.EncounterAdapter;
             _eventEncounterService = _eventScope.EncounterService;
-            _wordInput.SetEventLoop(_eventScope.LoopService);
+            _tooltipService?.SetEncounterService(_encounterAdapter);
             _tooltipService?.SetEventEncounterService(_eventEncounterService);
+            _wordInput.SetCombatLoop(_eventScope.CombatLoop);
             _wordInput.SetInputEnabled(true);
         }
 
@@ -355,7 +366,6 @@ namespace TextRPG.Core.WordInput.Scenarios
             _tooltipService?.SetEncounterService(null);
             _tooltipService?.SetEventEncounterService(null);
             _wordInput.SetCombatLoop(null);
-            _wordInput.SetEventLoop(null);
         }
 
         private void UpdateNodeProgressLabel(int nodeIndex, RunNodeType nodeType)
