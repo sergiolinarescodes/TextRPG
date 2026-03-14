@@ -77,7 +77,7 @@ Output JSON array:
         "actions": [
             {"action": "Water", "value": 5},
             {"action": "Damage", "value": 5},
-            {"action": "Push", "value": 2}
+            {"action": "Scramble", "value": 1}
         ]
     },
     {
@@ -409,9 +409,9 @@ The full mana range is **0–20**. Use the ENTIRE range to create meaningful cos
 | 0 | Free | Single weak action (value 1). Common short words. | scratch → Damage:1, drip → Water:1 |
 | 1–2 | Cheap | Single action (value 2–3) or weak 2-action combo | flame → Burn:2, sting → Damage:2 + Poison:1 |
 | 3–4 | Standard | Solid single action (value 4–5) or good 2-action combo | slash → Cleave:3 + Bleed:1, heal → Heal:4 |
-| 5–7 | Strong | Powerful combo (2–3 actions), strong AoE, or impactful debuff | tornado → Damage:4 + Push:2 + Scramble:1 |
+| 5–7 | Strong | Powerful combo (2–3 actions), strong AoE, or impactful debuff | tornado → Damage:4 + Scramble:2 + Scramble:1 |
 | 8–10 | Premium | Devastating multi-action, wide AoE, or elite summon | earthquake → Damage:6 + Stun:2 (AllEnemies), fortress → Summon:5 |
-| 11–14 | Epic | Massive power with 3–4 high-value actions or game-changing effects | armageddon → Cataclysm:8 (All), tsunami → Water:7 + Damage:7 + Push:3 |
+| 11–14 | Epic | Massive power with 3–4 high-value actions or game-changing effects | armageddon → Cataclysm:8 (All), tsunami → Water:7 + Damage:7 + Scramble:3 |
 | 15–20 | Legendary | Ultimate abilities. World-ending damage, full-party effects, or supreme summons. Reserved for long, rare, powerful words. | annihilation → Cataclysm:10 (All) + Fear:3, resurrection → Heal:10 + Purify:5 (AllAlliesAndSelf) |
 
 **Cost modifiers:**
@@ -479,13 +479,13 @@ Revise entries with identical profiles. But do NOT downgrade borderline words to
 |---------|------------|---------|
 | **1 action** | Simple, focused words. Most cheap words. | scratch → Damage:1, heal → Heal:3, burn → Burn:2 |
 | **2 actions** | Standard combos. Most mid-cost words. | slash → Cleave:3 + Bleed:1, shock → Shock:2 + Stun:1 |
-| **3 actions** | Strong words with multiple real-world effects. | tornado → Damage:4 + Push:2 + Scramble:1 |
-| **4+ actions** | Epic/legendary words. Rare, expensive, devastating. | tsunami → Water:7 + Damage:7 + Push:3 + Scramble:2 |
+| **3 actions** | Strong words with multiple real-world effects. | tornado → Damage:4 + Scramble:2 + Scramble:1 |
+| **4+ actions** | Epic/legendary words. Rare, expensive, devastating. | tsunami → Water:7 + Damage:7 + Scramble:3 + Scramble:2 |
 
 **Guideline**: Ask "What would this ACTUALLY do?" Each real consequence = an action. But don't force extra actions on simple words — "punch" is just Damage, and that's fine.
 
 ### General rules
-- **Word meaning drives effects**: "avalanche" → Damage + Push + Water; "whisper" → Fear
+- **Word meaning drives effects**: "avalanche" → Damage + Scramble + Water; "whisper" → Fear
 - **Longer/rarer words = stronger**: 3-4 letter = weak (value 1-2, cost 0-1), 5-7 letter = moderate (value 2-5, cost 2-7), 8+ letter = powerful (value 4-10, cost 5-20)
 - **Cost scales with power** across the full 0-20 range. Use the whole range.
 - **Range**: always `0` (slot system, everything in range)
